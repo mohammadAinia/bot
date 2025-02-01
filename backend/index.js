@@ -445,6 +445,7 @@ const STATES = {
     PHONE_INPUT: "phone_input",
     EMAIL: 3,
     ADDRESS: 4,
+    QUANTITY: 6,  // Add the QUANTITY state
     CONFIRMATION: 5
 };
 
@@ -668,6 +669,14 @@ app.post('/webhook', async (req, res) => {
 
             case STATES.ADDRESS:
                 session.data.address = textRaw;
+
+            case STATES.QUANTITY:
+                // Validate that the input is a number
+                if (isNaN(textRaw) || textRaw.trim() === "") {
+                    await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
+                    return res.sendStatus(200);
+                }
+                session.data.quantity = textRaw;
                 session.step = STATES.CONFIRMATION;
 
                 let summary = `✅ *Order Summary:*\n\n`;
@@ -675,11 +684,13 @@ app.post('/webhook', async (req, res) => {
                 summary += `📞 *Phone Number:* ${session.data.phone}\n`;
                 summary += `📧 *Email:* ${session.data.email}\n`;
                 summary += `📍 *Address:* ${session.data.address}\n`;
+                summary += `📦 *Quantity:* ${session.data.quantity}\n`;
                 summary += `🛢 *Request Type:* ${session.data.type}\n\n`;
                 summary += `Is the information correct? Please reply with *Yes* or *No*`;
 
                 await sendToWhatsApp(from, summary);
                 break;
+
 
             case STATES.CONFIRMATION:
                 if (text.includes("yes")) {
@@ -689,13 +700,19 @@ app.post('/webhook', async (req, res) => {
                         email: session.data.email,
                         phone_number: session.data.phone,
                         address: session.data.address,
+                        quantity: session.data.quantity // Include quantity in the request data
                     };
 
-                    await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
-                        headers: { 'Content-Type': 'application/json' }
-                    });
+                    try {
+                        await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
+                            headers: { 'Content-Type': 'application/json' }
+                        });
 
-                    await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
+                        await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
+                    } catch (error) {
+                        console.error('❌ Error sending to API:', error.response?.data || error.message);
+                        await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
+                    }
                 } else {
                     await sendToWhatsApp(from, "❌ Order has been canceled. You can retry anytime.");
                 }
