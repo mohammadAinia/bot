@@ -442,7 +442,8 @@ const STATES = {
     WELCOME: 0,
     FAQ: "faq",
     NAME: 1,
-    PHONE: 2,
+    PHONE_CONFIRM: "phone_confirm", // هل تريد استخدام رقم المرسل؟
+    PHONE_INPUT: "phone_input",     // إدخال رقم هاتف بديل
     EMAIL: 3,
     ADDRESS: 4,
     CONFIRMATION: 5
@@ -562,7 +563,7 @@ app.post('/webhook', async (req, res) => {
         if (!userSessions[from]) {
             userSessions[from] = { step: STATES.WELCOME, data: {} };
 
-            // قائمة عبارات التحية (بدلاً من regex نستخدم includes لتتبع التحية مع النص العربي)
+            // قائمة عبارات التحية (باستخدام includes لمطابقة النص العربي)
             const greetings = [
                 "السلام عليكم",
                 "السلام عليكم ورحمة الله",
@@ -573,7 +574,6 @@ app.post('/webhook', async (req, res) => {
                 "سلام"
             ];
 
-            // التحقق مما إذا كان النص يحتوي على أي عبارة من عبارات التحية باستخدام includes
             let isGreeting = greetings.some(greeting => text.includes(greeting.toLowerCase()));
 
             let welcomeText = "";
@@ -619,27 +619,39 @@ app.post('/webhook', async (req, res) => {
             case STATES.FAQ:
                 // قائمة عبارات إنهاء المحادثة
                 const terminationPhrases = ["شكرا", "اغلاق", "اغلاق المحادثة", "يعطيك العافية"];
-                // التحقق مما إذا كانت الرسالة تحتوي على عبارة إنهاء
                 if (terminationPhrases.some(phrase => text.includes(phrase))) {
                     await sendToWhatsApp(from, "تم إغلاق المحادثة. إذا كنت تحتاج إلى أي مساعدة مستقبلية، فلا تتردد في التواصل معنا.");
                     delete userSessions[from];
                     break;
                 }
                 
-                // إرسال السؤال إلى OpenAI والرد عليه
                 const aiResponse = await getOpenAIResponse(textRaw);
                 const reply = `${aiResponse}\n\nلمواصلة الاستفسار، يمكنك طرح سؤال آخر. إذا كنت ترغب في إنهاء المحادثة، يرجى كتابة "شكرا" أو "اغلاق المحادثة".`;
                 await sendToWhatsApp(from, reply);
-                // إبقاء حالة الجلسة على FAQ لاستقبال المزيد من الأسئلة
                 break;
 
             case STATES.NAME:
                 session.data.name = textRaw; // عدم تحويل الاسم لحروف صغيرة لتجنب فقدان التنسيق
-                session.step = STATES.PHONE;
-                await sendToWhatsApp(from, "📞 يرجى تزويدنا برقم هاتفك للتواصل.");
+                // بعد الاسم، نسأل المستخدم: هل تريد استخدام رقم الواتساب الذي تراسلني منه؟
+                session.step = STATES.PHONE_CONFIRM;
+                await sendToWhatsApp(from, "📞 هل تريد استخدام الرقم الذي تراسلني منه للتواصل؟ (نعم/لا)");
                 break;
 
-            case STATES.PHONE:
+            case STATES.PHONE_CONFIRM:
+                // التحقق من الإجابة: إذا كانت "نعم" نستخدم رقم from، وإذا كانت "لا" ننتقل لإدخال رقم جديد
+                if (text.includes("نعم")) {
+                    session.data.phone = from;
+                    session.step = STATES.EMAIL;
+                    await sendToWhatsApp(from, "📧 سيتم استخدام رقمك الحالي. يرجى تزويدنا ببريدك الإلكتروني.");
+                } else if (text.includes("لا")) {
+                    session.step = STATES.PHONE_INPUT;
+                    await sendToWhatsApp(from, "📞 من فضلك أدخل رقم هاتفك للتواصل.");
+                } else {
+                    await sendToWhatsApp(from, "❌ الرجاء الإجابة بنعم أو لا.");
+                }
+                break;
+
+            case STATES.PHONE_INPUT:
                 if (!isValidPhone(textRaw)) {
                     await sendToWhatsApp(from, "❌ رقم الهاتف غير صالح، يرجى إدخال رقم صحيح.");
                     return res.sendStatus(200); // إبقاء المستخدم في نفس الحالة
@@ -652,7 +664,7 @@ app.post('/webhook', async (req, res) => {
             case STATES.EMAIL:
                 if (!isValidEmail(textRaw)) {
                     await sendToWhatsApp(from, "❌ البريد الإلكتروني غير صالح، يرجى إدخال بريد إلكتروني صحيح.");
-                    return res.sendStatus(200); // إبقاء المستخدم في نفس الحالة
+                    return res.sendStatus(200);
                 }
                 session.data.email = textRaw;
                 session.step = STATES.ADDRESS;
