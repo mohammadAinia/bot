@@ -543,12 +543,15 @@ const defaultWelcomeMessage = `🌟 Welcome to *Mohammed Oil Refining Company* �
 
 app.post('/webhook', async (req, res) => {
     try {
+        console.log('Incoming Webhook Data:', req.body); // Log the incoming data for debugging
+
         const entry = req.body.entry?.[0];
         const changes = entry?.changes?.[0];
         const value = changes?.value;
         const messages = value?.messages;
 
         if (!messages || messages.length === 0) {
+            console.log('No messages received, returning early.');
             return res.sendStatus(200);
         }
 
@@ -574,16 +577,16 @@ app.post('/webhook', async (req, res) => {
             let welcomeText = "";
             if (isGreeting) {
                 welcomeText = `Wa Alaikum Assalam wa Rahmatullahi wa Barakatuh, welcome to *Mohammed Oil Refining Company*.
-                                                                                        
-                                                                                        We offer the following services:
-                                                                                        
-                                                                                        1️⃣ *Inquiries about our products and services*
-                                                                                        
-                                                                                        2️⃣ *Create a new request:*
-                                                                                           - 2.1 *Request for used oil disposal* 🛢️
-                                                                                           - 2.2 *Purchase of refined oil* 🏭
-                                                                                        
-                                                                                        Please send the *service number* you wish to request.`;
+                                                                                                                            
+                                                                                                                            We offer the following services:
+                                                                                                                            
+                                                                                                                            1️⃣ *Inquiries about our products and services*
+                                                                                                                            
+                                                                                                                            2️⃣ *Create a new request:*
+                                                                                                                               - 2.1 *Request for used oil disposal* 🛢️
+                                                                                                                               - 2.2 *Purchase of refined oil* 🏭
+                                                                                                                            
+                                                                                                                            Please send the *service number* you wish to request.`;
             } else {
                 welcomeText = defaultWelcomeMessage;
             }
@@ -669,6 +672,9 @@ app.post('/webhook', async (req, res) => {
 
             case STATES.ADDRESS:
                 session.data.address = textRaw;
+                session.step = STATES.QUANTITY;
+                await sendToWhatsApp(from, "📦 Please provide the quantity of the product.");
+                break;
 
             case STATES.QUANTITY:
                 // Validate that the input is a number
@@ -691,7 +697,6 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, summary);
                 break;
 
-
             case STATES.CONFIRMATION:
                 if (text.includes("yes")) {
                     // Send the data to the external API
@@ -703,14 +708,30 @@ app.post('/webhook', async (req, res) => {
                         quantity: session.data.quantity // Include quantity in the request data
                     };
 
+                    console.log('Request Data:', requestData); // Log request data for debugging
+
                     try {
-                        await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
-                            headers: { 'Content-Type': 'application/json' }
+                        const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
+                            headers: { 'Content-Type': 'application/json' },
+                            timeout: 5000  // 5-second timeout for the request
                         });
 
-                        await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
+                        if (response.status === 200) {
+                            console.log('API Response:', response.data); // Log successful response
+                            await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
+                        } else {
+                            console.error(`❌ API returned unexpected status code: ${response.status}`);
+                            await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
+                        }
                     } catch (error) {
-                        console.error('❌ Error sending to API:', error.response?.data || error.message);
+                        if (error.response) {
+                            // API responded with an error code
+                            console.error('API Error Response:', error.response.data);
+                            console.error('API Status Code:', error.response.status);
+                        } else {
+                            // Other errors (like network errors)
+                            console.error('Network or request error:', error.message);
+                        }
                         await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
                     }
                 } else {
@@ -727,10 +748,11 @@ app.post('/webhook', async (req, res) => {
 
         res.sendStatus(200);
     } catch (error) {
-        console.error('❌ Error:', error.response?.data || error.message);
+        console.error('❌ Error:', error.response?.data || error.message || error);
         res.sendStatus(500);
     }
 });
+
 
 
 
