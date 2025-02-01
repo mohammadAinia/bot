@@ -621,10 +621,20 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case STATES.FAQ:
+                // قائمة عبارات إنهاء المحادثة
+                const terminationPhrases = ["شكرا", "اغلاق", "اغلاق المحادثة", "يعطيك العافية"];
+                // التحقق مما إذا كانت الرسالة تحتوي على عبارة إنهاء
+                if (terminationPhrases.some(phrase => text.includes(phrase))) {
+                    await sendToWhatsApp(from, "تم إغلاق المحادثة. إذا كنت تحتاج إلى أي مساعدة مستقبلية، فلا تتردد في التواصل معنا.");
+                    delete userSessions[from];
+                    break;
+                }
+                
                 // إرسال السؤال إلى OpenAI والرد عليه
                 const aiResponse = await getOpenAIResponse(textRaw);
-                await sendToWhatsApp(from, aiResponse);
-                delete userSessions[from];
+                const reply = `${aiResponse}\n\nلمواصلة الاستفسار، يمكنك طرح سؤال آخر. إذا كنت ترغب في إنهاء المحادثة، يرجى كتابة "شكرا" أو "اغلاق المحادثة".`;
+                await sendToWhatsApp(from, reply);
+                // إبقاء حالة الجلسة على FAQ لاستقبال المزيد من الأسئلة
                 break;
 
             case STATES.NAME:
