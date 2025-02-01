@@ -582,7 +582,6 @@ const sendWelcomeMessage = async (recipient) => {
     await sendToWhatsApp(recipient, welcomeMessage);
 };
 
-
 app.post('/webhook', async (req, res) => {
     try {
         const entry = req.body.entry?.[0];
@@ -596,60 +595,20 @@ app.post('/webhook', async (req, res) => {
 
         const message = messages[0];
         const from = message.from;
-        const buttonReply = message.button?.payload || ""; // التقاط الرد من الزر
+        const buttonReply = message.button?.payload || "";
         const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
 
         console.log(`📩 New message from ${from}: ${text || buttonReply}`);
 
-        // إذا لم يكن هناك جلسة، يتم إنشاؤها
         if (!userSessions[from]) {
             userSessions[from] = { step: STATES.WELCOME, data: {} };
-
-            const welcomeMessage = {
-                messaging_product: "whatsapp",
-                to: from,
-                type: "interactive",
-                interactive: {
-                    type: "button",
-                    body: {
-                        text: "🌟 Welcome to *Mohammed Oil Refining Company* 🌟\n\nWe offer the following services:"
-                    },
-                    action: {
-                        buttons: [
-                            {
-                                type: "reply",
-                                reply: {
-                                    id: "inquiries",
-                                    title: "🔍 Inquiries"
-                                }
-                            },
-                            {
-                                type: "reply",
-                                reply: {
-                                    id: "dispose_oil",
-                                    title: "🛢️ Dispose Used Oil"
-                                }
-                            },
-                            {
-                                type: "reply",
-                                reply: {
-                                    id: "buy_refined_oil",
-                                    title: "🏭 Buy Refined Oil"
-                                }
-                            }
-                        ]
-                    }
-                }
-            };
-
-            await sendToWhatsApp(from, welcomeMessage);
+            await sendWelcomeMessage(from);
             return res.sendStatus(200);
         }
 
         const session = userSessions[from];
 
-        // التعامل مع ردود المستخدم
         switch (session.step) {
             case STATES.WELCOME:
                 if (buttonReply === "inquiries") {
@@ -685,45 +644,15 @@ app.post('/webhook', async (req, res) => {
                 session.data.name = textRaw;
                 session.step = STATES.PHONE_CONFIRM;
 
-                const phoneConfirmMessage = {
-                    messaging_product: "whatsapp",
-                    to: from,
-                    type: "interactive",
-                    interactive: {
-                        type: "button",
-                        body: {
-                            text: "📞 Do you want to use the number you are messaging from?"
-                        },
-                        action: {
-                            buttons: [
-                                {
-                                    type: "reply",
-                                    reply: {
-                                        id: "use_current",
-                                        title: "✅ Yes"
-                                    }
-                                },
-                                {
-                                    type: "reply",
-                                    reply: {
-                                        id: "enter_new",
-                                        title: "❌ No"
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                };
-
-                await sendToWhatsApp(from, phoneConfirmMessage);
+                await sendToWhatsApp(from, "📞 Do you want to use the number you are messaging from? (Yes/No)");
                 break;
 
             case STATES.PHONE_CONFIRM:
-                if (buttonReply === "use_current") {
+                if (text.includes("yes")) {
                     session.data.phone = from;
                     session.step = STATES.EMAIL;
                     await sendToWhatsApp(from, "📧 Your current number will be used. Please provide your email address.");
-                } else if (buttonReply === "enter_new") {
+                } else if (text.includes("no")) {
                     session.step = STATES.PHONE_INPUT;
                     await sendToWhatsApp(from, "📞 Please enter your contact phone number.");
                 } else {
@@ -754,36 +683,12 @@ app.post('/webhook', async (req, res) => {
             case STATES.ADDRESS:
                 session.data.address = textRaw;
                 session.step = STATES.CONFIRMATION;
-
-                const summary = `✅ *Order Summary:*\n\n🔹 *Name:* ${session.data.name}\n📞 *Phone:* ${session.data.phone}\n📧 *Email:* ${session.data.email}\n📍 *Address:* ${session.data.address}\n🛢 *Request Type:* ${session.data.type}\n\nIs the information correct?`;
-
-                const confirmMessage = {
-                    messaging_product: "whatsapp",
-                    to: from,
-                    type: "interactive",
-                    interactive: {
-                        type: "button",
-                        body: { text: summary },
-                        action: {
-                            buttons: [
-                                {
-                                    type: "reply",
-                                    reply: { id: "confirm", title: "✅ Yes" }
-                                },
-                                {
-                                    type: "reply",
-                                    reply: { id: "cancel", title: "❌ No" }
-                                }
-                            ]
-                        }
-                    }
-                };
-
-                await sendToWhatsApp(from, confirmMessage);
+                const summary = `✅ *Order Summary:*\n\n🔹 *Name:* ${session.data.name}\n📞 *Phone:* ${session.data.phone}\n📧 *Email:* ${session.data.email}\n📍 *Address:* ${session.data.address}\n🛢 *Request Type:* ${session.data.type}\n\nIs the information correct? (Yes/No)`;
+                await sendToWhatsApp(from, summary);
                 break;
 
             case STATES.CONFIRMATION:
-                if (buttonReply === "confirm") {
+                if (text.includes("yes")) {
                     await axios.post(process.env.ORDER_API_URL, session.data, { headers: { 'Content-Type': 'application/json' } });
                     await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
                 } else {
@@ -804,6 +709,7 @@ app.post('/webhook', async (req, res) => {
         res.sendStatus(500);
     }
 });
+
 
 
 
