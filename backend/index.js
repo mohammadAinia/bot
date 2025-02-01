@@ -441,8 +441,8 @@ const STATES = {
     WELCOME: 0,
     FAQ: "faq",
     NAME: 1,
-    PHONE_CONFIRM: "phone_confirm", // هل تريد استخدام رقم المرسل؟
-    PHONE_INPUT: "phone_input",     // إدخال رقم هاتف بديل
+    PHONE_CONFIRM: "phone_confirm",
+    PHONE_INPUT: "phone_input",
     EMAIL: 3,
     ADDRESS: 4,
     CONFIRMATION: 5
@@ -573,16 +573,16 @@ app.post('/webhook', async (req, res) => {
             let welcomeText = "";
             if (isGreeting) {
                 welcomeText = `Wa Alaikum Assalam wa Rahmatullahi wa Barakatuh, welcome to *Mohammed Oil Refining Company*.
-                                                    
-                                                    We offer the following services:
-                                                    
-                                                    1️⃣ *Inquiries about our products and services*
-                                                    
-                                                    2️⃣ *Create a new request:*
-                                                       - 2.1 *Request for used oil disposal* 🛢️
-                                                       - 2.2 *Purchase of refined oil* 🏭
-                                                    
-                                                    Please send the *service number* you wish to request.`;
+                                                                                        
+                                                                                        We offer the following services:
+                                                                                        
+                                                                                        1️⃣ *Inquiries about our products and services*
+                                                                                        
+                                                                                        2️⃣ *Create a new request:*
+                                                                                           - 2.1 *Request for used oil disposal* 🛢️
+                                                                                           - 2.2 *Purchase of refined oil* 🏭
+                                                                                        
+                                                                                        Please send the *service number* you wish to request.`;
             } else {
                 welcomeText = defaultWelcomeMessage;
             }
@@ -683,9 +683,18 @@ app.post('/webhook', async (req, res) => {
 
             case STATES.CONFIRMATION:
                 if (text.includes("yes")) {
-                    await axios.post(process.env.ORDER_API_URL, session.data, {
+                    // Send the data to the external API
+                    const requestData = {
+                        user_name: session.data.name,
+                        email: session.data.email,
+                        phone_number: session.data.phone,
+                        address: session.data.address,
+                    };
+
+                    await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
                         headers: { 'Content-Type': 'application/json' }
                     });
+
                     await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
                 } else {
                     await sendToWhatsApp(from, "❌ Order has been canceled. You can retry anytime.");
@@ -705,6 +714,7 @@ app.post('/webhook', async (req, res) => {
         res.sendStatus(500);
     }
 });
+
 
 
 
