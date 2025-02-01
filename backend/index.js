@@ -562,34 +562,27 @@ app.post('/webhook', async (req, res) => {
         if (!userSessions[from]) {
             userSessions[from] = { step: STATES.WELCOME, data: {} };
 
-            // List of greeting phrases (using includes to match Arabic text)
+            // List of greeting phrases
             const greetings = [
-                "Hello",
-                "Hi",
-                "Hey",
-                "Greetings",
-                "Good day",
-                "Good morning",
-                "Good afternoon",
-                "Good evening"
+                "hello", "hi", "hey", "greetings", "good day",
+                "good morning", "good afternoon", "good evening"
             ];
 
-            let isGreeting = greetings.some(greeting => text.includes(greeting.toLowerCase()));
+            let isGreeting = greetings.some(greeting => text.includes(greeting));
 
             let welcomeText = "";
             if (isGreeting) {
                 welcomeText = `Wa Alaikum Assalam wa Rahmatullahi wa Barakatuh, welcome to *Mohammed Oil Refining Company*.
-
-                We offer the following services:
-                
-                1️⃣ *Inquiries about our products and services*
-                
-                2️⃣ *Create a new request:*
-                   - 2.1 *Request for used oil disposal* 🛢️
-                   - 2.2 *Purchase of refined oil* 🏭
-                
-                Please send the *service number* you wish to request.`;
-                
+                                                    
+                                                    We offer the following services:
+                                                    
+                                                    1️⃣ *Inquiries about our products and services*
+                                                    
+                                                    2️⃣ *Create a new request:*
+                                                       - 2.1 *Request for used oil disposal* 🛢️
+                                                       - 2.2 *Purchase of refined oil* 🏭
+                                                    
+                                                    Please send the *service number* you wish to request.`;
             } else {
                 welcomeText = defaultWelcomeMessage;
             }
@@ -599,8 +592,6 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(200);
         }
 
-
-        
         const session = userSessions[from];
 
         // Handle messages based on the current state
@@ -628,7 +619,7 @@ app.post('/webhook', async (req, res) => {
                 if (terminationPhrases.some(phrase => text.includes(phrase))) {
                     await sendToWhatsApp(from, "The chat has been closed. If you need any future assistance, feel free to reach out to us.");
                     delete userSessions[from];
-                    break;
+                    return res.sendStatus(200); // Ensure no further code is executed after session deletion
                 }
 
                 const aiResponse = await getOpenAIResponse(textRaw);
@@ -637,14 +628,12 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case STATES.NAME:
-                session.data.name = textRaw; // Keep the original formatting of the name
-                // After the name, ask the user if they want to use their WhatsApp number
+                session.data.name = textRaw;
                 session.step = STATES.PHONE_CONFIRM;
                 await sendToWhatsApp(from, "📞 Do you want to use the number you are messaging from? (Yes/No)");
                 break;
 
             case STATES.PHONE_CONFIRM:
-                // Check the response: If "Yes", use the 'from' number; if "No", ask for a new number
                 if (text.includes("yes")) {
                     session.data.phone = from;
                     session.step = STATES.EMAIL;
@@ -660,7 +649,7 @@ app.post('/webhook', async (req, res) => {
             case STATES.PHONE_INPUT:
                 if (!isValidPhone(textRaw)) {
                     await sendToWhatsApp(from, "❌ Invalid phone number, please enter a valid number.");
-                    return res.sendStatus(200); // Keep the user in the same state
+                    return res.sendStatus(200);
                 }
                 session.data.phone = textRaw;
                 session.step = STATES.EMAIL;
@@ -694,7 +683,6 @@ app.post('/webhook', async (req, res) => {
 
             case STATES.CONFIRMATION:
                 if (text.includes("yes")) {
-                    // Assume ORDER_API_URL is set in the environment file for processing the request
                     await axios.post(process.env.ORDER_API_URL, session.data, {
                         headers: { 'Content-Type': 'application/json' }
                     });
@@ -717,6 +705,7 @@ app.post('/webhook', async (req, res) => {
         res.sendStatus(500);
     }
 });
+
 
 
 app.listen(PORT, () => console.log(`🚀 Server is running on http://localhost:${PORT}`));
