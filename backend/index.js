@@ -579,13 +579,17 @@ app.post('/webhook', async (req, res) => {
             let welcomeText = "";
             if (isGreeting) {
                 welcomeText = `Wa Alaikum Assalam wa Rahmatullahi wa Barakatuh, welcome to *Mohammed Oil Refining Company*.
-                                    We offer the following services:
-                                    1️⃣ *Inquiries about our products and services*
-                                    2️⃣ *Create a new request:*
-                                       - 2.1 *Request for used oil disposal* 🛢️
-                                       - 2.2 *Purchase of refined oil* 🏭
-                                    
-                                    Please send the *service number* you wish to request.`;
+
+                We offer the following services:
+                
+                1️⃣ *Inquiries about our products and services*
+                
+                2️⃣ *Create a new request:*
+                   - 2.1 *Request for used oil disposal* 🛢️
+                   - 2.2 *Purchase of refined oil* 🏭
+                
+                Please send the *service number* you wish to request.`;
+                
             } else {
                 welcomeText = defaultWelcomeMessage;
             }
