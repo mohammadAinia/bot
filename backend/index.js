@@ -438,6 +438,16 @@ app.get('/', (req, res) => {
 
 const userSessions = {};
 
+const STATES = {
+    WELCOME: 0,
+    FAQ: "faq",
+    NAME: 1,
+    PHONE: 2,
+    EMAIL: 3,
+    ADDRESS: 4,
+    CONFIRMATION: 5
+};
+
 
 // بيانات التحقق من Webhook
 const VERIFY_TOKEN = "Mohammad";
@@ -457,73 +467,39 @@ app.get("/webhook", (req, res) => {
 });
 
 
-// const welcomeMessage = `🌟 مرحبًا بك في *شركة محمد لتكرير الزيوت* 🌟  
-// نحن نقدم الخدمات التالية:  
-// ✅ *استفسارات عن منتجاتنا وخدماتنا*  
-// ✅ *إنشاء طلب جديد:*  
-//    - *طلب التخلص من الزيت المستعمل* 🛢️  
-//    - *شراء الزيت المعاد تكريره* 🏭  
-// أخبرني كيف يمكنني مساعدتك اليوم؟ 😊`;
-
 // // دالة لإرسال رسالة إلى OpenAI مع توجيه الأسئلة ضمن نطاق الشركة
-// const getOpenAIResponse = async (userMessage) => {
-//     try {
-//         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-//             model: "gpt-4",
-//             messages: [
-//                 {
-//                     role: "system",
-//                     content: `🌟 مرحبًا بك في شركة محمد لتكرير الزيوت 🌟  
-// الشركة متخصصة في إعادة تكرير الزيوت، وساعات العمل من الأحد إلى الخميس من 9 صباحًا حتى 2 مساءً.  
-// أنت مساعد افتراضي للشركة، مهمتك الإجابة فقط عن الأسئلة المتعلقة بالشركة، مثل الخدمات، الأسعار، أو طلبات التخلص من الزيت.  
-// إذا كان السؤال لا يتعلق بالشركة، فأجب بـ: "❌ عذرًا، يمكنني فقط الإجابة عن الأسئلة المتعلقة بخدمات شركتنا."`
-//                 },
-//                 {
-//                     role: "user",
-//                     content: userMessage
-//                 }
-//             ],
-//             max_tokens: 150,
-//             temperature: 0.7
-//         }, {
-//             headers: {
-//                 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-//                 'Content-Type': 'application/json'
-//             }
-//         });
+const getOpenAIResponse = async (userMessage) => {
+    try {
+        const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+            model: "gpt-4",
+            messages: [
+                {
+                    role: "system",
+                    content: `🌟 مرحبًا بك في شركة محمد لتكرير الزيوت 🌟  
+الشركة متخصصة في إعادة تكرير الزيوت، وساعات العمل من الأحد إلى الخميس من 9 صباحًا حتى 2 مساءً.  
+أنت مساعد افتراضي للشركة، مهمتك الإجابة فقط عن الأسئلة المتعلقة بالشركة، مثل الخدمات، الأسعار، أو طلبات التخلص من الزيت.  
+إذا كان السؤال لا يتعلق بالشركة، فأجب بـ: "❌ عذرًا، يمكنني فقط الإجابة عن الأسئلة المتعلقة بخدمات شركتنا."`
+                },
+                {
+                    role: "user",
+                    content: userMessage
+                }
+            ],
+            max_tokens: 150,
+            temperature: 0.7
+        }, {
+            headers: {
+                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
 
-//         return response.data.choices[0].message.content.trim();
-//     } catch (error) {
-//         console.error('❌ Error with OpenAI:', error.response?.data || error.message);
-//         return "❌ عذرًا، حدث خطأ أثناء معالجة طلبك.";
-//     }
-// };
-// دالة لإرسال رسائل WhatsApp
-// const sendToWhatsApp = async (to, message) => {
-//     try {
-//         await axios.post(process.env.WHATSAPP_API_URL, {
-//             messaging_product: 'whatsapp',
-//             recipient_type: 'individual',
-//             to: to,
-//             type: 'text',
-//             text: { body: message }
-//         }, {
-//             headers: { 'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`, 'Content-Type': 'application/json' }
-//         });
-//     } catch (error) {
-//         console.error('❌ Failed to send message to WhatsApp:', error.response?.data || error.message);
-//     }
-// };
-
-// استقبال رسائل واتساب
-const welcomeMessage = `🌟 مرحبًا بك في *شركة محمد لتكرير الزيوت* 🌟  
-نحن نقدم الخدمات التالية:  
-1️⃣ *استفسارات عن منتجاتنا وخدماتنا*  
-2️⃣ *إنشاء طلب جديد:*  
-   - 2.1 *طلب التخلص من الزيت المستعمل* 🛢️  
-   - 2.2 *شراء الزيت المعاد تكريره* 🏭  
-
-الرجاء إرسال *رقم الخدمة* التي ترغب بها.`;
+        return response.data.choices[0].message.content.trim();
+    } catch (error) {
+        console.error('❌ Error with OpenAI:', error.response?.data || error.message);
+        return "❌ عذرًا، حدث خطأ أثناء معالجة طلبك.";
+    }
+};
 
 const sendToWhatsApp = async (to, message) => {
     try {
@@ -534,12 +510,35 @@ const sendToWhatsApp = async (to, message) => {
             type: 'text',
             text: { body: message }
         }, {
-            headers: { 'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`, 'Content-Type': 'application/json' }
+            headers: { 
+                'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`, 
+                'Content-Type': 'application/json' 
+            }
         });
     } catch (error) {
         console.error('❌ Failed to send message to WhatsApp:', error.response?.data || error.message);
     }
 };
+
+const isValidEmail = (email) => {
+    const regex = /^\S+@\S+\.\S+$/;
+    return regex.test(email);
+};
+
+const isValidPhone = (phone) => {
+    const regex = /^[0-9]{10,15}$/; // تعديل هذا التعبير ليناسب تنسيق أرقام بلدك
+    return regex.test(phone);
+};
+
+// استقبال رسائل واتساب
+const welcomeMessage = `🌟 مرحبًا بك في *شركة محمد لتكرير الزيوت* 🌟  
+نحن نقدم الخدمات التالية:  
+1️⃣ *استفسارات عن منتجاتنا وخدماتنا*  
+2️⃣ *إنشاء طلب جديد:*  
+   - 2.1 *طلب التخلص من الزيت المستعمل* 🛢️  
+   - 2.2 *شراء الزيت المعاد تكريره* 🏭  
+
+الرجاء إرسال *رقم الخدمة* التي ترغب بها.`;
 
 app.post('/webhook', async (req, res) => {
     try {
@@ -554,73 +553,104 @@ app.post('/webhook', async (req, res) => {
 
         const message = messages[0];
         const from = message.from;
-        const text = message.text?.body?.toLowerCase().trim();
+        const textRaw = message.text?.body || "";
+        const text = textRaw.toLowerCase().trim();
 
         console.log(`📩 رسالة جديدة من ${from}: ${text}`);
 
+        // بدء جلسة جديدة إذا لم تكن موجودة
         if (!userSessions[from]) {
-            userSessions[from] = { step: 0, data: {} };
+            userSessions[from] = { step: STATES.WELCOME, data: {} };
             await sendToWhatsApp(from, welcomeMessage);
             return res.sendStatus(200);
         }
 
         const session = userSessions[from];
 
-        if (session.step === 0) {
-            if (text === "1") {
-                await sendToWhatsApp(from, "❓ يرجى إرسال سؤالك حول خدماتنا أو منتجاتنا.");
-                session.step = "faq";
-            } else if (text === "2.1") {
-                session.data.type = "التخلص من الزيت المستعمل";
-                session.step = 1;
-                await sendToWhatsApp(from, "🔹 يرجى تزويدنا باسمك الكريم.");
-            } else if (text === "2.2") {
-                session.data.type = "شراء الزيت المعاد تكريره";
-                session.step = 1;
-                await sendToWhatsApp(from, "🔹 يرجى تزويدنا باسمك الكريم.");
-            } else {
-                await sendToWhatsApp(from, "❌ خيار غير صالح، يرجى اختيار رقم من القائمة.");
-            }
-        } else if (session.step === "faq") {
-            await sendToWhatsApp(from, "📌 تم استلام سؤالك، سيتم الرد عليه قريبًا.");
-            delete userSessions[from];
-        } else if (session.step === 1) {
-            session.data.name = text;
-            session.step = 2;
-            await sendToWhatsApp(from, "📞 يرجى تزويدنا برقم هاتفك للتواصل.");
-        } else if (session.step === 2) {
-            session.data.phone = text;
-            session.step = 3;
-            await sendToWhatsApp(from, "📧 يرجى تزويدنا ببريدك الإلكتروني.");
-        } else if (session.step === 3) {
-            session.data.email = text;
-            session.step = 4;
-            await sendToWhatsApp(from, "📍 يرجى تزويدنا بعنوانك بالكامل.");
-        } else if (session.step === 4) {
-            session.data.address = text;
-            session.step = 5;
+        // معالجة الرسائل بناءً على الحالة الحالية
+        switch (session.step) {
+            case STATES.WELCOME:
+                if (text === "1") {
+                    await sendToWhatsApp(from, "❓ يرجى إرسال سؤالك حول خدماتنا أو منتجاتنا.");
+                    session.step = STATES.FAQ;
+                } else if (text === "2.1") {
+                    session.data.type = "التخلص من الزيت المستعمل";
+                    session.step = STATES.NAME;
+                    await sendToWhatsApp(from, "🔹 يرجى تزويدنا باسمك الكريم.");
+                } else if (text === "2.2") {
+                    session.data.type = "شراء الزيت المعاد تكريره";
+                    session.step = STATES.NAME;
+                    await sendToWhatsApp(from, "🔹 يرجى تزويدنا باسمك الكريم.");
+                } else {
+                    await sendToWhatsApp(from, "❌ خيار غير صالح، يرجى اختيار رقم من القائمة.");
+                }
+                break;
 
-            let summary = `✅ *ملخص الطلب:*\n\n`;
-            summary += `🔹 *الاسم:* ${session.data.name}\n`;
-            summary += `📞 *رقم الهاتف:* ${session.data.phone}\n`;
-            summary += `📧 *البريد الإلكتروني:* ${session.data.email}\n`;
-            summary += `📍 *العنوان:* ${session.data.address}\n`;
-            summary += `🛢 *نوع الطلب:* ${session.data.type}\n\n`;
-            summary += `هل المعلومات صحيحة؟ يرجى الرد بـ *نعم* أو *لا*`;
-
-            await sendToWhatsApp(from, summary);
-        } else if (session.step === 5) {
-            if (text.includes("نعم")) {
-                await axios.post(process.env.ORDER_API_URL, session.data, {
-                    headers: { 'Content-Type': 'application/json' }
-                });
-
-                await sendToWhatsApp(from, "✅ تم إرسال طلبك بنجاح! سيتم التواصل معك قريبًا.");
+            case STATES.FAQ:
+                // إرسال السؤال إلى OpenAI والرد عليه
+                const aiResponse = await getOpenAIResponse(textRaw);
+                await sendToWhatsApp(from, aiResponse);
                 delete userSessions[from];
-            } else {
-                await sendToWhatsApp(from, "❌ تم إلغاء الطلب. يمكنك إعادة المحاولة في أي وقت.");
+                break;
+
+            case STATES.NAME:
+                session.data.name = textRaw; // عدم تحويل الاسم لحروف صغيرة لتجنب فقدان التنسيق
+                session.step = STATES.PHONE;
+                await sendToWhatsApp(from, "📞 يرجى تزويدنا برقم هاتفك للتواصل.");
+                break;
+
+            case STATES.PHONE:
+                if (!isValidPhone(textRaw)) {
+                    await sendToWhatsApp(from, "❌ رقم الهاتف غير صالح، يرجى إدخال رقم صحيح.");
+                    return res.sendStatus(200); // إبقاء المستخدم في نفس الحالة
+                }
+                session.data.phone = textRaw;
+                session.step = STATES.EMAIL;
+                await sendToWhatsApp(from, "📧 يرجى تزويدنا ببريدك الإلكتروني.");
+                break;
+
+            case STATES.EMAIL:
+                if (!isValidEmail(textRaw)) {
+                    await sendToWhatsApp(from, "❌ البريد الإلكتروني غير صالح، يرجى إدخال بريد إلكتروني صحيح.");
+                    return res.sendStatus(200); // إبقاء المستخدم في نفس الحالة
+                }
+                session.data.email = textRaw;
+                session.step = STATES.ADDRESS;
+                await sendToWhatsApp(from, "📍 يرجى تزويدنا بعنوانك بالكامل.");
+                break;
+
+            case STATES.ADDRESS:
+                session.data.address = textRaw;
+                session.step = STATES.CONFIRMATION;
+                
+                let summary = `✅ *ملخص الطلب:*\n\n`;
+                summary += `🔹 *الاسم:* ${session.data.name}\n`;
+                summary += `📞 *رقم الهاتف:* ${session.data.phone}\n`;
+                summary += `📧 *البريد الإلكتروني:* ${session.data.email}\n`;
+                summary += `📍 *العنوان:* ${session.data.address}\n`;
+                summary += `🛢 *نوع الطلب:* ${session.data.type}\n\n`;
+                summary += `هل المعلومات صحيحة؟ يرجى الرد بـ *نعم* أو *لا*`;
+                
+                await sendToWhatsApp(from, summary);
+                break;
+
+            case STATES.CONFIRMATION:
+                if (text.includes("نعم")) {
+                    // افتراض وجود متغير ORDER_API_URL في ملف البيئة لمعالجة الطلب
+                    await axios.post(process.env.ORDER_API_URL, session.data, {
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    await sendToWhatsApp(from, "✅ تم إرسال طلبك بنجاح! سيتم التواصل معك قريبًا.");
+                } else {
+                    await sendToWhatsApp(from, "❌ تم إلغاء الطلب. يمكنك إعادة المحاولة في أي وقت.");
+                }
                 delete userSessions[from];
-            }
+                break;
+
+            default:
+                await sendToWhatsApp(from, "❌ حدث خطأ غير متوقع. يرجى إعادة المحاولة.");
+                delete userSessions[from];
+                break;
         }
 
         res.sendStatus(200);
