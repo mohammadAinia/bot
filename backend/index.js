@@ -595,6 +595,8 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(200);
         }
 
+
+        
         const session = userSessions[from];
 
         // Handle messages based on the current state
