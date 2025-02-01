@@ -562,11 +562,24 @@ app.post('/webhook', async (req, res) => {
         if (!userSessions[from]) {
             userSessions[from] = { step: STATES.WELCOME, data: {} };
 
-            // قائمة كلمات التحية الشائعة
-            const greetings = ["السلام عليكم", "السلام عليكم ورحمة الله", "مرحبا", "أهلا", "أهلاً"];
-            let isGreeting = greetings.some(greeting => textRaw.toLowerCase().includes(greeting.toLowerCase()));
+            // قائمة عبارات التحية (أضفنا المزيد من الصيغ للتغطية)
+            const greetings = [
+                "السلام عليكم",
+                "السلام عليكم ورحمة الله",
+                "وعليكم السلام",
+                "مرحبا",
+                "أهلا",
+                "أهلاً",
+                "سلام"
+            ];
 
-            // رسالة ترحيب مخصصة إذا كانت الرسالة عبارة عن تحية، أو رسالة ترحيب افتراضية
+            // نستخدم دالة تتحقق من وجود أي عبارة من عبارات التحية في النص
+            let isGreeting = greetings.some(greeting => {
+                // استخدام regex مع حدود الكلمات لتحسين الدقة
+                const pattern = new RegExp(`\\b${greeting.toLowerCase()}\\b`);
+                return pattern.test(text);
+            });
+
             let welcomeText = "";
             if (isGreeting) {
                 welcomeText = `وعليكم السلام ورحمة الله وبركاته، مرحباً بك في *شركة محمد لتكرير الزيوت*.
@@ -581,6 +594,7 @@ app.post('/webhook', async (req, res) => {
                 welcomeText = defaultWelcomeMessage;
             }
 
+            console.log(`isGreeting: ${isGreeting} | النص المستلم: "${text}"`);
             await sendToWhatsApp(from, welcomeText);
             return res.sendStatus(200);
         }
