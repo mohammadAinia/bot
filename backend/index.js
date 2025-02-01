@@ -531,56 +531,14 @@ const isValidPhone = (phone) => {
 };
 
 // Receiving WhatsApp messages
-// const defaultWelcomeMessage = `🌟 Welcome to *Mohammed Oil Refining Company* 🌟  
-//                                     We offer the following services:  
-//                                     1️⃣ *Inquiries about our products and services*  
-//                                     2️⃣ *Create a new request:*  
-//                                        - 2.1 *Request for used oil disposal* 🛢️  
-//                                        - 2.2 *Purchase of refined oil* 🏭  
+const defaultWelcomeMessage = `🌟 Welcome to *Mohammed Oil Refining Company* 🌟  
+                                    We offer the following services:  
+                                    1️⃣ *Inquiries about our products and services*  
+                                    2️⃣ *Create a new request:*  
+                                       - 2.1 *Request for used oil disposal* 🛢️  
+                                       - 2.2 *Purchase of refined oil* 🏭  
 
-//                                     Please send the *service number* you wish to request.`;
-
-
-const sendWelcomeMessage = async (recipient) => {
-    const welcomeMessage = {
-        messaging_product: "whatsapp",
-        to: recipient,
-        type: "interactive",
-        interactive: {
-            type: "button",
-            body: {
-                text: "🌟 Welcome to *Mohammed Oil Refining Company* 🌟\n\nWe offer the following services:"
-            },
-            action: {
-                buttons: [
-                    {
-                        type: "reply",
-                        reply: {
-                            id: "inquiries",
-                            title: "🔍 Inquiries"
-                        }
-                    },
-                    {
-                        type: "reply",
-                        reply: {
-                            id: "dispose_oil",
-                            title: "🛢️ Dispose Used Oil"
-                        }
-                    },
-                    {
-                        type: "reply",
-                        reply: {
-                            id: "buy_refined_oil",
-                            title: "🏭 Buy Refined Oil"
-                        }
-                    }
-                ]
-            }
-        }
-    };
-
-    await sendToWhatsApp(recipient, welcomeMessage);
-};
+                                    Please send the *service number* you wish to request.`;
 
 app.post('/webhook', async (req, res) => {
     try {
@@ -595,47 +553,71 @@ app.post('/webhook', async (req, res) => {
 
         const message = messages[0];
         const from = message.from;
-        const buttonReply = message.interactive?.button_reply?.id || ""; // Corrected extraction
         const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
 
-        console.log("📩 Message Object:", JSON.stringify(message, null, 2));
-        console.log(`📩 Button Reply: ${buttonReply}, Text: ${text}`);
+        console.log(`📩 New message from ${from}: ${text}`);
 
+        // If there is no session for the user, create one first
         if (!userSessions[from]) {
             userSessions[from] = { step: STATES.WELCOME, data: {} };
-            await sendWelcomeMessage(from);
+
+            // List of greeting phrases (using includes to match Arabic text)
+            const greetings = [
+                "Hello",
+                "Hi",
+                "Hey",
+                "Greetings",
+                "Good day",
+                "Good morning",
+                "Good afternoon",
+                "Good evening"
+            ];
+
+            let isGreeting = greetings.some(greeting => text.includes(greeting.toLowerCase()));
+
+            let welcomeText = "";
+            if (isGreeting) {
+                welcomeText = `Wa Alaikum Assalam wa Rahmatullahi wa Barakatuh, welcome to *Mohammed Oil Refining Company*.
+                                    We offer the following services:
+                                    1️⃣ *Inquiries about our products and services*
+                                    2️⃣ *Create a new request:*
+                                       - 2.1 *Request for used oil disposal* 🛢️
+                                       - 2.2 *Purchase of refined oil* 🏭
+                                    
+                                    Please send the *service number* you wish to request.`;
+            } else {
+                welcomeText = defaultWelcomeMessage;
+            }
+
+            console.log(`isGreeting: ${isGreeting} | Received text: "${text}"`);
+            await sendToWhatsApp(from, welcomeText);
             return res.sendStatus(200);
         }
 
         const session = userSessions[from];
 
+        // Handle messages based on the current state
         switch (session.step) {
             case STATES.WELCOME:
-                // Handle greeting or initial message
-                if (["hi", "hello", "hey", "start"].some(greeting => text.includes(greeting))) {
-                    // Send a welcome message when the user greets or types 'start'
-                    await sendWelcomeMessage(from);
-                    session.step = STATES.FAQ; // Transition to FAQ state, or another appropriate state.
-                } else if (buttonReply.toLowerCase() === "inquiries") {
+                if (text === "1") {
                     await sendToWhatsApp(from, "❓ Please send your question regarding our services or products.");
                     session.step = STATES.FAQ;
-                } else if (buttonReply.toLowerCase() === "dispose_oil") {
+                } else if (text === "2.1") {
                     session.data.type = "Used oil disposal";
                     session.step = STATES.NAME;
                     await sendToWhatsApp(from, "🔹 Please provide your full name.");
-                } else if (buttonReply.toLowerCase() === "buy_refined_oil") {
+                } else if (text === "2.2") {
                     session.data.type = "Purchase of refined oil";
                     session.step = STATES.NAME;
                     await sendToWhatsApp(from, "🔹 Please provide your full name.");
                 } else {
-                    // If it's neither a greeting nor a button reply, ask for a valid option
-                    await sendToWhatsApp(from, "❌ Invalid option, please select a valid service.");
+                    await sendToWhatsApp(from, "❌ Invalid option, please choose a number from the list.");
                 }
                 break;
-        
 
             case STATES.FAQ:
+                // List of phrases to end the conversation
                 const terminationPhrases = ["thank you", "close", "end chat", "appreciate it"];
                 if (terminationPhrases.some(phrase => text.includes(phrase))) {
                     await sendToWhatsApp(from, "The chat has been closed. If you need any future assistance, feel free to reach out to us.");
@@ -644,16 +626,19 @@ app.post('/webhook', async (req, res) => {
                 }
 
                 const aiResponse = await getOpenAIResponse(textRaw);
-                await sendToWhatsApp(from, `${aiResponse}\n\nTo continue your inquiry, you can ask another question. If you want to end the conversation, please type 'thank you' or 'end chat'.`);
+                const reply = `${aiResponse}\n\nTo continue your inquiry, you can ask another question. If you want to end the conversation, please type 'thank you' or 'end chat'.`;
+                await sendToWhatsApp(from, reply);
                 break;
 
             case STATES.NAME:
-                session.data.name = textRaw;
+                session.data.name = textRaw; // Keep the original formatting of the name
+                // After the name, ask the user if they want to use their WhatsApp number
                 session.step = STATES.PHONE_CONFIRM;
                 await sendToWhatsApp(from, "📞 Do you want to use the number you are messaging from? (Yes/No)");
                 break;
 
             case STATES.PHONE_CONFIRM:
+                // Check the response: If "Yes", use the 'from' number; if "No", ask for a new number
                 if (text.includes("yes")) {
                     session.data.phone = from;
                     session.step = STATES.EMAIL;
@@ -669,7 +654,7 @@ app.post('/webhook', async (req, res) => {
             case STATES.PHONE_INPUT:
                 if (!isValidPhone(textRaw)) {
                     await sendToWhatsApp(from, "❌ Invalid phone number, please enter a valid number.");
-                    return res.sendStatus(200);
+                    return res.sendStatus(200); // Keep the user in the same state
                 }
                 session.data.phone = textRaw;
                 session.step = STATES.EMAIL;
@@ -689,13 +674,24 @@ app.post('/webhook', async (req, res) => {
             case STATES.ADDRESS:
                 session.data.address = textRaw;
                 session.step = STATES.CONFIRMATION;
-                const summary = `✅ *Order Summary:*\n\n🔹 *Name:* ${session.data.name}\n📞 *Phone:* ${session.data.phone}\n📧 *Email:* ${session.data.email}\n📍 *Address:* ${session.data.address}\n🛢 *Request Type:* ${session.data.type}\n\nIs the information correct? (Yes/No)`;
+
+                let summary = `✅ *Order Summary:*\n\n`;
+                summary += `🔹 *Name:* ${session.data.name}\n`;
+                summary += `📞 *Phone Number:* ${session.data.phone}\n`;
+                summary += `📧 *Email:* ${session.data.email}\n`;
+                summary += `📍 *Address:* ${session.data.address}\n`;
+                summary += `🛢 *Request Type:* ${session.data.type}\n\n`;
+                summary += `Is the information correct? Please reply with *Yes* or *No*`;
+
                 await sendToWhatsApp(from, summary);
                 break;
 
             case STATES.CONFIRMATION:
                 if (text.includes("yes")) {
-                    await axios.post(process.env.ORDER_API_URL, session.data, { headers: { 'Content-Type': 'application/json' } });
+                    // Assume ORDER_API_URL is set in the environment file for processing the request
+                    await axios.post(process.env.ORDER_API_URL, session.data, {
+                        headers: { 'Content-Type': 'application/json' }
+                    });
                     await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
                 } else {
                     await sendToWhatsApp(from, "❌ Order has been canceled. You can retry anytime.");
@@ -715,9 +711,6 @@ app.post('/webhook', async (req, res) => {
         res.sendStatus(500);
     }
 });
-
-
-
 
 
 app.listen(PORT, () => console.log(`🚀 Server is running on http://localhost:${PORT}`));
