@@ -595,11 +595,12 @@ app.post('/webhook', async (req, res) => {
 
         const message = messages[0];
         const from = message.from;
-        const buttonReply = message.button?.payload || "";
+        const buttonReply = message.interactive?.button_reply?.id || ""; // Corrected extraction
         const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
 
-        console.log(`📩 New message from ${from}: ${text || buttonReply}`);
+        console.log("📩 Message Object:", JSON.stringify(message, null, 2));
+        console.log(`📩 Button Reply: ${buttonReply}, Text: ${text}`);
 
         if (!userSessions[from]) {
             userSessions[from] = { step: STATES.WELCOME, data: {} };
@@ -611,14 +612,14 @@ app.post('/webhook', async (req, res) => {
 
         switch (session.step) {
             case STATES.WELCOME:
-                if (buttonReply === "inquiries") {
+                if (buttonReply.toLowerCase() === "inquiries") {
                     await sendToWhatsApp(from, "❓ Please send your question regarding our services or products.");
                     session.step = STATES.FAQ;
-                } else if (buttonReply === "dispose_oil") {
+                } else if (buttonReply.toLowerCase() === "dispose_oil") {
                     session.data.type = "Used oil disposal";
                     session.step = STATES.NAME;
                     await sendToWhatsApp(from, "🔹 Please provide your full name.");
-                } else if (buttonReply === "buy_refined_oil") {
+                } else if (buttonReply.toLowerCase() === "buy_refined_oil") {
                     session.data.type = "Purchase of refined oil";
                     session.step = STATES.NAME;
                     await sendToWhatsApp(from, "🔹 Please provide your full name.");
@@ -636,14 +637,12 @@ app.post('/webhook', async (req, res) => {
                 }
 
                 const aiResponse = await getOpenAIResponse(textRaw);
-                const reply = `${aiResponse}\n\nTo continue your inquiry, you can ask another question. If you want to end the conversation, please type 'thank you' or 'end chat'.`;
-                await sendToWhatsApp(from, reply);
+                await sendToWhatsApp(from, `${aiResponse}\n\nTo continue your inquiry, you can ask another question. If you want to end the conversation, please type 'thank you' or 'end chat'.`);
                 break;
 
             case STATES.NAME:
                 session.data.name = textRaw;
                 session.step = STATES.PHONE_CONFIRM;
-
                 await sendToWhatsApp(from, "📞 Do you want to use the number you are messaging from? (Yes/No)");
                 break;
 
@@ -709,6 +708,7 @@ app.post('/webhook', async (req, res) => {
         res.sendStatus(500);
     }
 });
+
 
 
 
