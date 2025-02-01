@@ -614,6 +614,7 @@ app.post('/webhook', async (req, res) => {
             case STATES.WELCOME:
                 // Handle greeting or initial message
                 if (["hi", "hello", "hey", "start"].some(greeting => text.includes(greeting))) {
+                    // Send a welcome message when the user greets or types 'start'
                     await sendWelcomeMessage(from);
                     session.step = STATES.FAQ; // Transition to FAQ state, or another appropriate state.
                 } else if (buttonReply.toLowerCase() === "inquiries") {
@@ -628,6 +629,7 @@ app.post('/webhook', async (req, res) => {
                     session.step = STATES.NAME;
                     await sendToWhatsApp(from, "🔹 Please provide your full name.");
                 } else {
+                    // If it's neither a greeting nor a button reply, ask for a valid option
                     await sendToWhatsApp(from, "❌ Invalid option, please select a valid service.");
                 }
                 break;
