@@ -562,7 +562,7 @@ app.post('/webhook', async (req, res) => {
         if (!userSessions[from]) {
             userSessions[from] = { step: STATES.WELCOME, data: {} };
 
-            // قائمة عبارات التحية (أضفنا المزيد من الصيغ للتغطية)
+            // قائمة عبارات التحية (بدلاً من regex نستخدم includes لتتبع التحية مع النص العربي)
             const greetings = [
                 "السلام عليكم",
                 "السلام عليكم ورحمة الله",
@@ -573,12 +573,8 @@ app.post('/webhook', async (req, res) => {
                 "سلام"
             ];
 
-            // نستخدم دالة تتحقق من وجود أي عبارة من عبارات التحية في النص
-            let isGreeting = greetings.some(greeting => {
-                // استخدام regex مع حدود الكلمات لتحسين الدقة
-                const pattern = new RegExp(`\\b${greeting.toLowerCase()}\\b`);
-                return pattern.test(text);
-            });
+            // التحقق مما إذا كان النص يحتوي على أي عبارة من عبارات التحية باستخدام includes
+            let isGreeting = greetings.some(greeting => text.includes(greeting.toLowerCase()));
 
             let welcomeText = "";
             if (isGreeting) {
