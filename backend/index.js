@@ -429,7 +429,6 @@ if (!process.env.OPENAI_API_KEY || !process.env.WHATSAPP_API_URL || !process.env
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-
 app.use(bodyParser.json());
 
 app.get('/', (req, res) => {
@@ -449,10 +448,8 @@ const STATES = {
     CONFIRMATION: 5
 };
 
-
 // بيانات التحقق من Webhook
 const VERIFY_TOKEN = "Mohammad";
-
 // تحقق من الـ Webhook من Meta
 app.get("/webhook", (req, res) => {
     const mode = req.query["hub.mode"];
@@ -467,20 +464,21 @@ app.get("/webhook", (req, res) => {
     }
 });
 
-
-
 // // دالة لإرسال رسالة إلى OpenAI مع توجيه الأسئلة ضمن نطاق الشركة
 const getOpenAIResponse = async (userMessage) => {
     try {
+        const companyWebsite = "https://www.google.com/maps?q=33.5150,36.2910"; // Replace with the actual website
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
             model: "gpt-4",
             messages: [
                 {
                     role: "system",
-                    content: `🌟 مرحبًا بك في شركة محمد لتكرير الزيوت 🌟  
-الشركة متخصصة في إعادة تكرير الزيوت، وساعات العمل من الأحد إلى الخميس من 9 صباحًا حتى 2 مساءً.  
-أنت مساعد افتراضي للشركة، مهمتك الإجابة فقط عن الأسئلة المتعلقة بالشركة، مثل الخدمات، الأسعار، أو طلبات التخلص من الزيت.  
-إذا كان السؤال لا يتعلق بالشركة، فأجب بـ: "❌ عذرًا، يمكنني فقط الإجابة عن الأسئلة المتعلقة بخدمات شركتنا."`
+                    content: `🌟 Welcome to Mohammed Oil Refining Company 🌟  
+                                The company specializes in oil re-refining, and working hours are from Sunday to Thursday, 9 AM to 2 PM.  
+                                You are the company's virtual assistant, and your task is to answer only questions related to the company, such as services, prices, or oil disposal requests.  
+                                If the question is not related to the company, respond with: "❌ Sorry, I can only answer questions related to our company's services."  
+
+                                You can find more information on our website: ${companyWebsite}`
                 },
                 {
                     role: "user",
@@ -499,10 +497,9 @@ const getOpenAIResponse = async (userMessage) => {
         return response.data.choices[0].message.content.trim();
     } catch (error) {
         console.error('❌ Error with OpenAI:', error.response?.data || error.message);
-        return "❌ عذرًا، حدث خطأ أثناء معالجة طلبك.";
+        return "❌ Sorry, an error occurred while processing your request.";
     }
 };
-
 
 const sendToWhatsApp = async (to, message) => {
     try {
@@ -513,9 +510,9 @@ const sendToWhatsApp = async (to, message) => {
             type: 'text',
             text: { body: message }
         }, {
-            headers: { 
-                'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`, 
-                'Content-Type': 'application/json' 
+            headers: {
+                'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                'Content-Type': 'application/json'
             }
         });
     } catch (error) {
@@ -533,21 +530,15 @@ const isValidPhone = (phone) => {
     return regex.test(phone);
 };
 
-// استقبال رسائل واتساب
-const defaultWelcomeMessage = `🌟 مرحبًا بك في *شركة محمد لتكرير الزيوت* 🌟  
-نحن نقدم الخدمات التالية:  
-1️⃣ *استفسارات عن منتجاتنا وخدماتنا*  
-2️⃣ *إنشاء طلب جديد:*  
-   - 2.1 *طلب التخلص من الزيت المستعمل* 🛢️  
-   - 2.2 *شراء الزيت المعاد تكريره* 🏭  
+// Receiving WhatsApp messages
+const defaultWelcomeMessage = `🌟 Welcome to *Mohammed Oil Refining Company* 🌟  
+                                    We offer the following services:  
+                                    1️⃣ *Inquiries about our products and services*  
+                                    2️⃣ *Create a new request:*  
+                                       - 2.1 *Request for used oil disposal* 🛢️  
+                                       - 2.2 *Purchase of refined oil* 🏭  
 
-الرجاء إرسال *رقم الخدمة* التي ترغب بها.`;
-
-
-
-const companyLocationLink = "https://maps.app.goo.gl/4j1fJxN7yp12S3si8";  // قم بتغيير الرابط إلى رابط موقعك
-
-
+                                    Please send the *service number* you wish to request.`;
 
 app.post('/webhook', async (req, res) => {
     try {
@@ -565,165 +556,162 @@ app.post('/webhook', async (req, res) => {
         const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
 
-        console.log(`📩 رسالة جديدة من ${from}: ${text}`);
+        console.log(`📩 New message from ${from}: ${text}`);
 
-        // إذا لم توجد جلسة للمستخدم، نقوم بإنشائها أولاً
+        // If there is no session for the user, create one first
         if (!userSessions[from]) {
             userSessions[from] = { step: STATES.WELCOME, data: {} };
 
-            if (text.includes("الموقع") || text.includes("أين تقع الشركة")) {
-                await sendToWhatsApp(from, `📍 يمكنك العثور على موقعنا على خرائط جوجل عبر الرابط التالي: ${companyLocationLink}`);
-                return res.sendStatus(200);
-            }
-
-            // قائمة عبارات التحية (باستخدام includes لمطابقة النص العربي)
+            // List of greeting phrases (using includes to match Arabic text)
             const greetings = [
-                "السلام عليكم",
-                "السلام عليكم ورحمة الله",
-                "وعليكم السلام",
-                "مرحبا",
-                "أهلا",
-                "أهلاً",
-                "سلام"
+                "Hello",
+                "Hi",
+                "Hey",
+                "Greetings",
+                "Good day",
+                "Good morning",
+                "Good afternoon",
+                "Good evening"
             ];
 
             let isGreeting = greetings.some(greeting => text.includes(greeting.toLowerCase()));
 
             let welcomeText = "";
             if (isGreeting) {
-                welcomeText = `وعليكم السلام ورحمة الله وبركاته، مرحباً بك في *شركة محمد لتكرير الزيوت*.
-نحن نقدم الخدمات التالية:
-1️⃣ *استفسارات عن منتجاتنا وخدماتنا*
-2️⃣ *إنشاء طلب جديد:*
-   - 2.1 *طلب التخلص من الزيت المستعمل* 🛢️
-   - 2.2 *شراء الزيت المعاد تكريره* 🏭
-
-الرجاء إرسال *رقم الخدمة* التي ترغب بها.`;
+                welcomeText = `Wa Alaikum Assalam wa Rahmatullahi wa Barakatuh, welcome to *Mohammed Oil Refining Company*.
+                                    We offer the following services:
+                                    1️⃣ *Inquiries about our products and services*
+                                    2️⃣ *Create a new request:*
+                                       - 2.1 *Request for used oil disposal* 🛢️
+                                       - 2.2 *Purchase of refined oil* 🏭
+                                    
+                                    Please send the *service number* you wish to request.`;
             } else {
                 welcomeText = defaultWelcomeMessage;
             }
 
-            console.log(`isGreeting: ${isGreeting} | النص المستلم: "${text}"`);
+            console.log(`isGreeting: ${isGreeting} | Received text: "${text}"`);
             await sendToWhatsApp(from, welcomeText);
             return res.sendStatus(200);
         }
 
         const session = userSessions[from];
 
-        // معالجة الرسائل بناءً على الحالة الحالية
+        // Handle messages based on the current state
         switch (session.step) {
             case STATES.WELCOME:
                 if (text === "1") {
-                    await sendToWhatsApp(from, "❓ يرجى إرسال سؤالك حول خدماتنا أو منتجاتنا.");
+                    await sendToWhatsApp(from, "❓ Please send your question regarding our services or products.");
                     session.step = STATES.FAQ;
                 } else if (text === "2.1") {
-                    session.data.type = "التخلص من الزيت المستعمل";
+                    session.data.type = "Used oil disposal";
                     session.step = STATES.NAME;
-                    await sendToWhatsApp(from, "🔹 يرجى تزويدنا باسمك الكريم.");
+                    await sendToWhatsApp(from, "🔹 Please provide your full name.");
                 } else if (text === "2.2") {
-                    session.data.type = "شراء الزيت المعاد تكريره";
+                    session.data.type = "Purchase of refined oil";
                     session.step = STATES.NAME;
-                    await sendToWhatsApp(from, "🔹 يرجى تزويدنا باسمك الكريم.");
+                    await sendToWhatsApp(from, "🔹 Please provide your full name.");
                 } else {
-                    await sendToWhatsApp(from, "❌ خيار غير صالح، يرجى اختيار رقم من القائمة.");
+                    await sendToWhatsApp(from, "❌ Invalid option, please choose a number from the list.");
                 }
                 break;
 
             case STATES.FAQ:
-                // قائمة عبارات إنهاء المحادثة
-                const terminationPhrases = ["شكرا", "اغلاق", "اغلاق المحادثة", "يعطيك العافية"];
+                // List of phrases to end the conversation
+                const terminationPhrases = ["thank you", "close", "end chat", "appreciate it"];
                 if (terminationPhrases.some(phrase => text.includes(phrase))) {
-                    await sendToWhatsApp(from, "تم إغلاق المحادثة. إذا كنت تحتاج إلى أي مساعدة مستقبلية، فلا تتردد في التواصل معنا.");
+                    await sendToWhatsApp(from, "The chat has been closed. If you need any future assistance, feel free to reach out to us.");
                     delete userSessions[from];
                     break;
                 }
-                
+
                 const aiResponse = await getOpenAIResponse(textRaw);
-                const reply = `${aiResponse}\n\nلمواصلة الاستفسار، يمكنك طرح سؤال آخر. إذا كنت ترغب في إنهاء المحادثة، يرجى كتابة "شكرا" أو "اغلاق المحادثة".`;
+                const reply = `${aiResponse}\n\nTo continue your inquiry, you can ask another question. If you want to end the conversation, please type 'thank you' or 'end chat'.`;
                 await sendToWhatsApp(from, reply);
                 break;
 
             case STATES.NAME:
-                session.data.name = textRaw; // عدم تحويل الاسم لحروف صغيرة لتجنب فقدان التنسيق
-                // بعد الاسم، نسأل المستخدم: هل تريد استخدام رقم الواتساب الذي تراسلني منه؟
+                session.data.name = textRaw; // Keep the original formatting of the name
+                // After the name, ask the user if they want to use their WhatsApp number
                 session.step = STATES.PHONE_CONFIRM;
-                await sendToWhatsApp(from, "📞 هل تريد استخدام الرقم الذي تراسلني منه للتواصل؟ (نعم/لا)");
+                await sendToWhatsApp(from, "📞 Do you want to use the number you are messaging from? (Yes/No)");
                 break;
 
             case STATES.PHONE_CONFIRM:
-                // التحقق من الإجابة: إذا كانت "نعم" نستخدم رقم from، وإذا كانت "لا" ننتقل لإدخال رقم جديد
-                if (text.includes("نعم")) {
+                // Check the response: If "Yes", use the 'from' number; if "No", ask for a new number
+                if (text.includes("yes")) {
                     session.data.phone = from;
                     session.step = STATES.EMAIL;
-                    await sendToWhatsApp(from, "📧 سيتم استخدام رقمك الحالي. يرجى تزويدنا ببريدك الإلكتروني.");
-                } else if (text.includes("لا")) {
+                    await sendToWhatsApp(from, "📧 Your current number will be used. Please provide your email address.");
+                } else if (text.includes("no")) {
                     session.step = STATES.PHONE_INPUT;
-                    await sendToWhatsApp(from, "📞 من فضلك أدخل رقم هاتفك للتواصل.");
+                    await sendToWhatsApp(from, "📞 Please enter your contact phone number.");
                 } else {
-                    await sendToWhatsApp(from, "❌ الرجاء الإجابة بنعم أو لا.");
+                    await sendToWhatsApp(from, "❌ Please reply with Yes or No.");
                 }
                 break;
 
             case STATES.PHONE_INPUT:
                 if (!isValidPhone(textRaw)) {
-                    await sendToWhatsApp(from, "❌ رقم الهاتف غير صالح، يرجى إدخال رقم صحيح.");
-                    return res.sendStatus(200); // إبقاء المستخدم في نفس الحالة
+                    await sendToWhatsApp(from, "❌ Invalid phone number, please enter a valid number.");
+                    return res.sendStatus(200); // Keep the user in the same state
                 }
                 session.data.phone = textRaw;
                 session.step = STATES.EMAIL;
-                await sendToWhatsApp(from, "📧 يرجى تزويدنا ببريدك الإلكتروني.");
+                await sendToWhatsApp(from, "📧 Please provide your email address.");
                 break;
 
             case STATES.EMAIL:
                 if (!isValidEmail(textRaw)) {
-                    await sendToWhatsApp(from, "❌ البريد الإلكتروني غير صالح، يرجى إدخال بريد إلكتروني صحيح.");
+                    await sendToWhatsApp(from, "❌ Invalid email address, please enter a valid one.");
                     return res.sendStatus(200);
                 }
                 session.data.email = textRaw;
                 session.step = STATES.ADDRESS;
-                await sendToWhatsApp(from, "📍 يرجى تزويدنا بعنوانك بالكامل.");
+                await sendToWhatsApp(from, "📍 Please provide your full address.");
                 break;
 
             case STATES.ADDRESS:
                 session.data.address = textRaw;
                 session.step = STATES.CONFIRMATION;
-                
-                let summary = `✅ *ملخص الطلب:*\n\n`;
-                summary += `🔹 *الاسم:* ${session.data.name}\n`;
-                summary += `📞 *رقم الهاتف:* ${session.data.phone}\n`;
-                summary += `📧 *البريد الإلكتروني:* ${session.data.email}\n`;
-                summary += `📍 *العنوان:* ${session.data.address}\n`;
-                summary += `🛢 *نوع الطلب:* ${session.data.type}\n\n`;
-                summary += `هل المعلومات صحيحة؟ يرجى الرد بـ *نعم* أو *لا*`;
-                
+
+                let summary = `✅ *Order Summary:*\n\n`;
+                summary += `🔹 *Name:* ${session.data.name}\n`;
+                summary += `📞 *Phone Number:* ${session.data.phone}\n`;
+                summary += `📧 *Email:* ${session.data.email}\n`;
+                summary += `📍 *Address:* ${session.data.address}\n`;
+                summary += `🛢 *Request Type:* ${session.data.type}\n\n`;
+                summary += `Is the information correct? Please reply with *Yes* or *No*`;
+
                 await sendToWhatsApp(from, summary);
                 break;
 
             case STATES.CONFIRMATION:
-                if (text.includes("نعم")) {
-                    // افتراض وجود متغير ORDER_API_URL في ملف البيئة لمعالجة الطلب
+                if (text.includes("yes")) {
+                    // Assume ORDER_API_URL is set in the environment file for processing the request
                     await axios.post(process.env.ORDER_API_URL, session.data, {
                         headers: { 'Content-Type': 'application/json' }
                     });
-                    await sendToWhatsApp(from, "✅ تم إرسال طلبك بنجاح! سيتم التواصل معك قريبًا.");
+                    await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
                 } else {
-                    await sendToWhatsApp(from, "❌ تم إلغاء الطلب. يمكنك إعادة المحاولة في أي وقت.");
+                    await sendToWhatsApp(from, "❌ Order has been canceled. You can retry anytime.");
                 }
                 delete userSessions[from];
                 break;
 
             default:
-                await sendToWhatsApp(from, "❌ حدث خطأ غير متوقع. يرجى إعادة المحاولة.");
+                await sendToWhatsApp(from, "❌ An unexpected error occurred. Please try again.");
                 delete userSessions[from];
                 break;
         }
 
         res.sendStatus(200);
     } catch (error) {
-        console.error('❌ خطأ:', error.response?.data || error.message);
+        console.error('❌ Error:', error.response?.data || error.message);
         res.sendStatus(500);
     }
 });
+
 
 app.listen(PORT, () => console.log(`🚀 Server is running on http://localhost:${PORT}`));
 
