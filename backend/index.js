@@ -436,6 +436,9 @@ app.get('/', (req, res) => {
     res.send('Backend is running');
 })
 
+const userSessions = {};
+
+
 // بيانات التحقق من Webhook
 const VERIFY_TOKEN = "Mohammad";
 
@@ -453,19 +456,31 @@ app.get("/webhook", (req, res) => {
     }
 });
 
+
+const welcomeMessage = `🌟 مرحبًا بك في *شركة محمد لتكرير الزيوت* 🌟  
+نحن نقدم الخدمات التالية:  
+✅ *استفسارات عن منتجاتنا وخدماتنا*  
+✅ *إنشاء طلب جديد:*  
+   - *طلب التخلص من الزيت المستعمل* 🛢️  
+   - *شراء الزيت المعاد تكريره* 🏭  
+أخبرني كيف يمكنني مساعدتك اليوم؟ 😊`;
+
 // دالة لإرسال رسالة إلى OpenAI مع توجيه الأسئلة ضمن نطاق الشركة
 const getOpenAIResponse = async (userMessage) => {
     try {
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-            model: "gpt-4", 
+            model: "gpt-4",
             messages: [
                 {
-                    role: "system",  
-                    content: `Mohammed Oil Refining Company\nCompany working hours are from Sunday to Thursday from 9 am to 2 pm\nYou are an assistant for the oil company. Please answer only questions related to the company's services or products. If the question does not relate to the company, respond with "Sorry, I can only answer questions related to our company."`
+                    role: "system",
+                    content: `🌟 مرحبًا بك في شركة محمد لتكرير الزيوت 🌟  
+الشركة متخصصة في إعادة تكرير الزيوت، وساعات العمل من الأحد إلى الخميس من 9 صباحًا حتى 2 مساءً.  
+أنت مساعد افتراضي للشركة، مهمتك الإجابة فقط عن الأسئلة المتعلقة بالشركة، مثل الخدمات، الأسعار، أو طلبات التخلص من الزيت.  
+إذا كان السؤال لا يتعلق بالشركة، فأجب بـ: "❌ عذرًا، يمكنني فقط الإجابة عن الأسئلة المتعلقة بخدمات شركتنا."`
                 },
                 {
-                    role: "user",  
-                    content: userMessage  
+                    role: "user",
+                    content: userMessage
                 }
             ],
             max_tokens: 150,
@@ -480,10 +495,9 @@ const getOpenAIResponse = async (userMessage) => {
         return response.data.choices[0].message.content.trim();
     } catch (error) {
         console.error('❌ Error with OpenAI:', error.response?.data || error.message);
-        return "Sorry, there was an error processing your request.";
+        return "❌ عذرًا، حدث خطأ أثناء معالجة طلبك.";
     }
 };
-
 // دالة لإرسال رسائل WhatsApp
 const sendToWhatsApp = async (to, message) => {
     try {
@@ -514,14 +528,72 @@ app.post('/webhook', async (req, res) => {
         }
 
         const message = messages[0];
-        const from = message.from;  
-        const text = message.text?.body;  
+        const from = message.from;
+        const text = message.text?.body?.toLowerCase();
 
         console.log(`📩 رسالة جديدة من ${from}: ${text}`);
 
-        const replyText = await getOpenAIResponse(text);
+        // التحقق مما إذا كان المستخدم لديه جلسة نشطة لجمع الطلبات
+        if (!userSessions[from]) {
+            userSessions[from] = { step: 0, data: {} };
+        }
 
-        await sendToWhatsApp(from, replyText);
+        const session = userSessions[from];
+
+        if (session.step === 0) {
+            if (text.includes("شراء زيت")) {
+                session.data.type = "شراء زيت";
+                session.step = 1;
+                await sendToWhatsApp(from, "🔹 يرجى تزويدنا باسمك الكريم.");
+            } else if (text.includes("التخلص من الزيت")) {
+                session.data.type = "التخلص من الزيت المستعمل";
+                session.step = 1;
+                await sendToWhatsApp(from, "🔹 يرجى تزويدنا باسمك الكريم.");
+            } else {
+                // إذا لم يكن طلبًا، نرسل السؤال إلى ChatGPT
+                const replyText = await getOpenAIResponse(text);
+                await sendToWhatsApp(from, replyText);
+            }
+        } else if (session.step === 1) {
+            session.data.name = text;
+            session.step = 2;
+            await sendToWhatsApp(from, "📞 يرجى تزويدنا برقم هاتفك للتواصل.");
+        } else if (session.step === 2) {
+            session.data.phone = text;
+            session.step = 3;
+            await sendToWhatsApp(from, "📧 يرجى تزويدنا ببريدك الإلكتروني.");
+        } else if (session.step === 3) {
+            session.data.email = text;
+            session.step = 4;
+            await sendToWhatsApp(from, "📍 يرجى تزويدنا بعنوانك بالكامل.");
+        } else if (session.step === 4) {
+            session.data.address = text;
+            session.step = 5;
+
+            // إرسال ملخص الطلب للمستخدم
+            let summary = `✅ *ملخص الطلب:*\n\n`;
+            summary += `🔹 *الاسم:* ${session.data.name}\n`;
+            summary += `📞 *رقم الهاتف:* ${session.data.phone}\n`;
+            summary += `📧 *البريد الإلكتروني:* ${session.data.email}\n`;
+            summary += `📍 *العنوان:* ${session.data.address}\n`;
+            summary += `🛢 *نوع الطلب:* ${session.data.type}\n\n`;
+            summary += `هل المعلومات صحيحة؟ يرجى الرد بـ *نعم* أو *لا*`;
+
+            await sendToWhatsApp(from, summary);
+        } else if (session.step === 5) {
+            if (text.includes("نعم")) {
+                // إرسال الطلب إلى API
+                await axios.post(process.env.ORDER_API_URL, session.data, {
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                await sendToWhatsApp(from, "✅ تم إرسال طلبك بنجاح! سيتم التواصل معك قريبًا.");
+                delete userSessions[from]; // إنهاء الجلسة بعد الطلب
+            } else {
+                await sendToWhatsApp(from, "❌ تم إلغاء الطلب. يمكنك إعادة المحاولة في أي وقت.");
+                delete userSessions[from]; // إنهاء الجلسة إذا رفض المستخدم الطلب
+            }
+        }
 
         res.sendStatus(200);
     } catch (error) {
