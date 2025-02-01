@@ -467,10 +467,19 @@ app.get("/webhook", (req, res) => {
     }
 });
 
+const companyLocationLink = "https://maps.app.goo.gl/4j1fJxN7yp12S3si8";  // قم بتغيير الرابط إلى رابط موقعك
+
 
 // // دالة لإرسال رسالة إلى OpenAI مع توجيه الأسئلة ضمن نطاق الشركة
 const getOpenAIResponse = async (userMessage) => {
     try {
+        // تحقق مما إذا كان السؤال عن الموقع
+        const locationKeywords = ["الموقع", "أين تقع الشركة", "موقع الشركة", "أين يقع"];
+        if (locationKeywords.some(keyword => userMessage.includes(keyword))) {
+            // إذا كان السؤال عن الموقع، قم بإرجاع رابط الموقع
+            return `📍 يمكنك العثور على موقعنا على خرائط جوجل عبر الرابط التالي: ${companyLocationLink}`;
+        }
+
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
             model: "gpt-4",
             messages: [
@@ -501,6 +510,7 @@ const getOpenAIResponse = async (userMessage) => {
         return "❌ عذرًا، حدث خطأ أثناء معالجة طلبك.";
     }
 };
+
 
 const sendToWhatsApp = async (to, message) => {
     try {
