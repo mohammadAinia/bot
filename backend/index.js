@@ -445,9 +445,11 @@ const STATES = {
     PHONE_INPUT: "phone_input",
     EMAIL: 3,
     ADDRESS: 4,
-    QUANTITY: 6,  // Add the QUANTITY state
-    CONFIRMATION: 5
+    CITY: 7,  // New state for city input
+    QUANTITY: 6,  // State for entering quantity
+    CONFIRMATION: 5  // State for confirming the order
 };
+
 
 // بيانات التحقق من Webhook
 const VERIFY_TOKEN = "Mohammad";
@@ -676,69 +678,78 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, "📦 Please provide the quantity of the product.");
                 break;
 
+            case STATES.CITY:
+                session.data.city = textRaw;  // Store the city
+                session.step = STATES.QUANTITY;  // Proceed to the quantity step
+                await sendToWhatsApp(from, "📦 Please provide the quantity of the product.");
+                break;
+
             case STATES.QUANTITY:
-                // Validate that the input is a number
+                // التأكد من أن الكمية هي نص
                 if (isNaN(textRaw) || textRaw.trim() === "") {
                     await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
                     return res.sendStatus(200);
                 }
-                session.data.quantity = textRaw;
+                session.data.quantity = textRaw; // سيتم تخزين الكمية كنص
                 session.step = STATES.CONFIRMATION;
+
 
                 let summary = `✅ *Order Summary:*\n\n`;
                 summary += `🔹 *Name:* ${session.data.name}\n`;
                 summary += `📞 *Phone Number:* ${session.data.phone}\n`;
                 summary += `📧 *Email:* ${session.data.email}\n`;
                 summary += `📍 *Address:* ${session.data.address}\n`;
+                summary += `🌆 *City:* ${session.data.city}\n`;  // Add city to the summary
                 summary += `📦 *Quantity:* ${session.data.quantity}\n`;
                 summary += `🛢 *Request Type:* ${session.data.type}\n\n`;
                 summary += `Is the information correct? Please reply with *Yes* or *No*`;
-
+            
                 await sendToWhatsApp(from, summary);
                 break;
 
-            case STATES.CONFIRMATION:
-                if (text.includes("yes")) {
-                    // Send the data to the external API
-                    const requestData = {
-                        user_name: session.data.name,
-                        email: session.data.email,
-                        phone_number: session.data.phone,
-                        address: session.data.address,
-                        quantity: session.data.quantity // Include quantity in the request data
-                    };
-
-                    console.log('Request Data:', requestData); // Log request data for debugging
-
-                    try {
-                        const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
-                            headers: { 'Content-Type': 'application/json' },
-                            timeout: 5000  // 5-second timeout for the request
-                        });
-
-                        if (response.status === 200) {
-                            console.log('API Response:', response.data); // Log successful response
-                            await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
-                        } else {
-                            console.error(`❌ API returned unexpected status code: ${response.status}`);
-                            await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
+                case STATES.CONFIRMATION:
+                    if (text.includes("yes")) {
+                        // Send the data to the external API
+                        const requestData = {
+                            user_name: session.data.name,
+                            email: session.data.email,
+                            phone_number: session.data.phone,
+                            address: session.data.address,
+                            city: session.data.city,  // Include city in the request data
+                            quantity: session.data.quantity  // Include quantity in the request data
+                        };
+                
+                        console.log('Request Data:', requestData); // Log request data for debugging
+                
+                        try {
+                            const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
+                                headers: { 'Content-Type': 'application/json' },
+                                timeout: 5000  // 5-second timeout for the request
+                            });
+                
+                            if (response.status === 200) {
+                                console.log('API Response:', response.data); // Log successful response
+                                await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
+                            } else {
+                                console.error(`❌ API returned unexpected status code: ${response.status}`);
+                                await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
+                            }
+                        } catch (error) {
+                            if (error.response) {
+                                // API responded with an error code
+                                console.error('API Error Response:', error.response.data);
+                                console.error('API Status Code:', error.response.status);
+                            } else {
+                                // Other errors (like network errors)
+                                console.error('Network or request error:', error.message);
+                            }
+                            await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
                         }
-                    } catch (error) {
-                        if (error.response) {
-                            // API responded with an error code
-                            console.error('API Error Response:', error.response.data);
-                            console.error('API Status Code:', error.response.status);
-                        } else {
-                            // Other errors (like network errors)
-                            console.error('Network or request error:', error.message);
-                        }
-                        await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
+                    } else {
+                        await sendToWhatsApp(from, "❌ Order has been canceled. You can retry anytime.");
                     }
-                } else {
-                    await sendToWhatsApp(from, "❌ Order has been canceled. You can retry anytime.");
-                }
-                delete userSessions[from];
-                break;
+                    delete userSessions[from];  // Clear the session after confirmation
+                    break;
 
             default:
                 await sendToWhatsApp(from, "❌ An unexpected error occurred. Please try again.");
