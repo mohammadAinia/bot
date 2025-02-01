@@ -612,7 +612,11 @@ app.post('/webhook', async (req, res) => {
 
         switch (session.step) {
             case STATES.WELCOME:
-                if (buttonReply.toLowerCase() === "inquiries") {
+                // Handle greeting or initial message
+                if (["hi", "hello", "hey", "start"].some(greeting => text.includes(greeting))) {
+                    await sendWelcomeMessage(from);
+                    session.step = STATES.FAQ; // Transition to FAQ state, or another appropriate state.
+                } else if (buttonReply.toLowerCase() === "inquiries") {
                     await sendToWhatsApp(from, "❓ Please send your question regarding our services or products.");
                     session.step = STATES.FAQ;
                 } else if (buttonReply.toLowerCase() === "dispose_oil") {
@@ -627,6 +631,7 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(from, "❌ Invalid option, please select a valid service.");
                 }
                 break;
+        
 
             case STATES.FAQ:
                 const terminationPhrases = ["thank you", "close", "end chat", "appreciate it"];
