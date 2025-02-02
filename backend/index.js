@@ -550,7 +550,7 @@ const defaultWelcomeMessage = `ðŸŒŸ Welcome to *Mohammed Oil Refining Company* ð
 
                                     Please send the *service number* you wish to request.`;
 
-const axios = require('axios');
+import axios from 'axios'
 
 app.post('/webhook', async (req, res) => {
     try {
