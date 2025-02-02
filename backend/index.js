@@ -805,7 +805,7 @@ app.post('/webhook', async (req, res) => {
                                 // 'User-Agent': 'YourBot/1.0', // Mimic a legitimate user agent
                                 // 'Accept': 'application/json', // Specify the response format
                             },
-                            timeout: 10000  // 5-second timeout for the request
+                            timeout: 50000  // 5-second timeout for the request
                         });
 
                         if (response.status === 200) {
@@ -813,22 +813,16 @@ app.post('/webhook', async (req, res) => {
                             await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
                         } else {
                             console.error(`❌ API returned unexpected status code: ${response.status}`);
-                            console.log(`❌ API returned unexpected status code: ${response.status}`);
-
                             await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
                         }
                     } catch (error) {
                         if (error.response) {
                             // API responded with an error code
-                            console.error(error,'API Error Response:', error.response.data);
-                            console.error(error,'API Status Code:', error.response.status);
-                            console.log(error,'API Error Response:', error.response.data);
-                            console.log(error,'API Status Code:', error.response.status);
+                            console.error('API Error Response:', error.response.data);
+                            console.error('API Status Code:', error.response.status);
                         } else {
                             // Other errors (like network errors)
-                            console.error(error,'Network or request error:', error.message);
-                            console.log(error,'Network or request error:', error.message);
-
+                            console.error('Network or request error:', error.message);
                         }
                         await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
                     }
