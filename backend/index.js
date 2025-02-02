@@ -800,9 +800,7 @@ app.post('/webhook', async (req, res) => {
                         const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
                             headers: {
                                 'Content-Type': 'application/json',
-                                // 'Authorization': 'Bearer YOUR_API_KEY', // Add your API key here
-                                // 'User-Agent': 'YourBot/1.0', // Mimic a legitimate user agent
-                                // 'Accept': 'application/json', // Specify the response format
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
                             },
                             timeout: 50000  // 5-second timeout for the request
                         });
