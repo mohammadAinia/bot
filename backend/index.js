@@ -799,6 +799,7 @@ app.post('/webhook', async (req, res) => {
 
                     console.log('Request Data:', requestData); // Log request data for debugging
                     dataStore.push(requestData);
+                    await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
 
                     // try {
                     //     const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
@@ -885,15 +886,15 @@ app.post('/webhook', async (req, res) => {
 //             let welcomeText = "";
 //             if (isGreeting) {
 //                 welcomeText = `Wa Alaikum Assalam wa Rahmatullahi wa Barakatuh, welcome to *Mohammed Oil Refining Company*.
-                                                                                                                                                                  
+
 //                                                                                                                                                                   We offer the following services:
-                                                                                                                                                                  
+
 //                                                                                                                                                                   1️⃣ *Inquiries about our products and services*
-                                                                                                                                                                  
+
 //                                                                                                                                                                   2️⃣ *Create a new request:*
 //                                                                                                                                                                      - 2.1 *Request for used oil disposal* 🛢️
 //                                                                                                                                                                      - 2.2 *Purchase of refined oil* 🏭
-                                                                                                                                                                  
+
 //                                                                                                                                                                   Please send the *service number* you wish to request.`;
 //             } else {
 //                 welcomeText = defaultWelcomeMessage;
