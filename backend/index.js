@@ -767,74 +767,9 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, summary);
                 break;
 
-            // case STATES.CONFIRMATION:
-            //     if (text.includes("yes")) {
-            //         // Send the data to the external API
-            //         const requestData = {
-            //             user_name: session.data.name,
-            //             email: session.data.email,
-            //             phone_number: session.data.phone,
-            //             city: session.data.city,
-            //             label: session.data.label,
-            //             address: session.data.address,
-            //             street: session.data.street,
-            //             building_name: session.data.building_name,
-            //             flat_no: session.data.flat_no,
-            //             latitude: session.data.latitude,
-            //             longitude: session.data.longitude,
-            //             quantity: session.data.quantity
-            //             // user_name: "John Doe",
-            //             // email: "johndoe@example.com",
-            //             // phone_number: "+971 501234567",
-            //             // city: "Dubai",
-            //             // label: "Home",
-            //             // address: "123 Street, Downtown",
-            //             // street: "Main Street",
-            //             // building_name: "Building A",
-            //             // flat_no: "101",
-            //             // latitude: "25.276987",
-            //             // longitude: "55.296249",
-            //             // quantity: "5"
-            //         };
-
-            //         console.log('Request Data:', requestData); // Log request data for debugging
-
-            //         try {
-            //             const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
-            //                 headers: {
-            //                     'Content-Type': 'application/json',
-            //                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            //                 },
-            //                 timeout: 50000  // 5-second timeout for the request
-            //             });
-
-            //             if (response.status === 200) {
-            //                 console.log('API Response:', response.data); // Log successful response
-            //                 await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
-            //             } else {
-            //                 console.error(`❌ API returned unexpected status code: ${response.status}`);
-            //                 await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
-            //             }
-            //         } catch (error) {
-            //             if (error.response) {
-            //                 // API responded with an error code
-            //                 console.error('API Error Response:', error.response.data);
-            //                 console.error('API Status Code:', error.response.status);
-            //             } else {
-            //                 // Other errors (like network errors)
-            //                 console.error('Network or request error:', error.message);
-            //             }
-            //             await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
-            //         }
-            //     } else {
-            //         await sendToWhatsApp(from, "❌ Order has been canceled. You can retry anytime.");
-            //     }
-            //     delete userSessions[from];  // Clear the session after confirmation
-            //     break;
-
             case STATES.CONFIRMATION:
                 if (text.includes("yes")) {
-                    // Instead of sending data to API, store it in the array
+                    // Send the data to the external API
                     const requestData = {
                         user_name: session.data.name,
                         email: session.data.email,
@@ -848,16 +783,50 @@ app.post('/webhook', async (req, res) => {
                         latitude: session.data.latitude,
                         longitude: session.data.longitude,
                         quantity: session.data.quantity
+                        // user_name: "John Doe",
+                        // email: "johndoe@example.com",
+                        // phone_number: "+971 501234567",
+                        // city: "Dubai",
+                        // label: "Home",
+                        // address: "123 Street, Downtown",
+                        // street: "Main Street",
+                        // building_name: "Building A",
+                        // flat_no: "101",
+                        // latitude: "25.276987",
+                        // longitude: "55.296249",
+                        // quantity: "5"
                     };
 
-                    console.log('Stored Data:', requestData); // Log stored data for debugging
-
-                    // Push the collected data to the dataStore array
+                    console.log('Request Data:', requestData); // Log request data for debugging
                     dataStore.push(requestData);
 
-                    // Send a confirmation message
-                    await sendToWhatsApp(from, "✅ Your request has been stored successfully! We will contact you soon.");
+                    // try {
+                    //     const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
+                    //         headers: {
+                    //             'Content-Type': 'application/json',
+                    //             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                    //         },
+                    //         timeout: 50000  // 5-second timeout for the request
+                    //     });
 
+                    //     if (response.status === 200) {
+                    //         console.log('API Response:', response.data); // Log successful response
+                    //         await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
+                    //     } else {
+                    //         console.error(`❌ API returned unexpected status code: ${response.status}`);
+                    //         await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
+                    //     }
+                    // } catch (error) {
+                    //     if (error.response) {
+                    //         // API responded with an error code
+                    //         console.error('API Error Response:', error.response.data);
+                    //         console.error('API Status Code:', error.response.status);
+                    //     } else {
+                    //         // Other errors (like network errors)
+                    //         console.error('Network or request error:', error.message);
+                    //     }
+                    //     await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
+                    // }
                 } else {
                     await sendToWhatsApp(from, "❌ Order has been canceled. You can retry anytime.");
                 }
