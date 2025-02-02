@@ -769,18 +769,30 @@ app.post('/webhook', async (req, res) => {
                 if (text.includes("yes")) {
                     // Send the data to the external API
                     const requestData = {
-                        user_name: session.data.name,
-                        email: session.data.email,
-                        phone_number: session.data.phone,
-                        city: session.data.city,
-                        label: session.data.label,
-                        address: session.data.address,
-                        street: session.data.street,
-                        building_name: session.data.building_name,
-                        flat_no: session.data.flat_no,
-                        latitude: session.data.latitude,
-                        longitude: session.data.longitude,
-                        quantity: session.data.quantity
+                        // user_name: session.data.name,
+                        // email: session.data.email,
+                        // phone_number: session.data.phone,
+                        // city: session.data.city,
+                        // label: session.data.label,
+                        // address: session.data.address,
+                        // street: session.data.street,
+                        // building_name: session.data.building_name,
+                        // flat_no: session.data.flat_no,
+                        // latitude: session.data.latitude,
+                        // longitude: session.data.longitude,
+                        // quantity: session.data.quantity,
+                        user_name: "John Doe",
+                        email: "johndoe@example.com",
+                        phone_number: "+971 501234567",
+                        city: "Dubai",
+                        label: "Home",
+                        address: "123 Street, Downtown",
+                        street: "Main Street",
+                        building_name: "Building A",
+                        flat_no: "101",
+                        latitude: "25.276987",
+                        longitude: "55.296249",
+                        quantity: "5"
                     };
 
                     console.log('Request Data:', requestData); // Log request data for debugging
