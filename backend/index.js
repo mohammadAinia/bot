@@ -769,30 +769,30 @@ app.post('/webhook', async (req, res) => {
                 if (text.includes("yes")) {
                     // Send the data to the external API
                     const requestData = {
-                        // user_name: session.data.name,
-                        // email: session.data.email,
-                        // phone_number: session.data.phone,
-                        // city: session.data.city,
-                        // label: session.data.label,
-                        // address: session.data.address,
-                        // street: session.data.street,
-                        // building_name: session.data.building_name,
-                        // flat_no: session.data.flat_no,
-                        // latitude: session.data.latitude,
-                        // longitude: session.data.longitude,
-                        // quantity: session.data.quantity,
-                        user_name: "John Doe",
-                        email: "johndoe@example.com",
-                        phone_number: "+971 501234567",
-                        city: "Dubai",
-                        label: "Home",
-                        address: "123 Street, Downtown",
-                        street: "Main Street",
-                        building_name: "Building A",
-                        flat_no: "101",
-                        latitude: "25.276987",
-                        longitude: "55.296249",
-                        quantity: "5"
+                        user_name: session.data.name,
+                        email: session.data.email,
+                        phone_number: session.data.phone,
+                        city: session.data.city,
+                        label: session.data.label,
+                        address: session.data.address,
+                        street: session.data.street,
+                        building_name: session.data.building_name,
+                        flat_no: session.data.flat_no,
+                        latitude: session.data.latitude,
+                        longitude: session.data.longitude,
+                        quantity: session.data.quantity
+                        // user_name: "John Doe",
+                        // email: "johndoe@example.com",
+                        // phone_number: "+971 501234567",
+                        // city: "Dubai",
+                        // label: "Home",
+                        // address: "123 Street, Downtown",
+                        // street: "Main Street",
+                        // building_name: "Building A",
+                        // flat_no: "101",
+                        // latitude: "25.276987",
+                        // longitude: "55.296249",
+                        // quantity: "5"
                     };
 
                     console.log('Request Data:', requestData); // Log request data for debugging
@@ -802,10 +802,10 @@ app.post('/webhook', async (req, res) => {
                             headers: {
                                 'Content-Type': 'application/json',
                                 // 'Authorization': 'Bearer YOUR_API_KEY', // Add your API key here
-                                'User-Agent': 'YourBot/1.0', // Mimic a legitimate user agent
-                                'Accept': 'application/json', // Specify the response format
+                                // 'User-Agent': 'YourBot/1.0', // Mimic a legitimate user agent
+                                // 'Accept': 'application/json', // Specify the response format
                             },
-                            timeout: 5000  // 5-second timeout for the request
+                            timeout: 10000  // 5-second timeout for the request
                         });
 
                         if (response.status === 200) {
@@ -813,16 +813,22 @@ app.post('/webhook', async (req, res) => {
                             await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
                         } else {
                             console.error(`❌ API returned unexpected status code: ${response.status}`);
+                            console.log(`❌ API returned unexpected status code: ${response.status}`);
+
                             await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
                         }
                     } catch (error) {
                         if (error.response) {
                             // API responded with an error code
-                            console.error('API Error Response:', error.response.data);
-                            console.error('API Status Code:', error.response.status);
+                            console.error(error,'API Error Response:', error.response.data);
+                            console.error(error,'API Status Code:', error.response.status);
+                            console.log(error,'API Error Response:', error.response.data);
+                            console.log(error,'API Status Code:', error.response.status);
                         } else {
                             // Other errors (like network errors)
-                            console.error('Network or request error:', error.message);
+                            console.error(error,'Network or request error:', error.message);
+                            console.log(error,'Network or request error:', error.message);
+
                         }
                         await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
                     }
