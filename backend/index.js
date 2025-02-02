@@ -550,6 +550,8 @@ const defaultWelcomeMessage = `🌟 Welcome to *Mohammed Oil Refining Company* �
 
                                     Please send the *service number* you wish to request.`;
 
+const axios = require('axios');
+
 app.post('/webhook', async (req, res) => {
     try {
         console.log('Incoming Webhook Data:', req.body); // Log the incoming data for debugging
@@ -586,16 +588,16 @@ app.post('/webhook', async (req, res) => {
             let welcomeText = "";
             if (isGreeting) {
                 welcomeText = `Wa Alaikum Assalam wa Rahmatullahi wa Barakatuh, welcome to *Mohammed Oil Refining Company*.
-                                                                                                                            
-                                                                                                                            We offer the following services:
-                                                                                                                            
-                                                                                                                            1️⃣ *Inquiries about our products and services*
-                                                                                                                            
-                                                                                                                            2️⃣ *Create a new request:*
-                                                                                                                               - 2.1 *Request for used oil disposal* 🛢️
-                                                                                                                               - 2.2 *Purchase of refined oil* 🏭
-                                                                                                                            
-                                                                                                                            Please send the *service number* you wish to request.`;
+                                                                                                                                                                
+                                                                                                                                                                We offer the following services:
+                                                                                                                                                                
+                                                                                                                                                                1️⃣ *Inquiries about our products and services*
+                                                                                                                                                                
+                                                                                                                                                                2️⃣ *Create a new request:*
+                                                                                                                                                                   - 2.1 *Request for used oil disposal* 🛢️
+                                                                                                                                                                   - 2.2 *Purchase of refined oil* 🏭
+                                                                                                                                                                
+                                                                                                                                                                Please send the *service number* you wish to request.`;
             } else {
                 welcomeText = defaultWelcomeMessage;
             }
@@ -744,7 +746,6 @@ app.post('/webhook', async (req, res) => {
                 session.data.quantity = textRaw; // سيتم تخزين الكمية كنص
                 session.step = STATES.CONFIRMATION;
 
-
                 let summary = `✅ *Order Summary:*\n\n`;
                 summary += `🔹 *Name:* ${session.data.name}\n`;
                 summary += `📞 *Phone Number:* ${session.data.phone}\n`;
@@ -768,38 +769,30 @@ app.post('/webhook', async (req, res) => {
                 if (text.includes("yes")) {
                     // Send the data to the external API
                     const requestData = {
-                        // user_name: session.data.name,
-                        // email: session.data.email,
-                        // phone_number: session.data.phone,
-                        // city: session.data.city,  // Include city
-                        // label: session.data.label,  // Include label
-                        // address: session.data.address,
-                        // street: session.data.street,  // Include street
-                        // building_name: session.data.building_name,  // Include building name
-                        // flat_no: session.data.flat_no,  // Include flat number
-                        // latitude: session.data.latitude,  // Include latitude
-                        // longitude: session.data.longitude,  // Include longitude
-                        // quantity: session.data.quantity  // Include quantity
-                        user_name: "John Doe",
-                        email: "johndoe@example.com",
-                        phone_number: "+971 501234567",
-                        city: "Dubai",
-                        label: "Home",
-                        address: "123 Street, Downtown",
-                        street: "Main Street",
-                        building_name: "Building A",
-                        flat_no: "101",
-                        latitude: "25.276987",
-                        longitude: "55.296249",
-                        quantity: "5"
+                        user_name: session.data.name,
+                        email: session.data.email,
+                        phone_number: session.data.phone,
+                        city: session.data.city,
+                        label: session.data.label,
+                        address: session.data.address,
+                        street: session.data.street,
+                        building_name: session.data.building_name,
+                        flat_no: session.data.flat_no,
+                        latitude: session.data.latitude,
+                        longitude: session.data.longitude,
+                        quantity: session.data.quantity
                     };
-
 
                     console.log('Request Data:', requestData); // Log request data for debugging
 
                     try {
                         const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: {
+                                'Content-Type': 'application/json',
+                                // 'Authorization': 'Bearer YOUR_API_KEY', // Add your API key here
+                                'User-Agent': 'YourBot/1.0', // Mimic a legitimate user agent
+                                'Accept': 'application/json', // Specify the response format
+                            },
                             timeout: 5000  // 5-second timeout for the request
                         });
 
