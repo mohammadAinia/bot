@@ -419,6 +419,8 @@ import express from 'express';
 import axios from 'axios';
 import bodyParser from 'body-parser';
 import cors from 'cors';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 
 dotenv.config(); // ✅ تحميل متغيرات البيئة
 
@@ -429,6 +431,10 @@ if (!process.env.OPENAI_API_KEY || !process.env.WHATSAPP_API_URL || !process.env
 }
 
 const app = express();
+
+const ADMIN_USERNAME = 'admin';
+const ADMIN_PASSWORD = 'admin123'; // In a real-world scenario, hash this password
+const SECRET_KEY = process.env.SECRET_KEY || 'LoothTech12345'; // Use a strong secret key
 
 // Allow requests from your front-end's origin (e.g., http://localhost:5173)
 app.use(cors({
@@ -441,6 +447,33 @@ app.use(bodyParser.json());
 app.get('/', (req, res) => {
     res.send('Backend is running');
 })
+
+// Login endpoint
+app.post('/admin/login', (req, res) => {
+    const { username, password } = req.body;
+
+    // Check credentials
+    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+        // Generate JWT token
+        const token = jwt.sign({ username }, SECRET_KEY, { expiresIn: '1h' });
+        res.json({ token });
+    } else {
+        res.status(401).json({ error: 'Invalid username or password' });
+    }
+});
+
+const authenticateToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) return res.status(401).json({ error: 'Access denied. No token provided.' });
+
+    jwt.verify(token, SECRET_KEY, (err, user) => {
+        if (err) return res.status(403).json({ error: 'Invalid or expired token.' });
+        req.user = user;
+        next();
+    });
+};
 
 const userSessions = {};
 
@@ -487,14 +520,12 @@ If the question is not related to the company, respond with: "❌ Sorry, I can o
 let guidanceMessage = ""; // Initially empty; can be updated by the admin
 
 // New endpoint to retrieve the messages
-app.get('/admin/messages', (req, res) => {
-    res.json({
-        systemMessage,
-        guidanceMessage
-    });
+// Protected routes
+app.get('/admin/messages', authenticateToken, (req, res) => {
+    res.json({ systemMessage, guidanceMessage });
 });
 
-app.post('/admin/update-messages', (req, res) => {
+app.post('/admin/update-messages', authenticateToken, (req, res) => {
     const { newSystemMessage, newGuidance } = req.body;
 
     if (newSystemMessage) {
