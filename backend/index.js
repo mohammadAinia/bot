@@ -718,9 +718,16 @@ app.post('/webhook', async (req, res) => {
             } else {
                 welcomeText = defaultWelcomeMessage;
             }
-
+            // Define the interactive buttons for the welcome message.
+            const welcomeButtons = [
+                { id: "option_1", title: "1️⃣ Inquiries" },
+                { id: "option_2_1", title: "2.1 Used Oil Disposal" }
+                // You can add a third button here if needed (e.g., for "2.2 Purchase refined oil")
+            ];
             console.log(`isGreeting: ${isGreeting} | Received text: "${text}"`);
-            await sendToWhatsApp(from, welcomeText);
+            // await sendToWhatsApp(from, welcomeText);
+            await sendToWhatsApp(from, welcomeText, welcomeButtons);
+
             return res.sendStatus(200);
         }
 
@@ -758,10 +765,11 @@ app.post('/webhook', async (req, res) => {
                         { id: "name_skip", title: "Skip" },
                     ]);
                 } else {
-                    // Send buttons for the initial options
-                    await sendButtons(from, "Wa Alaikum Assalam wa Rahmatullahi wa Barakatuh, welcome to *Mohammed Oil Refining Company*.\n\nWe offer the following services:\n\n1️⃣ *Inquiries about our products and services*\n2️⃣ *Create a new request:*\n   - 2.1 *Request for used oil disposal* 🛢️\n   - 2.2 *Purchase of refined oil* 🏭\n\nPlease choose an option:", [
+                    // Optionally, you could re-send the welcome message buttons if the input doesn't match.
+                    await sendButtons(from, "❌ Invalid option. Please choose one of the options below:", [
                         { id: "option_1", title: "1️⃣ Inquiries" },
                         { id: "option_2_1", title: "2.1 Used Oil Disposal" },
+                        // You can add more options here if needed.
                     ]);
                 }
                 break;
