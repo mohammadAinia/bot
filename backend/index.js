@@ -547,52 +547,52 @@ const getOpenAIResponse = async (userMessage) => {
     }
 };
 
-// const sendToWhatsApp = async (to, message) => {
-//     try {
-//         await axios.post(process.env.WHATSAPP_API_URL, {
-//             messaging_product: 'whatsapp',
-//             recipient_type: 'individual',
-//             to: to,
-//             type: 'text',
-//             text: { body: message }
-//         }, {
-//             headers: {
-//                 'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-//                 'Content-Type': 'application/json'
-//             }
-//         });
-//     } catch (error) {
-//         console.error('❌ Failed to send message to WhatsApp:', error.response?.data || error.message);
-//     }
-// };
-const sendToWhatsApp = async (to, text, buttons = []) => {
-    if (buttons.length > 0) {
-        await sendButtons(to, text, buttons);
-    } else {
-        // قم بتنظيف النص هنا باستخدام trim() وتحقق من أنه ليس فارغاً
-        const cleanText = text.trim();
-        if (cleanText.length === 0) {
-            console.error("The text is empty!");
-            return; // أو يمكنك إرسال رسالة بديلة
-        }
-
-        const payload = {
-            messaging_product: "whatsapp",
-            recipient_type: "individual",
+const sendToWhatsApp = async (to, message) => {
+    try {
+        await axios.post(process.env.WHATSAPP_API_URL, {
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
             to: to,
-            type: "text",
-            text: {
-                body: cleanText,
-            },
-        };
-        await axios.post(`${process.env.WHATSAPP_API_URL}`, payload, {
+            type: 'text',
+            text: { body: message }
+        }, {
             headers: {
-                Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-                "Content-Type": "application/json",
-            },
+                'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                'Content-Type': 'application/json'
+            }
         });
+    } catch (error) {
+        console.error('❌ Failed to send message to WhatsApp:', error.response?.data || error.message);
     }
 };
+// const sendToWhatsApp = async (to, text, buttons = []) => {
+//     if (buttons.length > 0) {
+//         await sendButtons(to, text, buttons);
+//     } else {
+//         // قم بتنظيف النص هنا باستخدام trim() وتحقق من أنه ليس فارغاً
+//         const cleanText = text.trim();
+//         if (cleanText.length === 0) {
+//             console.error("The text is empty!");
+//             return; // أو يمكنك إرسال رسالة بديلة
+//         }
+
+//         const payload = {
+//             messaging_product: "whatsapp",
+//             recipient_type: "individual",
+//             to: to,
+//             type: "text",
+//             text: {
+//                 body: cleanText,
+//             },
+//         };
+//         await axios.post(`${process.env.WHATSAPP_API_URL}`, payload, {
+//             headers: {
+//                 Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+//                 "Content-Type": "application/json",
+//             },
+//         });
+//     }
+// };
 
 
 const isValidEmail = (email) => {
@@ -693,8 +693,9 @@ app.post('/webhook', async (req, res) => {
         const message = messages[0];
         const from = message.from;
         const textRaw = message.text?.body || "";
-        const buttonId = message.interactive?.button_reply?.id || ""; // Get button ID if clicked
-        const text = (textRaw || buttonId).toLowerCase().trim(); // Use button ID if no text
+        // const buttonId = message.interactive?.button_reply?.id || ""; // Get button ID if clicked
+        // const text = (textRaw || buttonId).toLowerCase().trim(); // Use button ID if no text
+        const text = (textRaw).toLowerCase().trim(); // Use button ID if no text
 
         console.log(`📩 New message from ${from}: ${text}`);
 
@@ -727,13 +728,14 @@ app.post('/webhook', async (req, res) => {
                 welcomeText = defaultWelcomeMessage;
             }
             // Define the interactive buttons for the welcome message.
-            const welcomeButtons = [
-                { id: "option_1", title: "Inquiries" },
-                { id: "option_2_1", title: "Oil Disposal" }
-              ];
+            // const welcomeButtons = [
+            //     { id: "option_1", title: "Inquiries" },
+            //     { id: "option_2_1", title: "Oil Disposal" }
+            // ];
             console.log(`isGreeting: ${isGreeting} | Received text: "${text}"`);
             // await sendToWhatsApp(from, welcomeText);
-            await sendToWhatsApp(from, welcomeText, welcomeButtons);
+            // await sendToWhatsApp(from, welcomeText, welcomeButtons);
+            await sendToWhatsApp(from, welcomeText);
 
             return res.sendStatus(200);
         }
@@ -742,42 +744,42 @@ app.post('/webhook', async (req, res) => {
 
         // Handle messages based on the current state
         switch (session.step) {
-            // case STATES.WELCOME:
-            //     if (text === "1") {
-            //         await sendToWhatsApp(from, "❓ Please send your question regarding our services or products.");
-            //         session.step = STATES.FAQ;
-            //     } else if (text === "2.1") {
-            //         session.data.type = "Used oil disposal";
-            //         session.step = STATES.NAME;
-            //         await sendToWhatsApp(from, "🔹 Please provide your full name.");
-            //     } else if (text === "2.2") {
-            //         session.data.type = "Purchase of refined oil";
-            //         session.step = STATES.NAME;
-            //         await sendToWhatsApp(from, "🔹 Please provide your full name.");
-            //     } else {
-            //         await sendToWhatsApp(from, "❌ Invalid option, please choose a number from the list.");
-            //     }
-            //     break;
             case STATES.WELCOME:
-                if (text === "1" || buttonId === "option_1") {
-                  await sendButtons(from, "❓ Please send your question regarding our services or products.", [
-                    { id: "faq_1", title: "Product Inquiry" },
-                    { id: "faq_2", title: "Service Inquiry" }
-                  ]);
-                  session.step = STATES.FAQ;
-                } else if (text === "2.1" || buttonId === "option_2_1") {
-                  session.data.type = "Used oil disposal";
-                  session.step = STATES.NAME;
-                  await sendButtons(from, "🔹 Please provide your full name.", [
-                    { id: "name_skip", title: "Skip" }
-                  ]);
+                if (text === "1") {
+                    await sendToWhatsApp(from, "❓ Please send your question regarding our services or products.");
+                    session.step = STATES.FAQ;
+                } else if (text === "2.1") {
+                    session.data.type = "Used oil disposal";
+                    session.step = STATES.NAME;
+                    await sendToWhatsApp(from, "🔹 Please provide your full name.");
+                } else if (text === "2.2") {
+                    session.data.type = "Purchase of refined oil";
+                    session.step = STATES.NAME;
+                    await sendToWhatsApp(from, "🔹 Please provide your full name.");
                 } else {
-                  await sendButtons(from, "❌ Invalid option. Please choose one of the options below:", [
-                    { id: "option_1", title: "Inquiries" },
-                    { id: "option_2_1", title: "Oil Disposal" }
-                  ]);
+                    await sendToWhatsApp(from, "❌ Invalid option, please choose a number from the list.");
                 }
                 break;
+            // case STATES.WELCOME:
+            //     if (text === "1" || buttonId === "option_1") {
+            //       await sendButtons(from, "❓ Please send your question regarding our services or products.", [
+            //         { id: "faq_1", title: "Product Inquiry" },
+            //         { id: "faq_2", title: "Service Inquiry" }
+            //       ]);
+            //       session.step = STATES.FAQ;
+            //     } else if (text === "2.1" || buttonId === "option_2_1") {
+            //       session.data.type = "Used oil disposal";
+            //       session.step = STATES.NAME;
+            //       await sendButtons(from, "🔹 Please provide your full name.", [
+            //         { id: "name_skip", title: "Skip" }
+            //       ]);
+            //     } else {
+            //       await sendButtons(from, "❌ Invalid option. Please choose one of the options below:", [
+            //         { id: "option_1", title: "Inquiries" },
+            //         { id: "option_2_1", title: "Oil Disposal" }
+            //       ]);
+            //     }
+            //     break;
 
             case STATES.FAQ:
                 // List of phrases to end the conversation
@@ -935,57 +937,57 @@ app.post('/webhook', async (req, res) => {
                     };
 
                     console.log('Request Data:', requestData); // Log request data for debugging
-                    //     try {
-                    //         const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
-                    //             headers: {
-                    //                 'Content-Type': 'application/json',
-                    //             },
-                    //             timeout: 5000  // 5-second timeout for the request
-                    //         });
-
-                    //         if (response.status === 200) {
-                    //             console.log('API Response:', response.data); // Log successful response
-                    //             await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
-                    //         } else {
-                    //             console.error(`❌ API returned unexpected status code: ${response.status}`);
-                    //             await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
-                    //         }
-                    //     } catch (error) {
-                    //         if (error.response) {
-                    //             // API responded with an error code
-                    //             console.error('API Error Response:', error.response.data);
-                    //             console.error('API Status Code:', error.response.status);
-                    //         } else {
-                    //             // Other errors (like network errors)
-                    //             console.error('Network or request error:', error.message);
-                    //         }
-                    //         await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
-                    //     }
-                    // } else {
-                    //     await sendToWhatsApp(from, "❌ Order has been canceled. You can retry anytime.");
-                    // }
-                    // delete userSessions[from];  // Clear the session after confirmation
-                    // break;
                     try {
-                        const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData);
+                        const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            timeout: 5000  // 5-second timeout for the request
+                        });
+
                         if (response.status === 200) {
+                            console.log('API Response:', response.data); // Log successful response
                             await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
                         } else {
+                            console.error(`❌ API returned unexpected status code: ${response.status}`);
                             await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
                         }
                     } catch (error) {
+                        if (error.response) {
+                            // API responded with an error code
+                            console.error('API Error Response:', error.response.data);
+                            console.error('API Status Code:', error.response.status);
+                        } else {
+                            // Other errors (like network errors)
+                            console.error('Network or request error:', error.message);
+                        }
                         await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
                     }
-                } else if (buttonId === "confirm_no" || text.includes("no")) {
-                    await sendToWhatsApp(from, "❌ Order has been canceled. You can retry anytime.");
                 } else {
-                    await sendButtons(from, "Is the information correct?", [
-                        { id: "confirm_yes", title: "Yes" },
-                        { id: "confirm_no", title: "No" },
-                    ]);
+                    await sendToWhatsApp(from, "❌ Order has been canceled. You can retry anytime.");
                 }
-                delete userSessions[from];
+                delete userSessions[from];  // Clear the session after confirmation
                 break;
+            //     try {
+            //         const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData);
+            //         if (response.status === 200) {
+            //             await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
+            //         } else {
+            //             await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
+            //         }
+            //     } catch (error) {
+            //         await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
+            //     }
+            // } else if (buttonId === "confirm_no" || text.includes("no")) {
+            //     await sendToWhatsApp(from, "❌ Order has been canceled. You can retry anytime.");
+            // } else {
+            //     await sendButtons(from, "Is the information correct?", [
+            //         { id: "confirm_yes", title: "Yes" },
+            //         { id: "confirm_no", title: "No" },
+            //     ]);
+            // }
+            // delete userSessions[from];
+            // break;
 
             default:
                 await sendToWhatsApp(from, "❌ An unexpected error occurred. Please try again.");
