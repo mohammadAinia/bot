@@ -630,37 +630,39 @@ function formatPhoneNumber(phoneNumber) {
 
 
 const sendButtons = async (to, text, buttons) => {
-    const buttonList = buttons.map((button) => ({
+    const formattedButtons = buttons.map(({ id, title }) => ({
         type: "reply",
-        reply: {
-            id: button.id, // Unique ID for the button
-            title: button.title, // Text displayed on the button
-        },
+        reply: { id, title },
     }));
 
     const payload = {
         messaging_product: "whatsapp",
         recipient_type: "individual",
-        to: to,
+        to,
         type: "interactive",
         interactive: {
             type: "button",
-            body: {
-                text: text, // Main message text
-            },
-            action: {
-                buttons: buttonList, // List of buttons
-            },
+            body: { text },
+            action: { buttons: formattedButtons },
         },
     };
 
-    await axios.post(`https://graph.facebook.com/v17.0/${YOUR_PHONE_NUMBER_ID}/messages`, payload, {
-        headers: {
-            Authorization: `Bearer ${YOUR_ACCESS_TOKEN}`,
-            "Content-Type": "application/json",
-        },
-    });
+    try {
+        await axios.post(
+            `https://graph.facebook.com/v17.0/${process.env.WHATSAPP_API_URL}/messages`,
+            payload,
+            {
+                headers: {
+                    Authorization: `Bearer ${process.env.WHATSAPP_API_URL}`,
+                    "Content-Type": "application/json",
+                },
+            }
+        );
+    } catch (error) {
+        console.error("❌ Error sending buttons:", error.response?.data || error.message);
+    }
 };
+
 
 app.post('/webhook', async (req, res) => {
     try {
