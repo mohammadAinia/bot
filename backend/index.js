@@ -679,9 +679,10 @@ const isValidEmail = (email) => {
 };
 
 const isValidPhone = (phone) => {
-    const regex = /^[0-9]{10,15}$/; // تعديل هذا التعبير ليناسب تنسيق أرقام بلدك
+    const regex = /^\+?\d{1,4}\s?\d{6,12}$/; // يسمح برمز الدولة والمسافة
     return regex.test(phone);
 };
+
 
 let dataStore = [];  // Array to temporarily store data
 
@@ -698,12 +699,23 @@ const defaultWelcomeMessage = `🌟 Welcome to *Mohammed Oil Refining Company* �
 
 
 function formatPhoneNumber(phoneNumber) {
-    // Ensure the number starts with "+"
-    if (!phoneNumber.startsWith("+")) {
-        return `+${phoneNumber}`;
+    // إزالة أي مسافات أو رموز غير ضرورية
+    let cleanedNumber = phoneNumber.replace(/\D/g, "");
+
+    // التأكد من أن الرقم يبدأ بـ "+"
+    if (!cleanedNumber.startsWith("+")) {
+        cleanedNumber = `+${cleanedNumber}`;
     }
-    return phoneNumber;
+
+    // إضافة مسافة بعد رمز الدولة (أول 3 أو 4 أرقام)
+    const match = cleanedNumber.match(/^\+(\d{1,4})(\d+)$/);
+    if (match) {
+        return `+${match[1]} ${match[2]}`; // إضافة المسافة بعد كود الدولة
+    }
+
+    return cleanedNumber; // إرجاع الرقم إذا لم ينطبق النمط
 }
+
 
 app.post('/webhook', async (req, res) => {
     try {
@@ -803,12 +815,12 @@ app.post('/webhook', async (req, res) => {
 
             case STATES.PHONE_CONFIRM:
                 if (text.includes("yes")) {
-                    session.data.phone = formatPhoneNumber(from);
+                    session.data.phone = formatPhoneNumber(from); // ✅ الرقم الآن سيكون بتنسيق "+971 501234567"
                     session.step = STATES.EMAIL;
                     await sendToWhatsApp(from, "📧 Your current number will be used. Please provide your email address.");
                 } else if (text.includes("no")) {
                     session.step = STATES.PHONE_INPUT;
-                    await sendToWhatsApp(from, "📞 Please enter your contact phone number.");
+                    await sendToWhatsApp(from, "📞 Please enter the phone with country code starting from +.");
                 } else {
                     await sendToWhatsApp(from, "❌ Please reply with Yes or No.");
                 }
@@ -819,7 +831,7 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(from, "❌ Invalid phone number, please enter a valid number.");
                     return res.sendStatus(200);
                 }
-                session.data.phone = formatPhoneNumber(textRaw);
+                session.data.phone = formatPhoneNumber(textRaw); // ✅ الآن يتم تنسيق الرقم قبل تخزينه
                 session.step = STATES.EMAIL;
                 await sendToWhatsApp(from, "📧 Please provide your email address.");
                 break;
@@ -922,30 +934,30 @@ app.post('/webhook', async (req, res) => {
                 if (text.includes("yes")) {
                     // Send the data to the external API
                     const requestData = {
-                        // user_name: session.data.name,
-                        // email: session.data.email,
-                        // phone_number: session.data.phone,
-                        // city: session.data.city,
-                        // label: session.data.label,
-                        // address: session.data.address,
-                        // street: session.data.street,
-                        // building_name: session.data.building_name,
-                        // flat_no: session.data.flat_no,
-                        // latitude: session.data.latitude,
-                        // longitude: session.data.longitude,
-                        // quantity: session.data.quantity
-                        user_name: "John Doe",
-                        email: "johndoe@example.com",
-                        phone_number: "+971 501234567",
-                        city: "Dubai",
-                        label: "Home",
-                        address: "123 Street, Downtown",
-                        street: "Main Street",
-                        building_name: "Building A",
-                        flat_no: "101",
-                        latitude: "25.276987",
-                        longitude: "55.296249",
-                        quantity: "5"
+                        user_name: session.data.name,
+                        email: session.data.email,
+                        phone_number: session.data.phone,
+                        city: session.data.city,
+                        label: session.data.label,
+                        address: session.data.address,
+                        street: session.data.street,
+                        building_name: session.data.building_name,
+                        flat_no: session.data.flat_no,
+                        latitude: session.data.latitude,
+                        longitude: session.data.longitude,
+                        quantity: session.data.quantity
+                        // user_name: "John Doe",
+                        // email: "johndoe@example.com",
+                        // phone_number: "+971 501234567",
+                        // city: "Dubai",
+                        // label: "Home",
+                        // address: "123 Street, Downtown",
+                        // street: "Main Street",
+                        // building_name: "Building A",
+                        // flat_no: "101",
+                        // latitude: "25.276987",
+                        // longitude: "55.296249",
+                        // quantity: "5"
                     };
 
                     console.log('Request Data:', requestData); // Log request data for debugging
