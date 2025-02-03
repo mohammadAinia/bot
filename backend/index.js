@@ -432,8 +432,8 @@ const app = express();
 
 // Allow requests from your front-end's origin (e.g., http://localhost:5173)
 app.use(cors({
-  origin: 'http://localhost:5173',
-  // You can also allow multiple origins or use a function to check origins dynamically
+    origin: 'http://localhost:5173',
+    // You can also allow multiple origins or use a function to check origins dynamically
 }));
 const PORT = process.env.PORT || 5000;
 app.use(bodyParser.json());
@@ -940,37 +940,37 @@ app.post('/webhook', async (req, res) => {
                         // quantity: "5"
                     };
 
-                    console.log('Request Data:', requestData); // Log request data for debugging
-                    dataStore.push(requestData);
-                    await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
+                    // console.log('Request Data:', requestData); // Log request data for debugging
+                    // dataStore.push(requestData);
+                    // await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
 
-                    // try {
-                    //     const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
-                    //         headers: {
-                    //             'Content-Type': 'application/json',
-                    //             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                    //         },
-                    //         timeout: 50000  // 5-second timeout for the request
-                    //     });
+                    try {
+                        const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
+                            headers: {
+                                'Content-Type': 'application/json',
+                                // 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                            },
+                            timeout: 5000  // 5-second timeout for the request
+                        });
 
-                    //     if (response.status === 200) {
-                    //         console.log('API Response:', response.data); // Log successful response
-                    //         await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
-                    //     } else {
-                    //         console.error(`❌ API returned unexpected status code: ${response.status}`);
-                    //         await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
-                    //     }
-                    // } catch (error) {
-                    //     if (error.response) {
-                    //         // API responded with an error code
-                    //         console.error('API Error Response:', error.response.data);
-                    //         console.error('API Status Code:', error.response.status);
-                    //     } else {
-                    //         // Other errors (like network errors)
-                    //         console.error('Network or request error:', error.message);
-                    //     }
-                    //     await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
-                    // }
+                        if (response.status === 200) {
+                            console.log('API Response:', response.data); // Log successful response
+                            await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
+                        } else {
+                            console.error(`❌ API returned unexpected status code: ${response.status}`);
+                            await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
+                        }
+                    } catch (error) {
+                        if (error.response) {
+                            // API responded with an error code
+                            console.error('API Error Response:', error.response.data);
+                            console.error('API Status Code:', error.response.status);
+                        } else {
+                            // Other errors (like network errors)
+                            console.error('Network or request error:', error.message);
+                        }
+                        await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
+                    }
                 } else {
                     await sendToWhatsApp(from, "❌ Order has been canceled. You can retry anytime.");
                 }
