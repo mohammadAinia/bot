@@ -418,6 +418,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 import axios from 'axios';
 import bodyParser from 'body-parser';
+import cors from 'cors';
 
 dotenv.config(); // ✅ تحميل متغيرات البيئة
 
@@ -428,6 +429,12 @@ if (!process.env.OPENAI_API_KEY || !process.env.WHATSAPP_API_URL || !process.env
 }
 
 const app = express();
+
+// Allow requests from your front-end's origin (e.g., http://localhost:5173)
+app.use(cors({
+  origin: 'http://localhost:5173',
+  // You can also allow multiple origins or use a function to check origins dynamically
+}));
 const PORT = process.env.PORT || 5000;
 app.use(bodyParser.json());
 
@@ -475,26 +482,159 @@ app.get("/webhook", (req, res) => {
 });
 
 // // دالة لإرسال رسالة إلى OpenAI مع توجيه الأسئلة ضمن نطاق الشركة
+// const getOpenAIResponse = async (userMessage) => {
+//     try {
+//         const companyWebsite = "https://www.google.com/maps?q=33.5150,36.2910"; // Replace with the actual website
+//         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+//             model: "gpt-4",
+//             messages: [
+//                 {
+//                     role: "system",
+//                     content: `🌟 Welcome to Mohammed Oil Refining Company 🌟  
+//                                 The company specializes in oil re-refining, and working hours are from Sunday to Thursday, 9 AM to 2 PM.  
+//                                 You are the company's virtual assistant, and your task is to answer only questions related to the company, such as services, prices, or oil disposal requests.  
+//                                 If the question is not related to the company, respond with: "❌ Sorry, I can only answer questions related to our company's services."  
+
+//                                 You can find more information on our website: ${companyWebsite}`
+//                 },
+//                 {
+//                     role: "user",
+//                     content: userMessage
+//                 }
+//             ],
+//             max_tokens: 150,
+//             temperature: 0.7
+//         }, {
+//             headers: {
+//                 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+//                 'Content-Type': 'application/json'
+//             }
+//         });
+
+//         return response.data.choices[0].message.content.trim();
+//     } catch (error) {
+//         console.error('❌ Error with OpenAI:', error.response?.data || error.message);
+//         return "❌ Sorry, an error occurred while processing your request.";
+//     }
+// };
+
+
+// const getOpenAIResponse = async (userMessage, guidance) => {
+//     try {
+//         const companyWebsite = "https://www.google.com/maps?q=33.5150,36.2910"; // Replace with actual website
+//         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+//             model: "gpt-4",
+//             messages: [
+//                 {
+//                     role: "system",
+//                     content: `🌟 Welcome to Mohammed Oil Refining Company 🌟  
+//                                 The company specializes in oil re-refining, and working hours are from Sunday to Thursday, 9 AM to 2 PM.  
+//                                 You are the company's virtual assistant, and your task is to answer only questions related to the company, such as services, prices, or oil disposal requests.  
+//                                 If the question is not related to the company, respond with: "❌ Sorry, I can only answer questions related to our company's services."  
+
+//                                 `
+//                 },
+//                 {
+//                     role: "system",
+//                     content: guidance
+//                 },
+//                 {
+//                     role: "user",
+//                     content: userMessage
+//                 },
+
+//             ],
+//             max_tokens: 150,
+//             temperature: 0.7
+//         }, {
+//             headers: {
+//                 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+//                 'Content-Type': 'application/json'
+//             }
+//         });
+
+//         return response.data.choices[0].message.content.trim();
+//     } catch (error) {
+//         console.error('❌ Error with OpenAI:', error.response?.data || error.message);
+//         return "❌ Sorry, an error occurred while processing your request.";
+//     }
+// };
+
+// API endpoint to receive question and guidance
+// app.post('/api/ask-question', async (req, res) => {
+//     const { userQuestion, guidance } = req.body;
+
+//     if (!userQuestion || !guidance) {
+//         return res.status(400).json({ error: 'Both userQuestion and guidance are required.' });
+//     }
+
+//     try {
+//         const aiResponse = await getOpenAIResponse(userQuestion, guidance);
+
+//         // Send the AI response back to the frontend
+//         return res.json({ response: aiResponse });
+//     } catch (error) {
+//         console.error('❌ Error processing request:', error);
+//         return res.status(500).json({ error: 'An error occurred while processing your request.' });
+//     }
+// });
+
+let systemMessage = `🌟 Welcome to Mohammed Oil Refining Company 🌟  
+The company specializes in oil re-refining, and working hours are from Sunday to Thursday, 9 AM to 2 PM.  
+You are the company's virtual assistant, and your task is to answer only questions related to the company, such as services, prices, or oil disposal requests.  
+If the question is not related to the company, respond with: "❌ Sorry, I can only answer questions related to our company's services."`;
+
+
+let guidanceMessage = ""; // Initially empty; can be updated by the admin
+
+
+// New endpoint to retrieve the messages
+app.get('/admin/messages', (req, res) => {
+    res.json({
+        systemMessage,
+        guidanceMessage
+    });
+});
+
+app.post('/admin/update-messages', (req, res) => {
+    const { newSystemMessage, newGuidance } = req.body;
+
+    if (newSystemMessage) {
+        if (typeof newSystemMessage !== 'string') {
+            return res.status(400).json({ error: 'Invalid system message provided.' });
+        }
+        systemMessage = newSystemMessage;
+        console.log('✅ System message updated:', systemMessage);
+    }
+
+    if (newGuidance) {
+        if (typeof newGuidance !== 'string') {
+            return res.status(400).json({ error: 'Invalid guidance message provided.' });
+        }
+        guidanceMessage = newGuidance;
+        console.log('✅ Guidance message updated:', guidanceMessage);
+    }
+
+    res.json({ message: 'Messages updated successfully.' });
+});
+
+
 const getOpenAIResponse = async (userMessage) => {
     try {
-        const companyWebsite = "https://www.google.com/maps?q=33.5150,36.2910"; // Replace with the actual website
+        const messages = [
+            { role: "system", content: systemMessage },  // Editable default message
+        ];
+
+        // If a guidance message exists, include it as a second system message
+        if (guidanceMessage && guidanceMessage.trim() !== "") {
+            messages.push({ role: "system", content: guidanceMessage });
+        }
+
+        messages.push({ role: "user", content: userMessage });  // User query
+
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
             model: "gpt-4",
-            messages: [
-                {
-                    role: "system",
-                    content: `🌟 Welcome to Mohammed Oil Refining Company 🌟  
-                                The company specializes in oil re-refining, and working hours are from Sunday to Thursday, 9 AM to 2 PM.  
-                                You are the company's virtual assistant, and your task is to answer only questions related to the company, such as services, prices, or oil disposal requests.  
-                                If the question is not related to the company, respond with: "❌ Sorry, I can only answer questions related to our company's services."  
-
-                                You can find more information on our website: ${companyWebsite}`
-                },
-                {
-                    role: "user",
-                    content: userMessage
-                }
-            ],
+            messages,
             max_tokens: 150,
             temperature: 0.7
         }, {
@@ -510,6 +650,9 @@ const getOpenAIResponse = async (userMessage) => {
         return "❌ Sorry, an error occurred while processing your request.";
     }
 };
+
+
+
 
 const sendToWhatsApp = async (to, message) => {
     try {
@@ -846,136 +989,6 @@ app.post('/webhook', async (req, res) => {
         res.sendStatus(500);
     }
 });
-
-
-
-
-// app.post('/webhook', async (req, res) => {
-//     try {
-//         console.log('Incoming Webhook Data:', req.body); // Log the incoming data for debugging
-
-//         const entry = req.body.entry?.[0];
-//         const changes = entry?.changes?.[0];
-//         const value = changes?.value;
-//         const messages = value?.messages;
-
-//         if (!messages || messages.length === 0) {
-//             console.log('No messages received, returning early.');
-//             return res.sendStatus(200);
-//         }
-
-//         const message = messages[0];
-//         const from = message.from;
-//         const textRaw = message.text?.body || "";
-//         const text = textRaw.toLowerCase().trim();
-
-//         console.log(`📩 New message from ${from}: ${text}`);
-
-//         // If there is no session for the user, create one first
-//         if (!userSessions[from]) {
-//             userSessions[from] = { step: STATES.WELCOME, data: {} };
-
-//             // List of greeting phrases
-//             const greetings = [
-//                 "hello", "hi", "hey", "greetings", "good day",
-//                 "good morning", "good afternoon", "good evening"
-//             ];
-
-//             let isGreeting = greetings.some(greeting => text.includes(greeting));
-
-//             let welcomeText = "";
-//             if (isGreeting) {
-//                 welcomeText = `Wa Alaikum Assalam wa Rahmatullahi wa Barakatuh, welcome to *Mohammed Oil Refining Company*.
-
-//                                                                                                                                                                   We offer the following services:
-
-//                                                                                                                                                                   1️⃣ *Inquiries about our products and services*
-
-//                                                                                                                                                                   2️⃣ *Create a new request:*
-//                                                                                                                                                                      - 2.1 *Request for used oil disposal* 🛢️
-//                                                                                                                                                                      - 2.2 *Purchase of refined oil* 🏭
-
-//                                                                                                                                                                   Please send the *service number* you wish to request.`;
-//             } else {
-//                 welcomeText = defaultWelcomeMessage;
-//             }
-
-//             console.log(`isGreeting: ${isGreeting} | Received text: "${text}"`);
-//             await sendToWhatsApp(from, welcomeText);
-//             return res.sendStatus(200);
-//         }
-
-//         const session = userSessions[from];
-
-//         // Handle messages based on the current state
-//         switch (session.step) {
-//             case STATES.WELCOME:
-//                 if (text === "1") {
-//                     await sendToWhatsApp(from, "❓ Please send your question regarding our services or products.");
-//                     session.step = STATES.FAQ;
-//                 } else if (text === "2.1") {
-//                     session.data.type = "Used oil disposal";
-//                     session.step = STATES.NAME;
-//                     await sendToWhatsApp(from, "🔹 Please provide your full name.");
-//                 } else if (text === "2.2") {
-//                     session.data.type = "Purchase of refined oil";
-//                     session.step = STATES.NAME;
-//                     await sendToWhatsApp(from, "🔹 Please provide your full name.");
-//                 } else {
-//                     await sendToWhatsApp(from, "❌ Invalid option, please choose a number from the list.");
-//                 }
-//                 break;
-
-//             // Other states remain the same as before
-
-//             case STATES.CONFIRMATION:
-//                 if (text.includes("yes")) {
-//                     // Instead of sending data to API, store it in the array
-//                     const requestData = {
-//                         user_name: session.data.name,
-//                         email: session.data.email,
-//                         phone_number: session.data.phone,
-//                         city: session.data.city,
-//                         label: session.data.label,
-//                         address: session.data.address,
-//                         street: session.data.street,
-//                         building_name: session.data.building_name,
-//                         flat_no: session.data.flat_no,
-//                         latitude: session.data.latitude,
-//                         longitude: session.data.longitude,
-//                         quantity: session.data.quantity
-//                     };
-
-//                     console.log('Stored Data:', requestData); // Log stored data for debugging
-
-//                     // Push the collected data to the dataStore array
-//                     dataStore.push(requestData);
-
-//                     // Send a confirmation message
-//                     await sendToWhatsApp(from, "✅ Your request has been stored successfully! We will contact you soon.");
-
-//                 } else {
-//                     await sendToWhatsApp(from, "❌ Order has been canceled. You can retry anytime.");
-//                 }
-//                 delete userSessions[from];  // Clear the session after confirmation
-//                 break;
-
-//             default:
-//                 await sendToWhatsApp(from, "❌ An unexpected error occurred. Please try again.");
-//                 delete userSessions[from];
-//                 break;
-//         }
-
-//         res.sendStatus(200);
-//     } catch (error) {
-//         console.error('❌ Error:', error.response?.data || error.message || error);
-//         res.sendStatus(500);
-//     }
-// });
-
-
-
-
 
 app.listen(PORT, () => console.log(`🚀 Server is running on http://localhost:${PORT}`));
 

@@ -78,69 +78,6 @@ const WhatsAppRequestForm = () => {
           value={formData.phone_number}
           onChange={handleChange}
         />
-        <input
-          type="text"
-          name="city"
-          placeholder="City"
-          value={formData.city}
-          onChange={handleChange}
-        />
-        <input
-          type="text"
-          name="label"
-          placeholder="Label"
-          value={formData.label}
-          onChange={handleChange}
-        />
-        <input
-          type="text"
-          name="address"
-          placeholder="Address"
-          value={formData.address}
-          onChange={handleChange}
-        />
-        <input
-          type="text"
-          name="street"
-          placeholder="Street"
-          value={formData.street}
-          onChange={handleChange}
-        />
-        <input
-          type="text"
-          name="building_name"
-          placeholder="Building Name"
-          value={formData.building_name}
-          onChange={handleChange}
-        />
-        <input
-          type="text"
-          name="flat_no"
-          placeholder="Flat No"
-          value={formData.flat_no}
-          onChange={handleChange}
-        />
-        <input
-          type="text"
-          name="latitude"
-          placeholder="Latitude"
-          value={formData.latitude}
-          onChange={handleChange}
-        />
-        <input
-          type="text"
-          name="longitude"
-          placeholder="Longitude"
-          value={formData.longitude}
-          onChange={handleChange}
-        />
-        <input
-          type="number"
-          name="quantity"
-          placeholder="Quantity"
-          value={formData.quantity}
-          onChange={handleChange}
-        />
         <button type="submit">Submit</button>
       </form>
     </div>
