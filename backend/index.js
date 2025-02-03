@@ -452,15 +452,16 @@ const STATES = {
     PHONE_INPUT: "phone_input",
     EMAIL: 3,
     ADDRESS: 4,
-    CITY: 7,  // Existing state for city input
-    LABEL: 8,  // New state for label input
-    STREET: 9,  // New state for street input
-    BUILDING_NAME: 10,  // New state for building name
-    FLAT_NO: 11,  // New state for flat number
-    LATITUDE: 12,  // New state for latitude
-    LONGITUDE: 13,  // New state for longitude
-    QUANTITY: 6,  // State for entering quantity
-    CONFIRMATION: 5  // State for confirming the order
+    CITY: 7,
+    LABEL: 8,
+    STREET: 9,
+    BUILDING_NAME: 10,
+    FLAT_NO: 11,
+    LATITUDE: 12,
+    LONGITUDE: 13,
+    QUANTITY: 6,
+    CONFIRMATION: 5,
+    MODIFY: "modify"  // New state for modification
 };
 // بيانات التحقق من Webhook
 const VERIFY_TOKEN = "Mohammad";
@@ -568,7 +569,7 @@ const sendToWhatsApp = async (to, message) => {
 
 function convertArabicNumbers(input) {
     return input.replace(/[٠١٢٣٤٥٦٧٨٩]/g, d => "0123456789"["٠١٢٣٤٥٦٧٨٩".indexOf(d)]);
-  }
+}
 
 const isValidEmail = (email) => {
     const regex = /^\S+@\S+\.\S+$/;
@@ -606,6 +607,26 @@ function formatPhoneNumber(phoneNumber) {
     return cleanedNumber; // إرجاع الرقم إذا لم ينطبق النمط
 }
 
+const sendUpdatedSummary = async (to, session) => {
+    let summary = `✅ *Updated Order Summary:*\n\n`;
+    summary += `🔹 *Name:* ${session.data.name}\n`;
+    summary += `📞 *Phone Number:* ${session.data.phone}\n`;
+    summary += `📧 *Email:* ${session.data.email}\n`;
+    summary += `📍 *Address:* ${session.data.address}\n`;
+    summary += `🌆 *City:* ${session.data.city}\n`;
+    summary += `🔖 *Label:* ${session.data.label}\n`;
+    summary += `🏠 *Street:* ${session.data.street}\n`;
+    summary += `🏢 *Building Name:* ${session.data.building_name}\n`;
+    summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;
+    summary += `📍 *Latitude:* ${session.data.latitude}\n`;
+    summary += `📍 *Longitude:* ${session.data.longitude}\n`;
+    summary += `📦 *Quantity:* ${session.data.quantity}\n`;
+    summary += `🛢 *Request Type:* ${session.data.type}\n\n`;
+    summary += `Is the information correct? Please reply with *Yes* or *No*`;
+
+    await sendToWhatsApp(to, summary);
+};
+
 app.post('/webhook', async (req, res) => {
     try {
         console.log('Incoming Webhook Data:', req.body); // Log the incoming data for debugging
@@ -620,16 +641,10 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(200);
         }
 
-        // const message = messages[0];
-        // const from = message.from;
-        // const textRaw = message.text?.body || "";
-        // const text = textRaw.toLowerCase().trim();
         const message = messages[0];
         const from = message.from;
         const textRaw = message.text?.body || "";
-        // const buttonId = message.interactive?.button_reply?.id || ""; // Get button ID if clicked
-        // const text = (textRaw || buttonId).toLowerCase().trim(); // Use button ID if no text
-        const text = (textRaw).toLowerCase().trim(); // Use button ID if no text
+        const text = textRaw.toLowerCase().trim();
 
         console.log(`📩 New message from ${from}: ${text}`);
 
@@ -647,16 +662,7 @@ app.post('/webhook', async (req, res) => {
 
             let welcomeText = "";
             if (isGreeting) {
-                welcomeText = `welcome to *Mohammed Oil Refining Company*.
-                                                                                                                                                                
-                                                                                                                                                                We offer the following services:
-                                                                                                                                                                
-                                                                                                                                                                1️⃣ *Inquiries about our products and services*
-                                                                                                                                                                
-                                                                                                                                                                2️⃣ *Create a new request:*
-                                                                                                                                                                 
-                                                                                                                                                                
-                                                                                                                                                                Please send the *service number* you wish to request.`;
+                welcomeText = `Welcome to *Mohammed Oil Refining Company*.\n\nWe offer the following services:\n\n1️⃣ *Inquiries about our products and services*\n2️⃣ *Create a new request:*\n\nPlease send the *service number* you wish to request.`;
             } else {
                 welcomeText = defaultWelcomeMessage;
             }
@@ -664,6 +670,7 @@ app.post('/webhook', async (req, res) => {
             await sendToWhatsApp(from, welcomeText);
             return res.sendStatus(200);
         }
+
         const session = userSessions[from];
 
         // Handle messages based on the current state
@@ -675,8 +682,7 @@ app.post('/webhook', async (req, res) => {
                 } else if (convertArabicNumbers(text) === "2") {
                     session.step = STATES.NAME;
                     await sendToWhatsApp(from, "🔹 Please provide your full name.");
-                }
-                else {
+                } else {
                     await sendToWhatsApp(from, "❌ Invalid option, please choose a number from the list.");
                 }
                 break;
@@ -687,7 +693,7 @@ app.post('/webhook', async (req, res) => {
                 if (terminationPhrases.some(phrase => text.includes(phrase))) {
                     await sendToWhatsApp(from, "The chat has been closed. If you need any future assistance, feel free to reach out to us.");
                     delete userSessions[from];
-                    return res.sendStatus(200); // Ensure no further code is executed after session deletion
+                    return res.sendStatus(200);
                 }
 
                 const aiResponse = await getOpenAIResponse(textRaw);
@@ -702,8 +708,8 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case STATES.PHONE_CONFIRM:
-                if (text.includes("yes")) {
-                    session.data.phone = formatPhoneNumber(from); // ✅ الرقم الآن سيكون بتنسيق "+971 501234567"
+                if (text.includes("yes") || text.includes("yea")) {
+                    session.data.phone = formatPhoneNumber(from);
                     session.step = STATES.EMAIL;
                     await sendToWhatsApp(from, "📧 Your current number will be used. Please provide your email address.");
                 } else if (text.includes("no")) {
@@ -719,7 +725,7 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(from, "❌ Invalid phone number, please enter a valid number.");
                     return res.sendStatus(200);
                 }
-                session.data.phone = formatPhoneNumber(textRaw); // ✅ الآن يتم تنسيق الرقم قبل تخزينه
+                session.data.phone = formatPhoneNumber(textRaw);
                 session.step = STATES.EMAIL;
                 await sendToWhatsApp(from, "📧 Please provide your email address.");
                 break;
@@ -741,26 +747,26 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case STATES.CITY:
-                session.data.city = textRaw;  // Store the city
-                session.step = STATES.STREET;  // Move to the street step
+                session.data.city = textRaw;
+                session.step = STATES.STREET;
                 await sendToWhatsApp(from, "🏠 Please provide the street name.");
                 break;
 
             case STATES.STREET:
-                session.data.street = textRaw;  // Store the street
-                session.step = STATES.BUILDING_NAME;  // Move to the building name step
+                session.data.street = textRaw;
+                session.step = STATES.BUILDING_NAME;
                 await sendToWhatsApp(from, "🏢 Please provide the building name.");
                 break;
 
             case STATES.BUILDING_NAME:
-                session.data.building_name = textRaw;  // Store the building name
-                session.step = STATES.FLAT_NO;  // Move to the flat number step
+                session.data.building_name = textRaw;
+                session.step = STATES.FLAT_NO;
                 await sendToWhatsApp(from, "🏠 Please provide the flat number.");
                 break;
 
             case STATES.FLAT_NO:
-                session.data.flat_no = textRaw;  // Store the flat number
-                session.step = STATES.LATITUDE;  // Move to the latitude step
+                session.data.flat_no = textRaw;
+                session.step = STATES.LATITUDE;
                 await sendToWhatsApp(from, "📍 Please provide the latitude.");
                 break;
 
@@ -769,8 +775,8 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(from, "❌ Please enter a valid latitude.");
                     return res.sendStatus(200);
                 }
-                session.data.latitude = textRaw;  // Store the latitude
-                session.step = STATES.LONGITUDE;  // Move to the longitude step
+                session.data.latitude = textRaw;
+                session.step = STATES.LONGITUDE;
                 await sendToWhatsApp(from, "📍 Please provide the longitude.");
                 break;
 
@@ -779,24 +785,23 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(from, "❌ Please enter a valid longitude.");
                     return res.sendStatus(200);
                 }
-                session.data.longitude = textRaw;  // Store the longitude
-                session.step = STATES.LABEL;  // Proceed to the quantity step
+                session.data.longitude = textRaw;
+                session.step = STATES.LABEL;
                 await sendToWhatsApp(from, "📦 Please provide the Label.");
                 break;
 
             case STATES.LABEL:
-                session.data.label = textRaw;  // Store the label
-                session.step = STATES.QUANTITY;  // Proceed to the quantity step
+                session.data.label = textRaw;
+                session.step = STATES.QUANTITY;
                 await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
                 break;
 
             case STATES.QUANTITY:
-                // التأكد من أن الكمية هي نص
                 if (isNaN(textRaw) || textRaw.trim() === "") {
                     await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
                     return res.sendStatus(200);
                 }
-                session.data.quantity = textRaw; // سيتم تخزين الكمية كنص
+                session.data.quantity = textRaw;
                 session.step = STATES.CONFIRMATION;
 
                 let summary = `✅ *Order Summary:*\n\n`;
@@ -806,11 +811,11 @@ app.post('/webhook', async (req, res) => {
                 summary += `📍 *Address:* ${session.data.address}\n`;
                 summary += `🌆 *City:* ${session.data.city}\n`;
                 summary += `🔖 *Label:* ${session.data.label}\n`;
-                summary += `🏠 *Street:* ${session.data.street}\n`;  // Add street to the summary
-                summary += `🏢 *Building Name:* ${session.data.building_name}\n`;  // Add building name to the summary
-                summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;  // Add flat number to the summary
-                summary += `📍 *Latitude:* ${session.data.latitude}\n`;  // Add latitude to the summary
-                summary += `📍 *Longitude:* ${session.data.longitude}\n`;  // Add longitude to the summary
+                summary += `🏠 *Street:* ${session.data.street}\n`;
+                summary += `🏢 *Building Name:* ${session.data.building_name}\n`;
+                summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;
+                summary += `📍 *Latitude:* ${session.data.latitude}\n`;
+                summary += `📍 *Longitude:* ${session.data.longitude}\n`;
                 summary += `📦 *Quantity:* ${session.data.quantity}\n`;
                 summary += `🛢 *Request Type:* ${session.data.type}\n\n`;
                 summary += `Is the information correct? Please reply with *Yes* or *No*`;
@@ -819,7 +824,7 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case STATES.CONFIRMATION:
-                if (text.includes("yes")) {
+                if (text.includes("yes") || text.includes("yea")) {
                     // Send the data to the external API
                     const requestData = {
                         user_name: session.data.name,
@@ -836,17 +841,17 @@ app.post('/webhook', async (req, res) => {
                         quantity: session.data.quantity
                     };
 
-                    console.log('Request Data:', requestData); // Log request data for debugging
+                    console.log('Request Data:', requestData);
                     try {
                         const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
                             headers: {
                                 'Content-Type': 'application/json',
                             },
-                            timeout: 5000  // 5-second timeout for the request
+                            timeout: 5000
                         });
 
                         if (response.status === 200) {
-                            console.log('API Response:', response.data); // Log successful response
+                            console.log('API Response:', response.data);
                             await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
                         } else {
                             console.error(`❌ API returned unexpected status code: ${response.status}`);
@@ -854,19 +859,142 @@ app.post('/webhook', async (req, res) => {
                         }
                     } catch (error) {
                         if (error.response) {
-                            // API responded with an error code
                             console.error('API Error Response:', error.response.data);
                             console.error('API Status Code:', error.response.status);
                         } else {
-                            // Other errors (like network errors)
                             console.error('Network or request error:', error.message);
                         }
                         await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
                     }
+                    delete userSessions[from];
+                } else if (text.includes("no")) {
+                    session.step = STATES.MODIFY;
+                    await sendToWhatsApp(from, "Which information would you like to modify? Please reply with the corresponding number:\n\n1. Name\n2. Phone Number\n3. Email\n4. Address\n5. City\n6. Label\n7. Street\n8. Building Name\n9. Flat Number\n10. Latitude\n11. Longitude\n12. Quantity");
                 } else {
-                    await sendToWhatsApp(from, "❌ Order has been canceled. You can retry anytime.");
+                    await sendToWhatsApp(from, "❌ Invalid input. Please reply with *Yes* or *No*.");
                 }
-                delete userSessions[from];  // Clear the session after confirmation
+                break;
+
+            case STATES.MODIFY:
+                const fieldToModify = parseInt(text);
+                if (isNaN(fieldToModify) || fieldToModify < 1 || fieldToModify > 12) {
+                    await sendToWhatsApp(from, "❌ Invalid option. Please choose a number between 1 and 12.");
+                    return res.sendStatus(200);
+                }
+
+                const fieldMap = {
+                    1: "name",
+                    2: "phone",
+                    3: "email",
+                    4: "address",
+                    5: "city",
+                    6: "label",
+                    7: "street",
+                    8: "building_name",
+                    9: "flat_no",
+                    10: "latitude",
+                    11: "longitude",
+                    12: "quantity"
+                };
+
+                const selectedField = fieldMap[fieldToModify];
+                session.modifyField = selectedField;
+                session.step = `MODIFY_${selectedField.toUpperCase()}`;
+
+                await sendToWhatsApp(from, `🔹 Please provide the new value for ${selectedField.replace(/_/g, " ")}.`);
+                break;
+
+            // Modification steps
+            case "MODIFY_NAME":
+                session.data.name = textRaw;
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
+                break;
+
+            case "MODIFY_PHONE":
+                if (!isValidPhone(textRaw)) {
+                    await sendToWhatsApp(from, "❌ Invalid phone number, please enter a valid number.");
+                    return res.sendStatus(200);
+                }
+                session.data.phone = formatPhoneNumber(textRaw);
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
+                break;
+
+            case "MODIFY_EMAIL":
+                if (!isValidEmail(textRaw)) {
+                    await sendToWhatsApp(from, "❌ Invalid email address, please enter a valid one.");
+                    return res.sendStatus(200);
+                }
+                session.data.email = textRaw;
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
+                break;
+
+            case "MODIFY_ADDRESS":
+                session.data.address = textRaw;
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
+                break;
+
+            case "MODIFY_CITY":
+                session.data.city = textRaw;
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
+                break;
+
+            case "MODIFY_LABEL":
+                session.data.label = textRaw;
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
+                break;
+
+            case "MODIFY_STREET":
+                session.data.street = textRaw;
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
+                break;
+
+            case "MODIFY_BUILDING_NAME":
+                session.data.building_name = textRaw;
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
+                break;
+
+            case "MODIFY_FLAT_NO":
+                session.data.flat_no = textRaw;
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
+                break;
+
+            case "MODIFY_LATITUDE":
+                if (isNaN(textRaw) || textRaw.trim() === "") {
+                    await sendToWhatsApp(from, "❌ Please enter a valid latitude.");
+                    return res.sendStatus(200);
+                }
+                session.data.latitude = textRaw;
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
+                break;
+
+            case "MODIFY_LONGITUDE":
+                if (isNaN(textRaw) || textRaw.trim() === "") {
+                    await sendToWhatsApp(from, "❌ Please enter a valid longitude.");
+                    return res.sendStatus(200);
+                }
+                session.data.longitude = textRaw;
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
+                break;
+
+            case "MODIFY_QUANTITY":
+                if (isNaN(textRaw) || textRaw.trim() === "") {
+                    await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
+                    return res.sendStatus(200);
+                }
+                session.data.quantity = textRaw;
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
                 break;
 
             default:
@@ -881,6 +1009,409 @@ app.post('/webhook', async (req, res) => {
         res.sendStatus(500);
     }
 });
+
+// app.post('/webhook', async (req, res) => {
+//     try {
+//         console.log('Incoming Webhook Data:', req.body); // Log the incoming data for debugging
+
+//         const entry = req.body.entry?.[0];
+//         const changes = entry?.changes?.[0];
+//         const value = changes?.value;
+//         const messages = value?.messages;
+
+//         if (!messages || messages.length === 0) {
+//             console.log('No messages received, returning early.');
+//             return res.sendStatus(200);
+//         }
+
+//         // const message = messages[0];
+//         // const from = message.from;
+//         // const textRaw = message.text?.body || "";
+//         // const text = textRaw.toLowerCase().trim();
+//         const message = messages[0];
+//         const from = message.from;
+//         const textRaw = message.text?.body || "";
+//         // const buttonId = message.interactive?.button_reply?.id || ""; // Get button ID if clicked
+//         // const text = (textRaw || buttonId).toLowerCase().trim(); // Use button ID if no text
+//         const text = (textRaw).toLowerCase().trim(); // Use button ID if no text
+
+//         console.log(`📩 New message from ${from}: ${text}`);
+
+//         // If there is no session for the user, create one first
+//         if (!userSessions[from]) {
+//             userSessions[from] = { step: STATES.WELCOME, data: {} };
+
+//             // List of greeting phrases
+//             const greetings = [
+//                 "hello", "hi", "hey", "greetings", "good day",
+//                 "good morning", "good afternoon", "good evening"
+//             ];
+
+//             let isGreeting = greetings.some(greeting => text.includes(greeting));
+
+//             let welcomeText = "";
+//             if (isGreeting) {
+//                 welcomeText = `welcome to *Mohammed Oil Refining Company*.
+                                                                                                                                                                
+//                                                                                                                                                                 We offer the following services:
+                                                                                                                                                                
+//                                                                                                                                                                 1️⃣ *Inquiries about our products and services*
+                                                                                                                                                                
+//                                                                                                                                                                 2️⃣ *Create a new request:*
+                                                                                                                                                                 
+                                                                                                                                                                
+//                                                                                                                                                                 Please send the *service number* you wish to request.`;
+//             } else {
+//                 welcomeText = defaultWelcomeMessage;
+//             }
+//             console.log(`isGreeting: ${isGreeting} | Received text: "${text}"`);
+//             await sendToWhatsApp(from, welcomeText);
+//             return res.sendStatus(200);
+//         }
+//         const session = userSessions[from];
+
+//         // Handle messages based on the current state
+//         switch (session.step) {
+//             case STATES.WELCOME:
+//                 if (convertArabicNumbers(text) === "1") {
+//                     await sendToWhatsApp(from, "❓ Please send your question regarding our services or products.");
+//                     session.step = STATES.FAQ;
+//                 } else if (convertArabicNumbers(text) === "2") {
+//                     session.step = STATES.NAME;
+//                     await sendToWhatsApp(from, "🔹 Please provide your full name.");
+//                 }
+//                 else {
+//                     await sendToWhatsApp(from, "❌ Invalid option, please choose a number from the list.");
+//                 }
+//                 break;
+
+//             case STATES.FAQ:
+//                 // List of phrases to end the conversation
+//                 const terminationPhrases = ["thank you", "close", "end chat", "appreciate it"];
+//                 if (terminationPhrases.some(phrase => text.includes(phrase))) {
+//                     await sendToWhatsApp(from, "The chat has been closed. If you need any future assistance, feel free to reach out to us.");
+//                     delete userSessions[from];
+//                     return res.sendStatus(200); // Ensure no further code is executed after session deletion
+//                 }
+
+//                 const aiResponse = await getOpenAIResponse(textRaw);
+//                 const reply = `${aiResponse}\n\nTo continue your inquiry, you can ask another question. If you want to end the conversation, please type 'thank you' or 'end chat'.`;
+//                 await sendToWhatsApp(from, reply);
+//                 break;
+
+//             case STATES.NAME:
+//                 session.data.name = textRaw;
+//                 session.step = STATES.PHONE_CONFIRM;
+//                 await sendToWhatsApp(from, "📞 Do you want to use the number you are messaging from? (Yes/No)");
+//                 break;
+
+//             case STATES.PHONE_CONFIRM:
+//                 if (text.includes("yes") || text.includes("yea")) {
+//                     session.data.phone = formatPhoneNumber(from); // ✅ الرقم الآن سيكون بتنسيق "+971 501234567"
+//                     session.step = STATES.EMAIL;
+//                     await sendToWhatsApp(from, "📧 Your current number will be used. Please provide your email address.");
+//                 } else if (text.includes("no")) {
+//                     session.step = STATES.PHONE_INPUT;
+//                     await sendToWhatsApp(from, "📞 Please enter the phone with country code starting from +.");
+//                 } else {
+//                     await sendToWhatsApp(from, "❌ Please reply with Yes or No.");
+//                 }
+//                 break;
+
+//             case STATES.PHONE_INPUT:
+//                 if (!isValidPhone(textRaw)) {
+//                     await sendToWhatsApp(from, "❌ Invalid phone number, please enter a valid number.");
+//                     return res.sendStatus(200);
+//                 }
+//                 session.data.phone = formatPhoneNumber(textRaw); // ✅ الآن يتم تنسيق الرقم قبل تخزينه
+//                 session.step = STATES.EMAIL;
+//                 await sendToWhatsApp(from, "📧 Please provide your email address.");
+//                 break;
+
+//             case STATES.EMAIL:
+//                 if (!isValidEmail(textRaw)) {
+//                     await sendToWhatsApp(from, "❌ Invalid email address, please enter a valid one.");
+//                     return res.sendStatus(200);
+//                 }
+//                 session.data.email = textRaw;
+//                 session.step = STATES.ADDRESS;
+//                 await sendToWhatsApp(from, "📍 Please provide your full address.");
+//                 break;
+
+//             case STATES.ADDRESS:
+//                 session.data.address = textRaw;
+//                 session.step = STATES.CITY;
+//                 await sendToWhatsApp(from, "📦 Please provide the City.");
+//                 break;
+
+//             case STATES.CITY:
+//                 session.data.city = textRaw;  // Store the city
+//                 session.step = STATES.STREET;  // Move to the street step
+//                 await sendToWhatsApp(from, "🏠 Please provide the street name.");
+//                 break;
+
+//             case STATES.STREET:
+//                 session.data.street = textRaw;  // Store the street
+//                 session.step = STATES.BUILDING_NAME;  // Move to the building name step
+//                 await sendToWhatsApp(from, "🏢 Please provide the building name.");
+//                 break;
+
+//             case STATES.BUILDING_NAME:
+//                 session.data.building_name = textRaw;  // Store the building name
+//                 session.step = STATES.FLAT_NO;  // Move to the flat number step
+//                 await sendToWhatsApp(from, "🏠 Please provide the flat number.");
+//                 break;
+
+//             case STATES.FLAT_NO:
+//                 session.data.flat_no = textRaw;  // Store the flat number
+//                 session.step = STATES.LATITUDE;  // Move to the latitude step
+//                 await sendToWhatsApp(from, "📍 Please provide the latitude.");
+//                 break;
+
+//             case STATES.LATITUDE:
+//                 if (isNaN(textRaw) || textRaw.trim() === "") {
+//                     await sendToWhatsApp(from, "❌ Please enter a valid latitude.");
+//                     return res.sendStatus(200);
+//                 }
+//                 session.data.latitude = textRaw;  // Store the latitude
+//                 session.step = STATES.LONGITUDE;  // Move to the longitude step
+//                 await sendToWhatsApp(from, "📍 Please provide the longitude.");
+//                 break;
+
+//             case STATES.LONGITUDE:
+//                 if (isNaN(textRaw) || textRaw.trim() === "") {
+//                     await sendToWhatsApp(from, "❌ Please enter a valid longitude.");
+//                     return res.sendStatus(200);
+//                 }
+//                 session.data.longitude = textRaw;  // Store the longitude
+//                 session.step = STATES.LABEL;  // Proceed to the quantity step
+//                 await sendToWhatsApp(from, "📦 Please provide the Label.");
+//                 break;
+
+//             case STATES.LABEL:
+//                 session.data.label = textRaw;  // Store the label
+//                 session.step = STATES.QUANTITY;  // Proceed to the quantity step
+//                 await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
+//                 break;
+
+//             case STATES.QUANTITY:
+//                 // التأكد من أن الكمية هي نص
+//                 if (isNaN(textRaw) || textRaw.trim() === "") {
+//                     await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
+//                     return res.sendStatus(200);
+//                 }
+//                 session.data.quantity = textRaw; // سيتم تخزين الكمية كنص
+//                 session.step = STATES.CONFIRMATION;
+
+//                 let summary = `✅ *Order Summary:*\n\n`;
+//                 summary += `🔹 *Name:* ${session.data.name}\n`;
+//                 summary += `📞 *Phone Number:* ${session.data.phone}\n`;
+//                 summary += `📧 *Email:* ${session.data.email}\n`;
+//                 summary += `📍 *Address:* ${session.data.address}\n`;
+//                 summary += `🌆 *City:* ${session.data.city}\n`;
+//                 summary += `🔖 *Label:* ${session.data.label}\n`;
+//                 summary += `🏠 *Street:* ${session.data.street}\n`;  // Add street to the summary
+//                 summary += `🏢 *Building Name:* ${session.data.building_name}\n`;  // Add building name to the summary
+//                 summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;  // Add flat number to the summary
+//                 summary += `📍 *Latitude:* ${session.data.latitude}\n`;  // Add latitude to the summary
+//                 summary += `📍 *Longitude:* ${session.data.longitude}\n`;  // Add longitude to the summary
+//                 summary += `📦 *Quantity:* ${session.data.quantity}\n`;
+//                 summary += `🛢 *Request Type:* ${session.data.type}\n\n`;
+//                 summary += `Is the information correct? Please reply with *Yes* or *No*`;
+
+//                 await sendToWhatsApp(from, summary);
+//                 break;
+
+//             case STATES.CONFIRMATION:
+//                 if (text.includes("yes") || text.includes("yea")) {
+//                     // Send the data to the external API
+//                     const requestData = {
+//                         user_name: session.data.name,
+//                         email: session.data.email,
+//                         phone_number: session.data.phone,
+//                         city: session.data.city,
+//                         label: session.data.label,
+//                         address: session.data.address,
+//                         street: session.data.street,
+//                         building_name: session.data.building_name,
+//                         flat_no: session.data.flat_no,
+//                         latitude: session.data.latitude,
+//                         longitude: session.data.longitude,
+//                         quantity: session.data.quantity
+//                     };
+
+//                     console.log('Request Data:', requestData); // Log request data for debugging
+//                     try {
+//                         const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
+//                             headers: {
+//                                 'Content-Type': 'application/json',
+//                             },
+//                             timeout: 5000  // 5-second timeout for the request
+//                         });
+
+//                         if (response.status === 200) {
+//                             console.log('API Response:', response.data); // Log successful response
+//                             await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
+//                         } else {
+//                             console.error(`❌ API returned unexpected status code: ${response.status}`);
+//                             await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
+//                         }
+//                     } catch (error) {
+//                         if (error.response) {
+//                             // API responded with an error code
+//                             console.error('API Error Response:', error.response.data);
+//                             console.error('API Status Code:', error.response.status);
+//                         } else {
+//                             // Other errors (like network errors)
+//                             console.error('Network or request error:', error.message);
+//                         }
+//                         await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
+//                     }
+//                     delete userSessions[from];  // Clear the session after confirmation
+//                 } else if (text.includes("no")) {
+//                     session.step = STATES.MODIFY;
+//                     await sendToWhatsApp(from, "Which information would you like to modify? Please reply with the corresponding number:\n\n1. Name\n2. Phone Number\n3. Email\n4. Address\n5. City\n6. Label\n7. Street\n8. Building Name\n9. Flat Number\n10. Latitude\n11. Longitude\n12. Quantity");
+//                 } else {
+//                     await sendToWhatsApp(from, "❌ Invalid input. Please reply with *Yes* or *No*.");
+//                 }
+//                 break;
+
+//             case STATES.MODIFY:
+//                 const fieldToModify = parseInt(text);
+//                 if (isNaN(fieldToModify) || fieldToModify < 1 || fieldToModify > 12) {
+//                     await sendToWhatsApp(from, "❌ Invalid option. Please choose a number between 1 and 12.");
+//                     return res.sendStatus(200);
+//                 }
+
+//                 // Map the selected number to the corresponding field
+//                 const fieldMap = {
+//                     1: "name",
+//                     2: "phone",
+//                     3: "email",
+//                     4: "address",
+//                     5: "city",
+//                     6: "label",
+//                     7: "street",
+//                     8: "building_name",
+//                     9: "flat_no",
+//                     10: "latitude",
+//                     11: "longitude",
+//                     12: "quantity"
+//                 };
+
+//                 const selectedField = fieldMap[fieldToModify];
+//                 session.modifyField = selectedField; // Store the field to modify
+//                 session.step = `MODIFY_${selectedField.toUpperCase()}`; // Transition to the specific modification step
+
+//                 await sendToWhatsApp(from, `🔹 Please provide the new value for ${selectedField.replace(/_/g, " ")}.`);
+//                 break;
+
+//             // Add cases for each modification step
+//             case "MODIFY_NAME":
+//                 session.data.name = textRaw;
+//                 session.step = STATES.CONFIRMATION;
+//                 await sendUpdatedSummary(from, session);
+//                 break;
+
+//             case "MODIFY_PHONE":
+//                 if (!isValidPhone(textRaw)) {
+//                     await sendToWhatsApp(from, "❌ Invalid phone number, please enter a valid number.");
+//                     return res.sendStatus(200);
+//                 }
+//                 session.data.phone = formatPhoneNumber(textRaw);
+//                 session.step = STATES.CONFIRMATION;
+//                 await sendUpdatedSummary(from, session);
+//                 break;
+
+//             case "MODIFY_EMAIL":
+//                 if (!isValidEmail(textRaw)) {
+//                     await sendToWhatsApp(from, "❌ Invalid email address, please enter a valid one.");
+//                     return res.sendStatus(200);
+//                 }
+//                 session.data.email = textRaw;
+//                 session.step = STATES.CONFIRMATION;
+//                 await sendUpdatedSummary(from, session);
+//                 break;
+
+//             case "MODIFY_ADDRESS":
+//                 session.data.address = textRaw;
+//                 session.step = STATES.CONFIRMATION;
+//                 await sendUpdatedSummary(from, session);
+//                 break;
+
+//             case "MODIFY_CITY":
+//                 session.data.city = textRaw;
+//                 session.step = STATES.CONFIRMATION;
+//                 await sendUpdatedSummary(from, session);
+//                 break;
+
+//             case "MODIFY_LABEL":
+//                 session.data.label = textRaw;
+//                 session.step = STATES.CONFIRMATION;
+//                 await sendUpdatedSummary(from, session);
+//                 break;
+
+//             case "MODIFY_STREET":
+//                 session.data.street = textRaw;
+//                 session.step = STATES.CONFIRMATION;
+//                 await sendUpdatedSummary(from, session);
+//                 break;
+
+//             case "MODIFY_BUILDING_NAME":
+//                 session.data.building_name = textRaw;
+//                 session.step = STATES.CONFIRMATION;
+//                 await sendUpdatedSummary(from, session);
+//                 break;
+
+//             case "MODIFY_FLAT_NO":
+//                 session.data.flat_no = textRaw;
+//                 session.step = STATES.CONFIRMATION;
+//                 await sendUpdatedSummary(from, session);
+//                 break;
+
+//             case "MODIFY_LATITUDE":
+//                 if (isNaN(textRaw) || textRaw.trim() === "") {
+//                     await sendToWhatsApp(from, "❌ Please enter a valid latitude.");
+//                     return res.sendStatus(200);
+//                 }
+//                 session.data.latitude = textRaw;
+//                 session.step = STATES.CONFIRMATION;
+//                 await sendUpdatedSummary(from, session);
+//                 break;
+
+//             case "MODIFY_LONGITUDE":
+//                 if (isNaN(textRaw) || textRaw.trim() === "") {
+//                     await sendToWhatsApp(from, "❌ Please enter a valid longitude.");
+//                     return res.sendStatus(200);
+//                 }
+//                 session.data.longitude = textRaw;
+//                 session.step = STATES.CONFIRMATION;
+//                 await sendUpdatedSummary(from, session);
+//                 break;
+
+//             case "MODIFY_QUANTITY":
+//                 if (isNaN(textRaw) || textRaw.trim() === "") {
+//                     await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
+//                     return res.sendStatus(200);
+//                 }
+//                 session.data.quantity = textRaw;
+//                 session.step = STATES.CONFIRMATION;
+//                 await sendUpdatedSummary(from, session);
+//                 break;
+                
+
+//             default:
+//                 await sendToWhatsApp(from, "❌ An unexpected error occurred. Please try again.");
+//                 delete userSessions[from];
+//                 break;
+//         }
+
+//         res.sendStatus(200);
+//     } catch (error) {
+//         console.error('❌ Error:', error.response?.data || error.message || error);
+//         res.sendStatus(500);
+//     }
+// });
 
 app.listen(PORT, () => console.log(`🚀 Server is running on http://localhost:${PORT}`));
 
