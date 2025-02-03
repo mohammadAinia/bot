@@ -569,13 +569,20 @@ const sendToWhatsApp = async (to, text, buttons = []) => {
     if (buttons.length > 0) {
         await sendButtons(to, text, buttons);
     } else {
+        // قم بتنظيف النص هنا باستخدام trim() وتحقق من أنه ليس فارغاً
+        const cleanText = text.trim();
+        if (cleanText.length === 0) {
+            console.error("The text is empty!");
+            return; // أو يمكنك إرسال رسالة بديلة
+        }
+
         const payload = {
             messaging_product: "whatsapp",
             recipient_type: "individual",
             to: to,
             type: "text",
             text: {
-                body: text,
+                body: cleanText,
             },
         };
         await axios.post(`${process.env.WHATSAPP_API_URL}`, payload, {
@@ -586,6 +593,7 @@ const sendToWhatsApp = async (to, text, buttons = []) => {
         });
     }
 };
+
 
 const isValidEmail = (email) => {
     const regex = /^\S+@\S+\.\S+$/;
