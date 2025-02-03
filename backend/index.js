@@ -428,7 +428,7 @@ if (!process.env.OPENAI_API_KEY || !process.env.WHATSAPP_API_URL || !process.env
     process.exit(1);
 }
 
-// const app = express();
+const app = express();
 
 // Allow requests from your front-end's origin (e.g., http://localhost:5173)
 // app.use(cors({
