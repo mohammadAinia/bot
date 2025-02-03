@@ -418,7 +418,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 import axios from 'axios';
 import bodyParser from 'body-parser';
-import cors from 'cors';
+// import cors from 'cors';
 
 dotenv.config(); // ✅ تحميل متغيرات البيئة
 
@@ -428,13 +428,13 @@ if (!process.env.OPENAI_API_KEY || !process.env.WHATSAPP_API_URL || !process.env
     process.exit(1);
 }
 
-const app = express();
+// const app = express();
 
 // Allow requests from your front-end's origin (e.g., http://localhost:5173)
-app.use(cors({
-  origin: 'http://localhost:5173',
-  // You can also allow multiple origins or use a function to check origins dynamically
-}));
+// app.use(cors({
+//   origin: 'http://localhost:5173',
+//   // You can also allow multiple origins or use a function to check origins dynamically
+// }));
 const PORT = process.env.PORT || 5000;
 app.use(bodyParser.json());
 
