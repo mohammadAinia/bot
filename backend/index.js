@@ -918,7 +918,7 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case STATES.CONFIRMATION:
-                if (buttonId === "confirm_yes" || text.includes("yes")) {
+                if (text.includes("yes")) {
                     // Send the data to the external API
                     const requestData = {
                         user_name: session.data.name,
