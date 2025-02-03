@@ -745,22 +745,23 @@ app.post('/webhook', async (req, res) => {
             //     }
             //     break;
             case STATES.WELCOME:
-                if (text === "1") {
+                if (text === "1" || buttonId === "option_1") {
                     await sendButtons(from, "❓ Please send your question regarding our services or products.", [
                         { id: "faq_1", title: "Product Inquiry" },
                         { id: "faq_2", title: "Service Inquiry" },
                     ]);
                     session.step = STATES.FAQ;
-                } else if (text === "2.1" || text === "2.2") {
-                    session.data.type = text === "2.1" ? "Used oil disposal" : "Purchase of refined oil";
+                } else if (text === "2.1" || buttonId === "option_2_1") {
+                    session.data.type = "Used oil disposal";
                     session.step = STATES.NAME;
                     await sendButtons(from, "🔹 Please provide your full name.", [
                         { id: "name_skip", title: "Skip" },
                     ]);
                 } else {
-                    await sendButtons(from, "❌ Invalid option, please choose a number from the list.", [
+                    // Send buttons for the initial options
+                    await sendButtons(from, "Wa Alaikum Assalam wa Rahmatullahi wa Barakatuh, welcome to *Mohammed Oil Refining Company*.\n\nWe offer the following services:\n\n1️⃣ *Inquiries about our products and services*\n2️⃣ *Create a new request:*\n   - 2.1 *Request for used oil disposal* 🛢️\n   - 2.2 *Purchase of refined oil* 🏭\n\nPlease choose an option:", [
                         { id: "option_1", title: "1️⃣ Inquiries" },
-                        { id: "option_2", title: "2️⃣ Create Request" },
+                        { id: "option_2_1", title: "2.1 Used Oil Disposal" },
                     ]);
                 }
                 break;
