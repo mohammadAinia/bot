@@ -651,7 +651,7 @@ const sendButtons = async (to, text, buttons) => {
 
     try {
         await axios.post(
-            `${process.env.WHATSAPP_API_URL}/${process.env.PHONE_NUMBER_ID}/messages`,
+            `${process.env.WHATSAPP_API_URL}/${process.env.PHONE_NUMBER_ID}`,
             payload,
             {
                 headers: {
