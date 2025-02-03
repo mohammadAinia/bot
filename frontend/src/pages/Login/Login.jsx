@@ -1,21 +1,29 @@
-// src/pages/Login/Login.js
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import './login.css';
 
-function Login() {
+function Login({ setIsAuthenticated }) {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const navigate = useNavigate();
 
+    // If already logged in, redirect to home
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            navigate('/');
+        }
+    }, [navigate]);
+
     const handleLogin = async (e) => {
         e.preventDefault();
         try {
             const response = await axios.post('https://bot-wy40.onrender.com/admin/login', { username, password });
-            localStorage.setItem('token', response.data.token); // Store the token in localStorage
-            navigate('/'); // Redirect to the home page after login
+            localStorage.setItem('token', response.data.token);
+            setIsAuthenticated(true);
+            navigate('/'); // Redirect to home after login
         } catch (err) {
             setError('Invalid username or password');
         }

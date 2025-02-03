@@ -1,7 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useState } from 'react';
 import './App.css';
-import Home from './pages/Home/Home';
 import Request from './pages/Request/Request';
 import Login from './pages/Login/Login';
 
@@ -11,16 +10,13 @@ function App() {
     return (
         <Router>
             <Routes>
-                <Route path="/login" element={<Login setIsAuthenticated={setIsAuthenticated} />} />
-                <Route
-                    path="/"
-                    element={
-                        isAuthenticated ? (
-                            <Request />
-                        ) : (
-                            <Navigate to="/login" />
-                        )
-                    }
+                <Route 
+                    path="/login" 
+                    element={isAuthenticated ? <Navigate to="/" /> : <Login setIsAuthenticated={setIsAuthenticated} />} 
+                />
+                <Route 
+                    path="/" 
+                    element={isAuthenticated ? <Request setIsAuthenticated={setIsAuthenticated} /> : <Navigate to="/login" />} 
                 />
             </Routes>
         </Router>

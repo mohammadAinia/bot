@@ -1,55 +1,59 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import './request.css';
 
-function Request() {
+function Request({ setIsAuthenticated }) {
     const [systemMessage, setSystemMessage] = useState('');
     const [guidanceMessage, setGuidanceMessage] = useState('');
+    const navigate = useNavigate();
 
     useEffect(() => {
         const token = localStorage.getItem('token');
-        axios
-            .get('https://bot-wy40.onrender.com/admin/messages', {
-                headers: { Authorization: `Bearer ${token}` },
-            })
-            .then((response) => {
-                setSystemMessage(response.data.systemMessage || '');
-                setGuidanceMessage(response.data.guidanceMessage || '');
-            })
-            .catch((error) => {
-                console.error('Error fetching messages:', error);
-            });
+        axios.get('https://bot-wy40.onrender.com/admin/messages', {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+        .then((response) => {
+            setSystemMessage(response.data.systemMessage || '');
+            setGuidanceMessage(response.data.guidanceMessage || '');
+        })
+        .catch((error) => {
+            console.error('Error fetching messages:', error);
+        });
     }, []);
 
     const handleSystemMessageSubmit = (e) => {
         e.preventDefault();
         const token = localStorage.getItem('token');
-        axios
-            .post(
-                'https://bot-wy40.onrender.com/admin/update-messages',
-                { newSystemMessage: systemMessage },
-                { headers: { Authorization: `Bearer ${token}` } }
-            )
-            .then((response) => console.log('System message updated:', response.data))
-            .catch((error) => console.error('Error updating system message:', error));
+        axios.post('https://bot-wy40.onrender.com/admin/update-messages',
+            { newSystemMessage: systemMessage },
+            { headers: { Authorization: `Bearer ${token}` } }
+        )
+        .then((response) => console.log('System message updated:', response.data))
+        .catch((error) => console.error('Error updating system message:', error));
     };
 
     const handleGuidanceMessageSubmit = (e) => {
         e.preventDefault();
         const token = localStorage.getItem('token');
-        axios
-            .post(
-                'https://bot-wy40.onrender.com/admin/update-messages',
-                { newGuidance: guidanceMessage },
-                { headers: { Authorization: `Bearer ${token}` } }
-            )
-            .then((response) => console.log('Guidance message updated:', response.data))
-            .catch((error) => console.error('Error updating guidance message:', error));
+        axios.post('https://bot-wy40.onrender.com/admin/update-messages',
+            { newGuidance: guidanceMessage },
+            { headers: { Authorization: `Bearer ${token}` } }
+        )
+        .then((response) => console.log('Guidance message updated:', response.data))
+        .catch((error) => console.error('Error updating guidance message:', error));
+    };
+
+    const handleLogout = () => {
+        localStorage.removeItem('token');
+        setIsAuthenticated(false);
+        navigate('/login');
     };
 
     return (
         <div className="request-container">
             <h1 className="header">Bot Guidance Interface</h1>
+            <button onClick={handleLogout} className="logout-btn">Logout</button>
             <div className="form-container">
                 <form className="form" onSubmit={handleSystemMessageSubmit}>
                     <div className="form-group">
