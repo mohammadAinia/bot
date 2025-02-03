@@ -565,35 +565,10 @@ const sendToWhatsApp = async (to, message) => {
         console.error('❌ Failed to send message to WhatsApp:', error.response?.data || error.message);
     }
 };
-// const sendToWhatsApp = async (to, text, buttons = []) => {
-//     if (buttons.length > 0) {
-//         await sendButtons(to, text, buttons);
-//     } else {
-//         // قم بتنظيف النص هنا باستخدام trim() وتحقق من أنه ليس فارغاً
-//         const cleanText = text.trim();
-//         if (cleanText.length === 0) {
-//             console.error("The text is empty!");
-//             return; // أو يمكنك إرسال رسالة بديلة
-//         }
 
-//         const payload = {
-//             messaging_product: "whatsapp",
-//             recipient_type: "individual",
-//             to: to,
-//             type: "text",
-//             text: {
-//                 body: cleanText,
-//             },
-//         };
-//         await axios.post(`${process.env.WHATSAPP_API_URL}`, payload, {
-//             headers: {
-//                 Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-//                 "Content-Type": "application/json",
-//             },
-//         });
-//     }
-// };
-
+function convertArabicNumbers(input) {
+    return input.replace(/[٠١٢٣٤٥٦٧٨٩]/g, d => "0123456789"["٠١٢٣٤٥٦٧٨٩".indexOf(d)]);
+  }
 
 const isValidEmail = (email) => {
     const regex = /^\S+@\S+\.\S+$/;
@@ -615,8 +590,6 @@ const defaultWelcomeMessage = `🌟 Welcome to *Mohammed Oil Refining Company* �
                               
 
                                     Please send the *service number* you wish to request.`;
-
-
 function formatPhoneNumber(phoneNumber) {
     // إزالة أي مسافات أو رموز غير ضرورية
     let cleanedNumber = phoneNumber.replace(/\D/g, "");
@@ -625,51 +598,13 @@ function formatPhoneNumber(phoneNumber) {
     if (!cleanedNumber.startsWith("+")) {
         cleanedNumber = `+${cleanedNumber}`;
     }
-
     // إضافة مسافة بعد رمز الدولة (أول 3 أو 4 أرقام)
     const match = cleanedNumber.match(/^\+(\d{1,4})(\d+)$/);
     if (match) {
         return `+${match[1]} ${match[2]}`; // إضافة المسافة بعد كود الدولة
     }
-
     return cleanedNumber; // إرجاع الرقم إذا لم ينطبق النمط
 }
-
-
-const sendButtons = async (to, text, buttons) => {
-    const formattedButtons = buttons.map(({ id, title }) => ({
-        type: "reply",
-        reply: { id, title },
-    }));
-
-    const payload = {
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to,
-        type: "interactive",
-        interactive: {
-            type: "button",
-            body: { text },
-            action: { buttons: formattedButtons },
-        },
-    };
-
-    try {
-        await axios.post(
-            `${process.env.WHATSAPP_API_URL}`,
-            payload,
-            {
-                headers: {
-                    Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-                    "Content-Type": "application/json",
-                },
-            }
-        );
-    } catch (error) {
-        console.error("❌ Error sending buttons:", error.response?.data || error.message);
-    }
-};
-
 
 app.post('/webhook', async (req, res) => {
     try {
@@ -712,7 +647,7 @@ app.post('/webhook', async (req, res) => {
 
             let welcomeText = "";
             if (isGreeting) {
-                welcomeText = `Wa Alaikum Assalam wa Rahmatullahi wa Barakatuh, welcome to *Mohammed Oil Refining Company*.
+                welcomeText = `welcome to *Mohammed Oil Refining Company*.
                                                                                                                                                                 
                                                                                                                                                                 We offer the following services:
                                                                                                                                                                 
@@ -725,60 +660,26 @@ app.post('/webhook', async (req, res) => {
             } else {
                 welcomeText = defaultWelcomeMessage;
             }
-            // Define the interactive buttons for the welcome message.
-            // const welcomeButtons = [
-            //     { id: "option_1", title: "Inquiries" },
-            //     { id: "option_2_1", title: "Oil Disposal" }
-            // ];
             console.log(`isGreeting: ${isGreeting} | Received text: "${text}"`);
-            // await sendToWhatsApp(from, welcomeText);
-            // await sendToWhatsApp(from, welcomeText, welcomeButtons);
             await sendToWhatsApp(from, welcomeText);
-
             return res.sendStatus(200);
         }
-
         const session = userSessions[from];
 
         // Handle messages based on the current state
         switch (session.step) {
             case STATES.WELCOME:
-                if (text === "1") {
+                if (convertArabicNumbers(text) === "1") {
                     await sendToWhatsApp(from, "❓ Please send your question regarding our services or products.");
                     session.step = STATES.FAQ;
-                } else if (text === "2") {
+                } else if (convertArabicNumbers(text) === "2") {
                     session.step = STATES.NAME;
                     await sendToWhatsApp(from, "🔹 Please provide your full name.");
                 }
-                //  else if (text === "2.2") {
-                //     session.data.type = "Purchase of refined oil";
-                //     session.step = STATES.NAME;
-                //     await sendToWhatsApp(from, "🔹 Please provide your full name.");
-                // } 
                 else {
                     await sendToWhatsApp(from, "❌ Invalid option, please choose a number from the list.");
                 }
                 break;
-            // case STATES.WELCOME:
-            //     if (text === "1" || buttonId === "option_1") {
-            //       await sendButtons(from, "❓ Please send your question regarding our services or products.", [
-            //         { id: "faq_1", title: "Product Inquiry" },
-            //         { id: "faq_2", title: "Service Inquiry" }
-            //       ]);
-            //       session.step = STATES.FAQ;
-            //     } else if (text === "2.1" || buttonId === "option_2_1") {
-            //       session.data.type = "Used oil disposal";
-            //       session.step = STATES.NAME;
-            //       await sendButtons(from, "🔹 Please provide your full name.", [
-            //         { id: "name_skip", title: "Skip" }
-            //       ]);
-            //     } else {
-            //       await sendButtons(from, "❌ Invalid option. Please choose one of the options below:", [
-            //         { id: "option_1", title: "Inquiries" },
-            //         { id: "option_2_1", title: "Oil Disposal" }
-            //       ]);
-            //     }
-            //     break;
 
             case STATES.FAQ:
                 // List of phrases to end the conversation
@@ -967,26 +868,6 @@ app.post('/webhook', async (req, res) => {
                 }
                 delete userSessions[from];  // Clear the session after confirmation
                 break;
-            //     try {
-            //         const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData);
-            //         if (response.status === 200) {
-            //             await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
-            //         } else {
-            //             await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
-            //         }
-            //     } catch (error) {
-            //         await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
-            //     }
-            // } else if (buttonId === "confirm_no" || text.includes("no")) {
-            //     await sendToWhatsApp(from, "❌ Order has been canceled. You can retry anytime.");
-            // } else {
-            //     await sendButtons(from, "Is the information correct?", [
-            //         { id: "confirm_yes", title: "Yes" },
-            //         { id: "confirm_no", title: "No" },
-            //     ]);
-            // }
-            // delete userSessions[from];
-            // break;
 
             default:
                 await sendToWhatsApp(from, "❌ An unexpected error occurred. Please try again.");
@@ -1008,9 +889,66 @@ app.listen(PORT, () => console.log(`🚀 Server is running on http://localhost:$
 
 
 
+// const sendButtons = async (to, text, buttons) => {
+//     const formattedButtons = buttons.map(({ id, title }) => ({
+//         type: "reply",
+//         reply: { id, title },
+//     }));
+//     const payload = {
+//         messaging_product: "whatsapp",
+//         recipient_type: "individual",
+//         to,
+//         type: "interactive",
+//         interactive: {
+//             type: "button",
+//             body: { text },
+//             action: { buttons: formattedButtons },
+//         },
+//     };
+//     try {
+//         await axios.post(
+//             `${process.env.WHATSAPP_API_URL}`,
+//             payload,
+//             {
+//                 headers: {
+//                     Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+//                     "Content-Type": "application/json",
+//                 },
+//             }
+//         );
+//     } catch (error) {
+//         console.error("❌ Error sending buttons:", error.response?.data || error.message);
+//     }
+// };
 
+// const sendToWhatsApp = async (to, text, buttons = []) => {
+//     if (buttons.length > 0) {
+//         await sendButtons(to, text, buttons);
+//     } else {
+//         // قم بتنظيف النص هنا باستخدام trim() وتحقق من أنه ليس فارغاً
+//         const cleanText = text.trim();
+//         if (cleanText.length === 0) {
+//             console.error("The text is empty!");
+//             return; // أو يمكنك إرسال رسالة بديلة
+//         }
 
-
+//         const payload = {
+//             messaging_product: "whatsapp",
+//             recipient_type: "individual",
+//             to: to,
+//             type: "text",
+//             text: {
+//                 body: cleanText,
+//             },
+//         };
+//         await axios.post(`${process.env.WHATSAPP_API_URL}`, payload, {
+//             headers: {
+//                 Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+//                 "Content-Type": "application/json",
+//             },
+//         });
+//     }
+// };
 
 
 
