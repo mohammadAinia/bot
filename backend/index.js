@@ -875,34 +875,37 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-            case STATES.MODIFY:
-                const fieldToModify = parseInt(text);
-                if (isNaN(fieldToModify) || fieldToModify < 1 || fieldToModify > 12) {
-                    await sendToWhatsApp(from, "❌ Invalid option. Please choose a number between 1 and 12.");
-                    return res.sendStatus(200);
-                }
-
-                const fieldMap = {
-                    1: "name",
-                    2: "phone",
-                    3: "email",
-                    4: "address",
-                    5: "city",
-                    6: "label",
-                    7: "street",
-                    8: "building_name",
-                    9: "flat_no",
-                    10: "latitude",
-                    11: "longitude",
-                    12: "quantity"
-                };
-
-                const selectedField = fieldMap[fieldToModify];
-                session.modifyField = selectedField;
-                session.step = `MODIFY_${selectedField.toUpperCase()}`;
-
-                await sendToWhatsApp(from, `🔹 Please provide the new value for ${selectedField.replace(/_/g, " ")}.`);
-                break;
+                case STATES.MODIFY:
+                    // Convert any Arabic digits in the text to English digits
+                    const normalizedText = convertArabicNumbers(text);
+                    const fieldToModify = parseInt(normalizedText);
+                    if (isNaN(fieldToModify) || fieldToModify < 1 || fieldToModify > 12) {
+                        await sendToWhatsApp(from, "❌ Invalid option. Please choose a number between 1 and 12.");
+                        return res.sendStatus(200);
+                    }
+                
+                    const fieldMap = {
+                        1: "name",
+                        2: "phone",
+                        3: "email",
+                        4: "address",
+                        5: "city",
+                        6: "label",
+                        7: "street",
+                        8: "building_name",
+                        9: "flat_no",
+                        10: "latitude",
+                        11: "longitude",
+                        12: "quantity"
+                    };
+                
+                    const selectedField = fieldMap[fieldToModify];
+                    session.modifyField = selectedField;
+                    session.step = `MODIFY_${selectedField.toUpperCase()}`;
+                
+                    await sendToWhatsApp(from, `🔹 Please provide the new value for ${selectedField.replace(/_/g, " ")}.`);
+                    break;
+                
 
             // Modification steps
             case "MODIFY_NAME":
