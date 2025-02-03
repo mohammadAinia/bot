@@ -578,9 +578,9 @@ const sendToWhatsApp = async (to, text, buttons = []) => {
                 body: text,
             },
         };
-        await axios.post(`https://graph.facebook.com/v17.0/${YOUR_PHONE_NUMBER_ID}/messages`, payload, {
+        await axios.post(`https://graph.facebook.com/v17.0/${process.env.WHATSAPP_API_URL}/messages`, payload, {
             headers: {
-                Authorization: `Bearer ${YOUR_ACCESS_TOKEN}`,
+                Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
                 "Content-Type": "application/json",
             },
         });
