@@ -697,6 +697,14 @@ const defaultWelcomeMessage = `🌟 Welcome to *Mohammed Oil Refining Company* �
                                     Please send the *service number* you wish to request.`;
 
 
+function formatPhoneNumber(phoneNumber) {
+    // Ensure the number starts with "+"
+    if (!phoneNumber.startsWith("+")) {
+        return `+${phoneNumber}`;
+    }
+    return phoneNumber;
+}
+
 app.post('/webhook', async (req, res) => {
     try {
         console.log('Incoming Webhook Data:', req.body); // Log the incoming data for debugging
@@ -795,7 +803,7 @@ app.post('/webhook', async (req, res) => {
 
             case STATES.PHONE_CONFIRM:
                 if (text.includes("yes")) {
-                    session.data.phone = from;
+                    session.data.phone = formatPhoneNumber(from);
                     session.step = STATES.EMAIL;
                     await sendToWhatsApp(from, "📧 Your current number will be used. Please provide your email address.");
                 } else if (text.includes("no")) {
@@ -811,7 +819,7 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(from, "❌ Invalid phone number, please enter a valid number.");
                     return res.sendStatus(200);
                 }
-                session.data.phone = textRaw;
+                session.data.phone = formatPhoneNumber(textRaw);
                 session.step = STATES.EMAIL;
                 await sendToWhatsApp(from, "📧 Please provide your email address.");
                 break;
