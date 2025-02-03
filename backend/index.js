@@ -572,20 +572,18 @@ const sendToWhatsApp = async (to, text, buttons = []) => {
         const payload = {
             messaging_product: "whatsapp",
             recipient_type: "individual",
-            to,
+            to: to,
             type: "text",
-            text: { body: text },
+            text: {
+                body: text,
+            },
         };
-        await axios.post(
-            `${process.env.WHATSAPP_API_URL}/${process.env.PHONE_NUMBER_ID}/messages`,
-            payload,
-            {
-                headers: {
-                    Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-                    "Content-Type": "application/json",
-                },
-            }
-        );
+        await axios.post(`${process.env.WHATSAPP_API_URL}`, payload, {
+            headers: {
+                Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                "Content-Type": "application/json",
+            },
+        });
     }
 };
 
@@ -651,7 +649,7 @@ const sendButtons = async (to, text, buttons) => {
 
     try {
         await axios.post(
-            `${process.env.WHATSAPP_API_URL}/${process.env.PHONE_NUMBER_ID}`,
+            `${process.env.WHATSAPP_API_URL}/${process.env.PHONE_NUMBER_ID}/messages`,
             payload,
             {
                 headers: {
