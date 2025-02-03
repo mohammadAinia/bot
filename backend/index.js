@@ -720,10 +720,9 @@ app.post('/webhook', async (req, res) => {
             }
             // Define the interactive buttons for the welcome message.
             const welcomeButtons = [
-                { id: "option_1", title: "1️⃣ Inquiries" },
-                { id: "option_2_1", title: "2.1 Used Oil Disposal" }
-                // You can add a third button here if needed (e.g., for "2.2 Purchase refined oil")
-            ];
+                { id: "option_1", title: "Inquiries" },
+                { id: "option_2_1", title: "Oil Disposal" }
+              ];
             console.log(`isGreeting: ${isGreeting} | Received text: "${text}"`);
             // await sendToWhatsApp(from, welcomeText);
             await sendToWhatsApp(from, welcomeText, welcomeButtons);
@@ -753,24 +752,22 @@ app.post('/webhook', async (req, res) => {
             //     break;
             case STATES.WELCOME:
                 if (text === "1" || buttonId === "option_1") {
-                    await sendButtons(from, "❓ Please send your question regarding our services or products.", [
-                        { id: "faq_1", title: "Product Inquiry" },
-                        { id: "faq_2", title: "Service Inquiry" },
-                    ]);
-                    session.step = STATES.FAQ;
+                  await sendButtons(from, "❓ Please send your question regarding our services or products.", [
+                    { id: "faq_1", title: "Product Inquiry" },
+                    { id: "faq_2", title: "Service Inquiry" }
+                  ]);
+                  session.step = STATES.FAQ;
                 } else if (text === "2.1" || buttonId === "option_2_1") {
-                    session.data.type = "Used oil disposal";
-                    session.step = STATES.NAME;
-                    await sendButtons(from, "🔹 Please provide your full name.", [
-                        { id: "name_skip", title: "Skip" },
-                    ]);
+                  session.data.type = "Used oil disposal";
+                  session.step = STATES.NAME;
+                  await sendButtons(from, "🔹 Please provide your full name.", [
+                    { id: "name_skip", title: "Skip" }
+                  ]);
                 } else {
-                    // Optionally, you could re-send the welcome message buttons if the input doesn't match.
-                    await sendButtons(from, "❌ Invalid option. Please choose one of the options below:", [
-                        { id: "option_1", title: "1️⃣ Inquiries" },
-                        { id: "option_2_1", title: "2.1 Used Oil Disposal" },
-                        // You can add more options here if needed.
-                    ]);
+                  await sendButtons(from, "❌ Invalid option. Please choose one of the options below:", [
+                    { id: "option_1", title: "Inquiries" },
+                    { id: "option_2_1", title: "Oil Disposal" }
+                  ]);
                 }
                 break;
 
