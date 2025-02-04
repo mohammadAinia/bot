@@ -904,7 +904,7 @@ app.post('/webhook', async (req, res) => {
                         email: session.data.email,
                         phone_number: session.data.phone,
                         city: session.data.city,
-                        label: "",
+                        label: "Home",
                         address: session.data.address,
                         street: session.data.street,
                         building_name: session.data.building_name,
