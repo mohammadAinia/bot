@@ -783,6 +783,7 @@ app.post('/webhook', async (req, res) => {
 
             case STATES.NAME:
                 session.data.name = textRaw;
+                session.data.label = "home";
                 session.data.phone = formatPhoneNumber(from); // Automatically store the sender's number
                 session.step = STATES.EMAIL;
                 await sendToWhatsApp(from, "📧 Please provide your email address.");
@@ -904,7 +905,7 @@ app.post('/webhook', async (req, res) => {
                         email: session.data.email,
                         phone_number: session.data.phone,
                         city: session.data.city,
-                        label: "Home",
+                        label: session.data.label || "Home",  // Ensure 'label' is always provided
                         address: session.data.address,
                         street: session.data.street,
                         building_name: session.data.building_name,
@@ -913,6 +914,7 @@ app.post('/webhook', async (req, res) => {
                         longitude: session.data.longitude,
                         quantity: session.data.quantity
                     };
+
 
                     console.log('Request Data:', requestData);
                     try {
