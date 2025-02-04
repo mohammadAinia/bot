@@ -899,21 +899,45 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, "🏠 Please provide the flat number.");
                 break;
 
+            // case STATES.FLAT_NO:
+            //     session.data.flat_no = textRaw;
+            //     session.step = STATES.LONGITUDE;
+            //     await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
+            //     break;
+
+            // // case STATES.LATITUDE:
+            // case STATES.LONGITUDE:
+            //     if (message.location) {
+            //         session.data.latitude = message.location.latitude;
+            //         session.data.longitude = message.location.longitude;
+            //         session.step = STATES.QUANTITY;
+            //         await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
+            //     } else {
+            //         await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
+            //     }
+            //     break;
             case STATES.FLAT_NO:
                 session.data.flat_no = textRaw;
                 session.step = STATES.LONGITUDE;
-                await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
+                session.locationPromptSent = false; // Reset the flag
+                await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature. Tap the 📎 icon and select 'Location'.");
                 break;
 
-            // case STATES.LATITUDE:
             case STATES.LONGITUDE:
                 if (message.location) {
+                    // If the message contains a valid location, process it
                     session.data.latitude = message.location.latitude;
                     session.data.longitude = message.location.longitude;
                     session.step = STATES.QUANTITY;
                     await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
                 } else {
-                    await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
+                    // If the message does not contain a location, check if the prompt has already been sent
+                    if (!session.locationPromptSent) {
+                        await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature. Tap the 📎 icon and select 'Location'.");
+                        session.locationPromptSent = true; // Mark the prompt as sent
+                    }
+                    // Log invalid input for debugging
+                    console.error("Invalid input received in LONGITUDE state:", textRaw);
                 }
                 break;
 
@@ -1082,7 +1106,9 @@ app.post('/webhook', async (req, res) => {
 
                     if (cityMap[citySelection]) {
                         session.data.city = cityMap[citySelection];  // Update the city in session data
-                        session.step = STATES.CONFIRMATION;  // Transition to confirmation step
+                        session.step = STATES.CONFIRMATION;  // Transition to confirmation step after city is modified
+
+                        // Ensure all fields are updated and send the confirmation summary
                         await sendUpdatedSummary(from, session);  // ✅ Show updated summary after modification
                     } else {
                         await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided options.");
@@ -1093,6 +1119,7 @@ app.post('/webhook', async (req, res) => {
                     await sendCitySelection(from);  // Re-send the city selection buttons
                 }
                 break;
+
 
 
             case "MODIFY_STREET":
