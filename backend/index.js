@@ -864,7 +864,7 @@ app.post('/webhook', async (req, res) => {
             case STATES.ADDRESS:
                 session.data.address = textRaw;
                 session.step = STATES.CITY;
-                await sendToWhatsApp(from, "📦 Please provide the City.");
+                // await sendToWhatsApp(from, "📦 Please provide the City.");
                 break;
 
             case STATES.CITY:
