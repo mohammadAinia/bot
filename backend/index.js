@@ -899,48 +899,23 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, "🏠 Please provide the flat number.");
                 break;
 
-            // case STATES.FLAT_NO:
-            //     session.data.flat_no = textRaw;
-            //     session.step = STATES.LATITUDE;
-            //     await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
-            //     break;
-
-            // case STATES.LATITUDE:
-            // case STATES.LONGITUDE:
-            //     if (message.location) {
-            //         session.data.latitude = message.location.latitude;
-            //         session.data.longitude = message.location.longitude;
-            //         session.step = STATES.QUANTITY;
-            //         await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
-            //     } else {
-            //         await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
-            //     }
-            //     break;
             case STATES.FLAT_NO:
                 session.data.flat_no = textRaw;
-                session.step = STATES.LATITUDE;
+                session.step = STATES.LONGITUDE;
                 await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
                 break;
 
-            case STATES.LATITUDE:
-                if (message.location) {
-                    session.data.latitude = message.location.latitude;
-                    session.step = STATES.LONGITUDE;  // ✅ Move to LONGITUDE but don't send another prompt
-                } else if (!session.data.latitude) {  // ✅ Only send if not already requested
-                    await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
-                }
-                break;
-
+            // case STATES.LATITUDE:
             case STATES.LONGITUDE:
                 if (message.location) {
+                    session.data.latitude = message.location.latitude;
                     session.data.longitude = message.location.longitude;
                     session.step = STATES.QUANTITY;
                     await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
-                } else if (!session.data.longitude) {  // ✅ Prevent duplicate request
+                } else {
                     await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
                 }
                 break;
-
 
             case STATES.QUANTITY:
                 if (isNaN(textRaw) || textRaw.trim() === "") {
@@ -1106,9 +1081,9 @@ app.post('/webhook', async (req, res) => {
                     };
 
                     if (cityMap[citySelection]) {
-                        session.data.city = cityMap[citySelection];
-                        session.step = STATES.CONFIRMATION;
-                        await sendUpdatedSummary(from, session);  // ✅ Show updated summary
+                        session.data.city = cityMap[citySelection];  // Update the city in session data
+                        session.step = STATES.CONFIRMATION;  // Transition to confirmation step
+                        await sendUpdatedSummary(from, session);  // ✅ Show updated summary after modification
                     } else {
                         await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided options.");
                         await sendCitySelection(from);  // Re-send city selection if invalid
@@ -1118,6 +1093,7 @@ app.post('/webhook', async (req, res) => {
                     await sendCitySelection(from);  // Re-send the city selection buttons
                 }
                 break;
+
 
             case "MODIFY_STREET":
                 session.data.street = textRaw;
