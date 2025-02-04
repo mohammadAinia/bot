@@ -919,8 +919,12 @@ app.post('/webhook', async (req, res) => {
             case STATES.FLAT_NO:
                 session.data.flat_no = textRaw;
                 session.step = STATES.LONGITUDE;
-                session.locationPromptSent = false; // Reset the flag
-                await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature. Tap the 📎 icon and select 'Location'.");
+
+                // Only send the location prompt if it hasn't been sent already
+                if (!session.locationPromptSent) {
+                    await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature. Tap the 📎 icon and select 'Location'.");
+                    session.locationPromptSent = true; // Mark the prompt as sent
+                }
                 break;
 
             case STATES.LONGITUDE:
@@ -940,6 +944,7 @@ app.post('/webhook', async (req, res) => {
                     console.error("Invalid input received in LONGITUDE state:", textRaw);
                 }
                 break;
+
 
             case STATES.QUANTITY:
                 if (isNaN(textRaw) || textRaw.trim() === "") {
@@ -1119,6 +1124,7 @@ app.post('/webhook', async (req, res) => {
                     await sendCitySelection(from);  // Re-send the city selection buttons
                 }
                 break;
+
 
 
 
