@@ -857,7 +857,7 @@ app.post('/webhook', async (req, res) => {
                     session.data.latitude = message.location.latitude;
                     session.data.longitude = message.location.longitude;
                     session.step = STATES.QUANTITY;
-                    await sendToWhatsApp(from, "📦 Please provide the Label.");
+                    await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
                 } else {
                     await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
                 }
@@ -890,7 +890,7 @@ app.post('/webhook', async (req, res) => {
                 summary += `📍 *Latitude:* ${session.data.latitude}\n`;
                 summary += `📍 *Longitude:* ${session.data.longitude}\n`;
                 summary += `📦 *Quantity:* ${session.data.quantity}\n`;
-                summary += `🛢 *Request Type:* ${session.data.type}\n\n`;
+                // summary += `🛢 *Request Type:* ${session.data.type}\n\n`;
                 summary += `Is the information correct? Please reply with *Yes* or *No*`;
 
                 await sendToWhatsApp(from, summary);
@@ -904,7 +904,7 @@ app.post('/webhook', async (req, res) => {
                         email: session.data.email,
                         phone_number: session.data.phone,
                         city: session.data.city,
-                        // label: session.data.label,
+                        label: "",
                         address: session.data.address,
                         street: session.data.street,
                         building_name: session.data.building_name,
