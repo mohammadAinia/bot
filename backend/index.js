@@ -899,6 +899,23 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, "🏠 Please provide the flat number.");
                 break;
 
+            // case STATES.FLAT_NO:
+            //     session.data.flat_no = textRaw;
+            //     session.step = STATES.LATITUDE;
+            //     await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
+            //     break;
+
+            // case STATES.LATITUDE:
+            // case STATES.LONGITUDE:
+            //     if (message.location) {
+            //         session.data.latitude = message.location.latitude;
+            //         session.data.longitude = message.location.longitude;
+            //         session.step = STATES.QUANTITY;
+            //         await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
+            //     } else {
+            //         await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
+            //     }
+            //     break;
             case STATES.FLAT_NO:
                 session.data.flat_no = textRaw;
                 session.step = STATES.LATITUDE;
@@ -906,16 +923,24 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case STATES.LATITUDE:
-            case STATES.LONGITUDE:
                 if (message.location) {
                     session.data.latitude = message.location.latitude;
-                    session.data.longitude = message.location.longitude;
-                    session.step = STATES.QUANTITY;
-                    await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
-                } else {
+                    session.step = STATES.LONGITUDE;  // ✅ Move to LONGITUDE but don't send another prompt
+                } else if (!session.data.latitude) {  // ✅ Only send if not already requested
                     await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
                 }
                 break;
+
+            case STATES.LONGITUDE:
+                if (message.location) {
+                    session.data.longitude = message.location.longitude;
+                    session.step = STATES.QUANTITY;
+                    await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
+                } else if (!session.data.longitude) {  // ✅ Prevent duplicate request
+                    await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
+                }
+                break;
+
 
             case STATES.QUANTITY:
                 if (isNaN(textRaw) || textRaw.trim() === "") {
@@ -1070,54 +1095,29 @@ app.post('/webhook', async (req, res) => {
                 session.step = STATES.MODIFY_CITY_SELECTION;  // ✅ Move to a new state for handling the selection
                 break;
 
-            // case STATES.MODIFY_CITY_SELECTION:
-            //     if (message.interactive && message.interactive.list_reply) {
-            //         const citySelection = message.interactive.list_reply.id; // Get the selected city ID
+            case STATES.MODIFY_CITY_SELECTION:
+                if (message.interactive && message.interactive.button_reply) {  // ✅ Handle button replies
+                    const citySelection = message.interactive.button_reply.id;  // ✅ Get selected city ID
 
-            //         const cityMap = {
-            //             "abu_dhabi": "Abu Dhabi",
-            //             "dubai": "Dubai",
-            //             "sharjah": "Sharjah"
-            //         };
+                    const cityMap = {
+                        "abu_dhabi": "Abu Dhabi",
+                        "dubai": "Dubai",
+                        "sharjah": "Sharjah"
+                    };
 
-            //         if (cityMap[citySelection]) {
-            //             session.data.city = cityMap[citySelection];
-            //             session.step = STATES.CONFIRMATION;
-            //             await sendUpdatedSummary(from, session);  // ✅ Show updated summary
-            //         } else {
-            //             await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided list.");
-            //             await sendCitySelection(from);  // Re-send the city selection list
-            //         }
-            //     } else {
-            //         await sendToWhatsApp(from, "❌ Please select a city from the provided options.");
-            //         await sendCitySelection(from);  // Re-send the options if the user sends invalid input
-            //     }
-            //     break;
-
-                case STATES.MODIFY_CITY_SELECTION:
-                    if (message.interactive && message.interactive.button_reply) {  // ✅ Handle button replies
-                        const citySelection = message.interactive.button_reply.id;  // ✅ Get selected city ID
-    
-                        const cityMap = {
-                            "abu_dhabi": "Abu Dhabi",
-                            "dubai": "Dubai",
-                            "sharjah": "Sharjah"
-                        };
-    
-                        if (cityMap[citySelection]) {
-                            session.data.city = cityMap[citySelection];
-                            session.step = STATES.CONFIRMATION;
-                            await sendUpdatedSummary(from, session);  // ✅ Show updated summary
-                        } else {
-                            await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided options.");
-                            await sendCitySelection(from); // Re-send city selection if invalid
-                        }
+                    if (cityMap[citySelection]) {
+                        session.data.city = cityMap[citySelection];
+                        session.step = STATES.CONFIRMATION;
+                        await sendUpdatedSummary(from, session);  // ✅ Show updated summary
                     } else {
-                        await sendToWhatsApp(from, "❌ Please select a city from the provided options.");
-                        await sendCitySelection(from); // Re-send the city selection buttons
+                        await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided options.");
+                        await sendCitySelection(from);  // Re-send city selection if invalid
                     }
-                    break;
-
+                } else {
+                    await sendToWhatsApp(from, "❌ Please select a city from the provided options.");
+                    await sendCitySelection(from);  // Re-send the city selection buttons
+                }
+                break;
 
             case "MODIFY_STREET":
                 session.data.street = textRaw;
