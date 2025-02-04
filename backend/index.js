@@ -868,14 +868,8 @@ app.post('/webhook', async (req, res) => {
             //     break;
             case STATES.ADDRESS:
                 session.data.address = textRaw;
-                session.step = STATES.CITY;  // Move to CITY state
-                return await sendCitySelection(from);  // ✅ Immediately send the city selection and return
-
-            case STATES.CITY:
-                await sendCitySelection(from);
-                session.step = STATES.CITY_SELECTION;
-                break;
-
+                session.step = STATES.CITY_SELECTION;  // ✅ Move directly to CITY_SELECTION
+                return await sendCitySelection(from);   // ✅ Immediately send the city selection and return
 
             case STATES.CITY_SELECTION:
                 if (message.interactive && message.interactive.list_reply) {
