@@ -869,26 +869,34 @@ app.post('/webhook', async (req, res) => {
 
             case STATES.CITY:
                 await sendCitySelection(from);
-                session.step = STATES.CITY_SELECTION; // Use a proper state from STATES enum
+                session.step = STATES.CITY_SELECTION;
                 break;
+
 
             case STATES.CITY_SELECTION:
-                const citySelection = textRaw.toLowerCase();
-                const cityMap = {
-                    "abu_dhabi": "Abu Dhabi",
-                    "dubai": "Dubai",
-                    "sharjah": "Sharjah"
-                };
+                if (message.interactive && message.interactive.list_reply) {
+                    const citySelection = message.interactive.list_reply.id; // Get the selected city ID
 
-                if (cityMap[citySelection]) {
-                    session.data.city = cityMap[citySelection];
-                    session.step = STATES.STREET;
-                    await sendToWhatsApp(from, `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`);
+                    const cityMap = {
+                        "abu_dhabi": "Abu Dhabi",
+                        "dubai": "Dubai",
+                        "sharjah": "Sharjah"
+                    };
+
+                    if (cityMap[citySelection]) {
+                        session.data.city = cityMap[citySelection];
+                        session.step = STATES.STREET;
+                        await sendToWhatsApp(from, `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`);
+                    } else {
+                        await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided list.");
+                        await sendCitySelection(from); // Re-send the city selection list
+                    }
                 } else {
-                    await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided list.");
-                    await sendCitySelection(from); // Re-prompt the user to select a city
+                    await sendToWhatsApp(from, "❌ Please select a city from the provided options.");
+                    await sendCitySelection(from); // Re-send the options if the user sends invalid input
                 }
                 break;
+
 
             case STATES.STREET:
                 session.data.street = textRaw;
