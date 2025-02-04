@@ -676,7 +676,7 @@ const STATES = {
     EMAIL: 3,
     ADDRESS: 4,
     CITY: 7,
-    // LABEL: 8,
+    LABEL: 8,
     STREET: 9,
     BUILDING_NAME: 10,
     FLAT_NO: 11,
@@ -783,7 +783,6 @@ app.post('/webhook', async (req, res) => {
 
             case STATES.NAME:
                 session.data.name = textRaw;
-                session.data.label = "home";
                 session.data.phone = formatPhoneNumber(from); // Automatically store the sender's number
                 session.step = STATES.EMAIL;
                 await sendToWhatsApp(from, "📧 Please provide your email address.");
@@ -857,6 +856,7 @@ app.post('/webhook', async (req, res) => {
                 if (message.location) {
                     session.data.latitude = message.location.latitude;
                     session.data.longitude = message.location.longitude;
+                    session.data.label = "home";
                     session.step = STATES.QUANTITY;
                     await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
                 } else {
@@ -865,7 +865,7 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             // case STATES.LABEL:
-            //     session.data.label = textRaw;
+            //     session.data.label = "home";
             //     session.step = STATES.QUANTITY;
             //     await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
             //     break;
@@ -884,7 +884,7 @@ app.post('/webhook', async (req, res) => {
                 summary += `📧 *Email:* ${session.data.email}\n`;
                 summary += `📍 *Address:* ${session.data.address}\n`;
                 summary += `🌆 *City:* ${session.data.city}\n`;
-                // summary += `🔖 *Label:* ${session.data.label}\n`;
+                summary += `🔖 *Label:* ${session.data.label}\n`;
                 summary += `🏠 *Street:* ${session.data.street}\n`;
                 summary += `🏢 *Building Name:* ${session.data.building_name}\n`;
                 summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;
