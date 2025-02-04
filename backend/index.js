@@ -701,7 +701,6 @@ const sendUpdatedSummary = async (to, session) => {
     summary += `📍 *Latitude:* ${session.data.latitude}\n`;
     summary += `📍 *Longitude:* ${session.data.longitude}\n`;
     summary += `📦 *Quantity:* ${session.data.quantity}\n`;
-    summary += `🛢 *Request Type:* ${session.data.type}\n\n`;
     summary += `Is the information correct? Please reply with *Yes* or *No*`;
 
     await sendToWhatsApp(to, summary);
