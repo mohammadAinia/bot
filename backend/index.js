@@ -864,20 +864,15 @@ app.post('/webhook', async (req, res) => {
             case STATES.ADDRESS:
                 session.data.address = textRaw;
                 session.step = STATES.CITY;
-                // await sendToWhatsApp(from, "📦 Please provide the City.");
+                await sendToWhatsApp(from, "📦 Please provide the City.");
                 break;
 
-            // case STATES.CITY:
-            //     session.data.city = textRaw;
-            //     session.step = STATES.STREET;
-            //     await sendToWhatsApp(from, "🏠 Please provide the street name.");
-            //     break;
             case STATES.CITY:
                 await sendCitySelection(from);
-                session.step = "CITY_SELECTION";
+                session.step = STATES.CITY_SELECTION; // Use a proper state from STATES enum
                 break;
 
-            case "CITY_SELECTION":
+            case STATES.CITY_SELECTION:
                 const citySelection = textRaw.toLowerCase();
                 const cityMap = {
                     "abu_dhabi": "Abu Dhabi",
@@ -891,6 +886,7 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(from, `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`);
                 } else {
                     await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided list.");
+                    await sendCitySelection(from); // Re-prompt the user to select a city
                 }
                 break;
 
