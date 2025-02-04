@@ -1125,9 +1125,12 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case "MODIFY_CITY_SELECTION":
-                const citySelection = textRaw.toLowerCase();
+                // Normalize the user input: trim spaces and convert to lowercase for comparison
+                const citySelection = textRaw.trim().toLowerCase();
+
+                // Map of valid city selections
                 const cityMap = {
-                    "abu_dhabi": "Abu Dhabi",
+                    "abu dhabi": "Abu Dhabi",
                     "dubai": "Dubai",
                     "sharjah": "Sharjah"
                 };
@@ -1137,10 +1140,12 @@ app.post('/webhook', async (req, res) => {
                     session.step = STATES.CONFIRMATION; // Move to confirmation step
                     await sendUpdatedSummary(from, session); // Send updated summary
                 } else {
+                    // If the city is invalid, prompt the user again
                     await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided list.");
                     await sendCitySelection(from); // Re-prompt the user to select a city
                 }
                 break;
+
 
 
             // case "MODIFY_CITY":
