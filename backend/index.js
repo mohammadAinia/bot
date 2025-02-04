@@ -861,11 +861,15 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, "📍 Please provide your full address.");
                 break;
 
+            // case STATES.ADDRESS:
+            //     session.data.address = textRaw;
+            //     session.step = STATES.CITY;
+            //     // await sendToWhatsApp(from, "📦 Please provide the City.");
+            //     break;
             case STATES.ADDRESS:
                 session.data.address = textRaw;
-                session.step = STATES.CITY;
-                // await sendToWhatsApp(from, "📦 Please provide the City.");
-                break;
+                session.step = STATES.CITY;  // Move to CITY state
+                return await sendCitySelection(from);  // ✅ Immediately send the city selection and return
 
             case STATES.CITY:
                 await sendCitySelection(from);
