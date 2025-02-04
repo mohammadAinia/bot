@@ -863,8 +863,8 @@ app.post('/webhook', async (req, res) => {
                 return await sendCitySelection(from);   // ✅ Immediately send the city selection and return
 
             case STATES.CITY_SELECTION:
-                if (message.interactive && message.interactive.list_reply) {
-                    const citySelection = message.interactive.list_reply.id; // Get the selected city ID
+                if (message.interactive && message.interactive.button_reply) {  // ✅ Handle button replies
+                    const citySelection = message.interactive.button_reply.id;  // ✅ Get selected city ID
 
                     const cityMap = {
                         "abu_dhabi": "Abu Dhabi",
@@ -877,14 +877,15 @@ app.post('/webhook', async (req, res) => {
                         session.step = STATES.STREET;
                         await sendToWhatsApp(from, `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`);
                     } else {
-                        await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided list.");
-                        await sendCitySelection(from); // Re-send the city selection list
+                        await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided options.");
+                        await sendCitySelection(from); // Re-send city selection if invalid
                     }
                 } else {
                     await sendToWhatsApp(from, "❌ Please select a city from the provided options.");
-                    await sendCitySelection(from); // Re-send the options if the user sends invalid input
+                    await sendCitySelection(from); // Re-send the city selection buttons
                 }
                 break;
+
 
             case STATES.STREET:
                 session.data.street = textRaw;
@@ -1069,29 +1070,53 @@ app.post('/webhook', async (req, res) => {
                 session.step = STATES.MODIFY_CITY_SELECTION;  // ✅ Move to a new state for handling the selection
                 break;
 
-            case STATES.MODIFY_CITY_SELECTION:
-                if (message.interactive && message.interactive.list_reply) {
-                    const citySelection = message.interactive.list_reply.id; // Get the selected city ID
+            // case STATES.MODIFY_CITY_SELECTION:
+            //     if (message.interactive && message.interactive.list_reply) {
+            //         const citySelection = message.interactive.list_reply.id; // Get the selected city ID
 
-                    const cityMap = {
-                        "abu_dhabi": "Abu Dhabi",
-                        "dubai": "Dubai",
-                        "sharjah": "Sharjah"
-                    };
+            //         const cityMap = {
+            //             "abu_dhabi": "Abu Dhabi",
+            //             "dubai": "Dubai",
+            //             "sharjah": "Sharjah"
+            //         };
 
-                    if (cityMap[citySelection]) {
-                        session.data.city = cityMap[citySelection];
-                        session.step = STATES.CONFIRMATION;
-                        await sendUpdatedSummary(from, session);  // ✅ Show updated summary
+            //         if (cityMap[citySelection]) {
+            //             session.data.city = cityMap[citySelection];
+            //             session.step = STATES.CONFIRMATION;
+            //             await sendUpdatedSummary(from, session);  // ✅ Show updated summary
+            //         } else {
+            //             await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided list.");
+            //             await sendCitySelection(from);  // Re-send the city selection list
+            //         }
+            //     } else {
+            //         await sendToWhatsApp(from, "❌ Please select a city from the provided options.");
+            //         await sendCitySelection(from);  // Re-send the options if the user sends invalid input
+            //     }
+            //     break;
+
+                case STATES.MODIFY_CITY_SELECTION:
+                    if (message.interactive && message.interactive.button_reply) {  // ✅ Handle button replies
+                        const citySelection = message.interactive.button_reply.id;  // ✅ Get selected city ID
+    
+                        const cityMap = {
+                            "abu_dhabi": "Abu Dhabi",
+                            "dubai": "Dubai",
+                            "sharjah": "Sharjah"
+                        };
+    
+                        if (cityMap[citySelection]) {
+                            session.data.city = cityMap[citySelection];
+                            session.step = STATES.CONFIRMATION;
+                            await sendUpdatedSummary(from, session);  // ✅ Show updated summary
+                        } else {
+                            await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided options.");
+                            await sendCitySelection(from); // Re-send city selection if invalid
+                        }
                     } else {
-                        await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided list.");
-                        await sendCitySelection(from);  // Re-send the city selection list
+                        await sendToWhatsApp(from, "❌ Please select a city from the provided options.");
+                        await sendCitySelection(from); // Re-send the city selection buttons
                     }
-                } else {
-                    await sendToWhatsApp(from, "❌ Please select a city from the provided options.");
-                    await sendCitySelection(from);  // Re-send the options if the user sends invalid input
-                }
-                break;
+                    break;
 
 
             case "MODIFY_STREET":
