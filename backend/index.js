@@ -579,49 +579,15 @@ const getOpenAIResponse = async (userMessage) => {
     }
 };
 
-// const sendToWhatsApp = async (to, message) => {
-//     try {
-//         await axios.post(process.env.WHATSAPP_API_URL, {
-//             messaging_product: 'whatsapp',
-//             recipient_type: 'individual',
-//             to: to,
-//             type: 'text',
-//             text: { body: message }
-//         }, {
-//             headers: {
-//                 'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-//                 'Content-Type': 'application/json'
-//             }
-//         });
-//     } catch (error) {
-//         console.error('❌ Failed to send message to WhatsApp:', error.response?.data || error.message);
-//     }
-// };
-const sendToWhatsApp = async (to, message, buttons = []) => {
+const sendToWhatsApp = async (to, message) => {
     try {
-        const payload = {
+        await axios.post(process.env.WHATSAPP_API_URL, {
             messaging_product: 'whatsapp',
             recipient_type: 'individual',
             to: to,
-            type: 'interactive',
-            interactive: {
-                type: 'button',
-                body: {
-                    text: message
-                },
-                action: {
-                    buttons: buttons.map((button, index) => ({
-                        type: 'reply',
-                        reply: {
-                            id: `btn_${index + 1}`,
-                            title: button
-                        }
-                    }))
-                }
-            }
-        };
-
-        await axios.post(process.env.WHATSAPP_API_URL, payload, {
+            type: 'text',
+            text: { body: message }
+        }, {
             headers: {
                 'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
                 'Content-Type': 'application/json'
@@ -631,6 +597,40 @@ const sendToWhatsApp = async (to, message, buttons = []) => {
         console.error('❌ Failed to send message to WhatsApp:', error.response?.data || error.message);
     }
 };
+// const sendToWhatsApp = async (to, message, buttons = []) => {
+//     try {
+//         const payload = {
+//             messaging_product: 'whatsapp',
+//             recipient_type: 'individual',
+//             to: to,
+//             type: 'interactive',
+//             interactive: {
+//                 type: 'button',
+//                 body: {
+//                     text: message
+//                 },
+//                 action: {
+//                     buttons: buttons.map((button, index) => ({
+//                         type: 'reply',
+//                         reply: {
+//                             id: `btn_${index + 1}`,
+//                             title: button
+//                         }
+//                     }))
+//                 }
+//             }
+//         };
+
+//         await axios.post(process.env.WHATSAPP_API_URL, payload, {
+//             headers: {
+//                 'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+//                 'Content-Type': 'application/json'
+//             }
+//         });
+//     } catch (error) {
+//         console.error('❌ Failed to send message to WhatsApp:', error.response?.data || error.message);
+//     }
+// };
 
 function convertArabicNumbers(input) {
     return input.replace(/[٠١٢٣٤٥٦٧٨٩]/g, d => "0123456789"["٠١٢٣٤٥٦٧٨٩".indexOf(d)]);
