@@ -654,25 +654,15 @@ const sendCitySelection = async (to) => {
             to: to,
             type: "interactive",
             interactive: {
-                type: "list",
-                header: {
-                    type: "text",
-                    text: "🌆 City Selection"
-                },
+                type: "button",  // ✅ Change to "button" instead of "list"
                 body: {
-                    text: "Please select your city from the options below:"
+                    text: "🌆 Please select your city:"
                 },
                 action: {
-                    button: "Select City",
-                    sections: [
-                        {
-                            title: "Available Cities",
-                            rows: [
-                                { id: "abu_dhabi", title: "Abu Dhabi" },
-                                { id: "dubai", title: "Dubai" },
-                                { id: "sharjah", title: "Sharjah" }
-                            ]
-                        }
+                    buttons: [
+                        { type: "reply", reply: { id: "abu_dhabi", title: "Abu Dhabi" } },
+                        { type: "reply", reply: { id: "dubai", title: "Dubai" } },
+                        { type: "reply", reply: { id: "sharjah", title: "Sharjah" } }
                     ]
                 }
             }
@@ -686,6 +676,7 @@ const sendCitySelection = async (to) => {
         console.error("❌ Failed to send city selection:", error.response?.data || error.message);
     }
 };
+
 
 
 let dataStore = [];  // Array to temporarily store data
@@ -895,7 +886,6 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-
             case STATES.STREET:
                 session.data.street = textRaw;
                 session.step = STATES.BUILDING_NAME;
@@ -1029,7 +1019,12 @@ app.post('/webhook', async (req, res) => {
                 if (selectedField === "location") {
                     await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
                     session.step = "MODIFY_LOCATION";
-                } else {
+                }
+                else if (selectedField === "city") {
+                    await sendCitySelection(from);  // ✅ Show city selection directly
+                    session.step = STATES.MODIFY_CITY_SELECTION;
+                }
+                else {
                     session.modifyField = selectedField;
                     session.step = `MODIFY_${selectedField.toUpperCase()}`;
                     await sendToWhatsApp(from, `🔹 Please provide the new value for ${selectedField.replace(/_/g, " ")}.`);
