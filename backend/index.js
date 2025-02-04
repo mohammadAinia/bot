@@ -676,7 +676,7 @@ const STATES = {
     EMAIL: 3,
     ADDRESS: 4,
     CITY: 7,
-    LABEL: 8,
+    // LABEL: 8,
     STREET: 9,
     BUILDING_NAME: 10,
     FLAT_NO: 11,
@@ -694,7 +694,7 @@ const sendUpdatedSummary = async (to, session) => {
     summary += `📧 *Email:* ${session.data.email}\n`;
     summary += `📍 *Address:* ${session.data.address}\n`;
     summary += `🌆 *City:* ${session.data.city}\n`;
-    summary += `🔖 *Label:* ${session.data.label}\n`;
+    // summary += `🔖 *Label:* ${session.data.label}\n`;
     summary += `🏠 *Street:* ${session.data.street}\n`;
     summary += `🏢 *Building Name:* ${session.data.building_name}\n`;
     summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;
@@ -856,7 +856,6 @@ app.post('/webhook', async (req, res) => {
                 if (message.location) {
                     session.data.latitude = message.location.latitude;
                     session.data.longitude = message.location.longitude;
-                    session.data.label = "home";
                     session.step = STATES.QUANTITY;
                     await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
                 } else {
@@ -865,7 +864,7 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             // case STATES.LABEL:
-            //     session.data.label = "home";
+            //     session.data.label = textRaw;
             //     session.step = STATES.QUANTITY;
             //     await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
             //     break;
@@ -884,7 +883,7 @@ app.post('/webhook', async (req, res) => {
                 summary += `📧 *Email:* ${session.data.email}\n`;
                 summary += `📍 *Address:* ${session.data.address}\n`;
                 summary += `🌆 *City:* ${session.data.city}\n`;
-                summary += `🔖 *Label:* ${session.data.label}\n`;
+                // summary += `🔖 *Label:* ${session.data.label}\n`;
                 summary += `🏠 *Street:* ${session.data.street}\n`;
                 summary += `🏢 *Building Name:* ${session.data.building_name}\n`;
                 summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;
@@ -905,7 +904,7 @@ app.post('/webhook', async (req, res) => {
                         email: session.data.email,
                         phone_number: session.data.phone,
                         city: session.data.city,
-                        label: session.data.label || "Home",  // Ensure 'label' is always provided
+                        // label: "Home",
                         address: session.data.address,
                         street: session.data.street,
                         building_name: session.data.building_name,
@@ -914,7 +913,6 @@ app.post('/webhook', async (req, res) => {
                         longitude: session.data.longitude,
                         quantity: session.data.quantity
                     };
-
 
                     console.log('Request Data:', requestData);
                     try {
@@ -944,7 +942,7 @@ app.post('/webhook', async (req, res) => {
                     delete userSessions[from];
                 } else if (text.includes("no")) {
                     session.step = STATES.MODIFY;
-                    await sendToWhatsApp(from, "Which information would you like to modify? Please reply with the corresponding number:\n\n1. Name\n2. Phone Number\n3. Email\n4. Address\n5. City\n6. Label\n7. Street\n8. Building Name\n9. Flat Number\n10. Latitude\n11. Longitude\n12. Quantity");
+                    await sendToWhatsApp(from, "Which information would you like to modify? Please reply with the corresponding number:\n\n1. Name\n2. Phone Number\n3. Email\n4. Address\n5. City\n6. Street\n7. Building Name\n8. Flat Number\n9. Location\n10. Quantity");
                 } else {
                     await sendToWhatsApp(from, "❌ Invalid input. Please reply with *Yes* or *No*.");
                 }
@@ -954,8 +952,8 @@ app.post('/webhook', async (req, res) => {
                 // Convert any Arabic digits in the text to English digits
                 const normalizedText = convertArabicNumbers(text);
                 const fieldToModify = parseInt(normalizedText);
-                if (isNaN(fieldToModify) || fieldToModify < 1 || fieldToModify > 12) {
-                    await sendToWhatsApp(from, "❌ Invalid option. Please choose a number between 1 and 12.");
+                if (isNaN(fieldToModify) || fieldToModify < 1 || fieldToModify > 11) {
+                    await sendToWhatsApp(from, "❌ Invalid option. Please choose a number between 1 and 11.");
                     return res.sendStatus(200);
                 }
 
@@ -965,22 +963,24 @@ app.post('/webhook', async (req, res) => {
                     3: "email",
                     4: "address",
                     5: "city",
-                    6: "label",
-                    7: "street",
-                    8: "building_name",
-                    9: "flat_no",
-                    10: "latitude",
-                    11: "longitude",
-                    12: "quantity"
+                    6: "street",
+                    7: "building_name",
+                    8: "flat_no",
+                    9: "location",
+                    10: "quantity"
                 };
 
                 const selectedField = fieldMap[fieldToModify];
-                session.modifyField = selectedField;
-                session.step = `MODIFY_${selectedField.toUpperCase()}`;
 
-                await sendToWhatsApp(from, `🔹 Please provide the new value for ${selectedField.replace(/_/g, " ")}.`);
+                if (selectedField === "location") {
+                    await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
+                    session.step = "MODIFY_LOCATION";
+                } else {
+                    session.modifyField = selectedField;
+                    session.step = `MODIFY_${selectedField.toUpperCase()}`;
+                    await sendToWhatsApp(from, `🔹 Please provide the new value for ${selectedField.replace(/_/g, " ")}.`);
+                }
                 break;
-
 
             // Modification steps
             case "MODIFY_NAME":
@@ -1021,12 +1021,6 @@ app.post('/webhook', async (req, res) => {
                 await sendUpdatedSummary(from, session);
                 break;
 
-            case "MODIFY_LABEL":
-                session.data.label = textRaw;
-                session.step = STATES.CONFIRMATION;
-                await sendUpdatedSummary(from, session);
-                break;
-
             case "MODIFY_STREET":
                 session.data.street = textRaw;
                 session.step = STATES.CONFIRMATION;
@@ -1045,24 +1039,15 @@ app.post('/webhook', async (req, res) => {
                 await sendUpdatedSummary(from, session);
                 break;
 
-            case "MODIFY_LATITUDE":
-                if (isNaN(textRaw) || textRaw.trim() === "") {
-                    await sendToWhatsApp(from, "❌ Please enter a valid latitude.");
-                    return res.sendStatus(200);
+            case "MODIFY_LOCATION":
+                if (message.location) {
+                    session.data.latitude = message.location.latitude;
+                    session.data.longitude = message.location.longitude;
+                    session.step = STATES.CONFIRMATION;
+                    await sendUpdatedSummary(from, session);
+                } else {
+                    await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
                 }
-                session.data.latitude = textRaw;
-                session.step = STATES.CONFIRMATION;
-                await sendUpdatedSummary(from, session);
-                break;
-
-            case "MODIFY_LONGITUDE":
-                if (isNaN(textRaw) || textRaw.trim() === "") {
-                    await sendToWhatsApp(from, "❌ Please enter a valid longitude.");
-                    return res.sendStatus(200);
-                }
-                session.data.longitude = textRaw;
-                session.step = STATES.CONFIRMATION;
-                await sendUpdatedSummary(from, session);
                 break;
 
             case "MODIFY_QUANTITY":
@@ -1079,6 +1064,7 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, "❌ An unexpected error occurred. Please try again.");
                 delete userSessions[from];
                 break;
+
         }
 
         res.sendStatus(200);
