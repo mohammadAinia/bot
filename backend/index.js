@@ -646,6 +646,48 @@ const isValidPhone = (phone) => {
     return regex.test(phone);
 };
 
+const sendCitySelection = async (to) => {
+    try {
+        await axios.post(process.env.WHATSAPP_API_URL, {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: to,
+            type: "interactive",
+            interactive: {
+                type: "list",
+                header: {
+                    type: "text",
+                    text: "🌆 City Selection"
+                },
+                body: {
+                    text: "Please select your city from the options below:"
+                },
+                action: {
+                    button: "Select City",
+                    sections: [
+                        {
+                            title: "Available Cities",
+                            rows: [
+                                { id: "abu_dhabi", title: "Abu Dhabi" },
+                                { id: "dubai", title: "Dubai" },
+                                { id: "sharjah", title: "Sharjah" }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }, {
+            headers: {
+                "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                "Content-Type": "application/json"
+            }
+        });
+    } catch (error) {
+        console.error("❌ Failed to send city selection:", error.response?.data || error.message);
+    }
+};
+
+
 let dataStore = [];  // Array to temporarily store data
 
 
@@ -694,7 +736,6 @@ const sendUpdatedSummary = async (to, session) => {
     summary += `📧 *Email:* ${session.data.email}\n`;
     summary += `📍 *Address:* ${session.data.address}\n`;
     summary += `🌆 *City:* ${session.data.city}\n`;
-    // summary += `🔖 *Label:* ${session.data.label}\n`;
     summary += `🏠 *Street:* ${session.data.street}\n`;
     summary += `🏢 *Building Name:* ${session.data.building_name}\n`;
     summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;
@@ -826,10 +867,31 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, "📦 Please provide the City.");
                 break;
 
+            // case STATES.CITY:
+            //     session.data.city = textRaw;
+            //     session.step = STATES.STREET;
+            //     await sendToWhatsApp(from, "🏠 Please provide the street name.");
+            //     break;
             case STATES.CITY:
-                session.data.city = textRaw;
-                session.step = STATES.STREET;
-                await sendToWhatsApp(from, "🏠 Please provide the street name.");
+                await sendCitySelection(from);
+                session.step = "CITY_SELECTION";
+                break;
+
+            case "CITY_SELECTION":
+                const citySelection = textRaw.toLowerCase();
+                const cityMap = {
+                    "abu_dhabi": "Abu Dhabi",
+                    "dubai": "Dubai",
+                    "sharjah": "Sharjah"
+                };
+
+                if (cityMap[citySelection]) {
+                    session.data.city = cityMap[citySelection];
+                    session.step = STATES.STREET;
+                    await sendToWhatsApp(from, `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`);
+                } else {
+                    await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided list.");
+                }
                 break;
 
             case STATES.STREET:
@@ -862,12 +924,6 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-            // case STATES.LABEL:
-            //     session.data.label = textRaw;
-            //     session.step = STATES.QUANTITY;
-            //     await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
-            //     break;
-
             case STATES.QUANTITY:
                 if (isNaN(textRaw) || textRaw.trim() === "") {
                     await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
@@ -882,14 +938,12 @@ app.post('/webhook', async (req, res) => {
                 summary += `📧 *Email:* ${session.data.email}\n`;
                 summary += `📍 *Address:* ${session.data.address}\n`;
                 summary += `🌆 *City:* ${session.data.city}\n`;
-                // summary += `🔖 *Label:* ${session.data.label}\n`;
                 summary += `🏠 *Street:* ${session.data.street}\n`;
                 summary += `🏢 *Building Name:* ${session.data.building_name}\n`;
                 summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;
                 summary += `📍 *Latitude:* ${session.data.latitude}\n`;
                 summary += `📍 *Longitude:* ${session.data.longitude}\n`;
                 summary += `📦 *Quantity:* ${session.data.quantity}\n`;
-                // summary += `🛢 *Request Type:* ${session.data.type}\n\n`;
                 summary += `Is the information correct? Please reply with *Yes* or *No*`;
 
                 await sendToWhatsApp(from, summary);
@@ -903,7 +957,6 @@ app.post('/webhook', async (req, res) => {
                         email: session.data.email,
                         phone_number: session.data.phone,
                         city: session.data.city,
-                        // label: "Home",
                         address: session.data.address,
                         street: session.data.street,
                         building_name: session.data.building_name,
