@@ -1080,10 +1080,10 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
                     session.step = "MODIFY_LOCATION";
                 }
-                else if (selectedField === "city") {
-                    await sendCitySelection(from);  // ✅ Show city selection directly
-                    session.step = STATES.MODIFY_CITY_SELECTION;
-                }
+                // else if (selectedField === "city") {
+                //     await sendCitySelection(from);  // ✅ Show city selection directly
+                //     session.step = STATES.MODIFY_CITY_SELECTION;
+                // }
                 else {
                     session.modifyField = selectedField;
                     session.step = `MODIFY_${selectedField.toUpperCase()}`;
@@ -1124,23 +1124,29 @@ app.post('/webhook', async (req, res) => {
                 await sendUpdatedSummary(from, session);
                 break;
 
-            case STATES.MODIFY_CITY_SELECTION:
-                const citySelection = textRaw.toLowerCase();
-                const cityMap = {
-                    "abu_dhabi": "Abu Dhabi",
-                    "dubai": "Dubai",
-                    "sharjah": "Sharjah"
-                };
-
-                if (cityMap[citySelection]) {
-                    session.data.city = cityMap[citySelection]; // Update the city in session data
-                    session.step = STATES.CONFIRMATION; // Move to confirmation step
-                    await sendUpdatedSummary(from, session); // Send updated summary
-                } else {
-                    await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided list.");
-                    await sendCitySelection(from); // Re-prompt the user to select a city
-                }
+            case "MODIFY_CITY":
+                session.data.city = textRaw;
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
                 break;
+
+            // case STATES.MODIFY_CITY_SELECTION:
+            //     const citySelection = textRaw.toLowerCase();
+            //     const cityMap = {
+            //         "abu_dhabi": "Abu Dhabi",
+            //         "dubai": "Dubai",
+            //         "sharjah": "Sharjah"
+            //     };
+
+            //     if (cityMap[citySelection]) {
+            //         session.data.city = cityMap[citySelection]; // Update the city in session data
+            //         session.step = STATES.CONFIRMATION; // Move to confirmation step
+            //         await sendUpdatedSummary(from, session); // Send updated summary
+            //     } else {
+            //         await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided list.");
+            //         await sendCitySelection(from); // Re-prompt the user to select a city
+            //     }
+            //     break;
 
 
             // case "MODIFY_CITY":
