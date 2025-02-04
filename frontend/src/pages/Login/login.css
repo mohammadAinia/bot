@@ -1,77 +1,58 @@
 /* login.css */
-
-body {
-    margin: 0;
-    padding: 0;
-    background: linear-gradient(135deg, #74ebd5 0%, #ACB6E5 100%);
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .login-container {
+.login-container {
+    max-width: 400px;
+    margin: 100px auto;
+    padding: 40px;
     background: #ffffff;
-    padding: 2rem 3rem;
-    border-radius: 8px;
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
-    width: 320px;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
     text-align: center;
   }
   
-  .login-container h1 {
-    margin-bottom: 1.5rem;
-    font-size: 1.8rem;
-    color: #333333;
+  h1 {
+    font-size: 2rem;
+    margin-bottom: 20px;
+    color: #333;
   }
   
   .form-group {
-    margin-bottom: 1.25rem;
+    margin-bottom: 20px;
     text-align: left;
   }
   
-  .form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 600;
-    color: #555555;
-  }
-  
-  .form-group input {
-    width: 100%;
-    padding: 0.65rem;
-    border: 1px solid #dddddd;
-    border-radius: 4px;
+  label {
     font-size: 1rem;
-    transition: border-color 0.3s;
+    font-weight: bold;
+    color: #555;
   }
   
-  .form-group input:focus {
+  input {
+    width: 100%;
+    padding: 10px;
+    font-size: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 5px;
     outline: none;
-    border-color: #74ebd5;
   }
   
-  .error {
-    color: #e74c3c;
-    font-size: 0.9rem;
-    margin-bottom: 1rem;
-  }
-  
-  button[type="submit"] {
+  button {
     width: 100%;
-    padding: 0.75rem;
-    background: #74ebd5;
+    padding: 10px;
+    font-size: 1.2rem;
+    color: white;
+    background-color: #28a745;
     border: none;
-    border-radius: 4px;
-    font-size: 1rem;
-    color: #ffffff;
-    font-weight: 600;
+    border-radius: 5px;
     cursor: pointer;
     transition: background 0.3s;
   }
   
-  button[type="submit"]:hover {
-    background: #5ac0aa;
+  button:hover {
+    background-color: #218838;
   }
   
+  .error {
+    color: red;
+    font-size: 0.9rem;
+    margin-top: 10px;
+  }

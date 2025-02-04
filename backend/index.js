@@ -475,27 +475,7 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-const userSessions = {};
 
-const STATES = {
-    WELCOME: 0,
-    FAQ: "faq",
-    NAME: 1,
-    PHONE_CONFIRM: "phone_confirm",
-    PHONE_INPUT: "phone_input",
-    EMAIL: 3,
-    ADDRESS: 4,
-    CITY: 7,
-    LABEL: 8,
-    STREET: 9,
-    BUILDING_NAME: 10,
-    FLAT_NO: 11,
-    LATITUDE: 12,
-    LONGITUDE: 13,
-    QUANTITY: 6,
-    CONFIRMATION: 5,
-    MODIFY: "modify"  // New state for modification
-};
 // بيانات التحقق من Webhook
 const VERIFY_TOKEN = "Mohammad";
 // تحقق من الـ Webhook من Meta
@@ -518,11 +498,18 @@ You are the company's virtual assistant, and your task is to answer only questio
 If the question is not related to the company, respond with: "❌ Sorry, I can only answer questions related to our company's services."`;
 
 let guidanceMessage = ""; // Initially empty; can be updated by the admin
+// Receiving WhatsApp messages
+const defaultWelcomeMessage = `🌟 Welcome to *Mohammed Oil Refining Company* 🌟  
+                                    We offer the following services:  
+                                    1️⃣ *Inquiries about our products and services*  
+                                    2️⃣ *Create a new request:*  
+                              
 
+                                    Please send the *service number* you wish to request.`;
 // New endpoint to retrieve the messages
 // Protected routes
 app.get('/admin/messages', authenticateToken, (req, res) => {
-    res.json({ systemMessage, guidanceMessage });
+    res.json({ systemMessage, guidanceMessage, defaultWelcomeMessage });
 });
 
 app.post('/admin/update-messages', authenticateToken, (req, res) => {
@@ -545,6 +532,19 @@ app.post('/admin/update-messages', authenticateToken, (req, res) => {
     }
 
     res.json({ message: 'Messages updated successfully.' });
+});
+
+
+app.post('/admin/update-welcome-message', authenticateToken, (req, res) => {
+    const { newWelcomeMessage } = req.body;
+
+    if (newWelcomeMessage && typeof newWelcomeMessage === 'string') {
+        defaultWelcomeMessage = newWelcomeMessage;
+        console.log('✅ Welcome message updated:', defaultWelcomeMessage);
+        res.json({ message: 'Welcome message updated successfully.' });
+    } else {
+        res.status(400).json({ error: 'Invalid welcome message provided.' });
+    }
 });
 
 const getOpenAIResponse = async (userMessage) => {
@@ -614,14 +614,7 @@ const isValidPhone = (phone) => {
 
 let dataStore = [];  // Array to temporarily store data
 
-// Receiving WhatsApp messages
-const defaultWelcomeMessage = `🌟 Welcome to *Mohammed Oil Refining Company* 🌟  
-                                    We offer the following services:  
-                                    1️⃣ *Inquiries about our products and services*  
-                                    2️⃣ *Create a new request:*  
-                              
 
-                                    Please send the *service number* you wish to request.`;
 function formatPhoneNumber(phoneNumber) {
     // إزالة أي مسافات أو رموز غير ضرورية
     let cleanedNumber = phoneNumber.replace(/\D/g, "");
@@ -637,6 +630,28 @@ function formatPhoneNumber(phoneNumber) {
     }
     return cleanedNumber; // إرجاع الرقم إذا لم ينطبق النمط
 }
+
+const userSessions = {};
+
+const STATES = {
+    WELCOME: 0,
+    FAQ: "faq",
+    NAME: 1,
+    PHONE_CONFIRM: "phone_confirm",
+    PHONE_INPUT: "phone_input",
+    EMAIL: 3,
+    ADDRESS: 4,
+    CITY: 7,
+    LABEL: 8,
+    STREET: 9,
+    BUILDING_NAME: 10,
+    FLAT_NO: 11,
+    LATITUDE: 12,
+    LONGITUDE: 13,
+    QUANTITY: 6,
+    CONFIRMATION: 5,
+    MODIFY: "modify"  // New state for modification
+};
 
 const sendUpdatedSummary = async (to, session) => {
     let summary = `✅ *Updated Order Summary:*\n\n`;
