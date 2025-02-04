@@ -672,7 +672,7 @@ const STATES = {
     FAQ: "faq",
     NAME: 1,
     PHONE_CONFIRM: "phone_confirm",
-    // PHONE_INPUT: "phone_input",
+    PHONE_INPUT: "phone_input",
     EMAIL: 3,
     ADDRESS: 4,
     CITY: 7,
@@ -694,13 +694,14 @@ const sendUpdatedSummary = async (to, session) => {
     summary += `📧 *Email:* ${session.data.email}\n`;
     summary += `📍 *Address:* ${session.data.address}\n`;
     summary += `🌆 *City:* ${session.data.city}\n`;
-    // summary += `🔖 *Label:* ${session.data.label}\n`;
+    summary += `🔖 *Label:* ${session.data.label}\n`;
     summary += `🏠 *Street:* ${session.data.street}\n`;
     summary += `🏢 *Building Name:* ${session.data.building_name}\n`;
     summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;
     summary += `📍 *Latitude:* ${session.data.latitude}\n`;
     summary += `📍 *Longitude:* ${session.data.longitude}\n`;
     summary += `📦 *Quantity:* ${session.data.quantity}\n`;
+    summary += `🛢 *Request Type:* ${session.data.type}\n\n`;
     summary += `Is the information correct? Please reply with *Yes* or *No*`;
 
     await sendToWhatsApp(to, summary);
@@ -782,32 +783,33 @@ app.post('/webhook', async (req, res) => {
 
             case STATES.NAME:
                 session.data.name = textRaw;
-                session.step = STATES.PHONE_CONFIRM;
-                await sendToWhatsApp(from, "📧 Please provide your email address");
+                session.data.phone = formatPhoneNumber(from); // Automatically store the sender's number
+                session.step = STATES.EMAIL;
+                await sendToWhatsApp(from, "📧 Please provide your email address.");
                 break;
 
             case STATES.PHONE_CONFIRM:
-                // if (text.includes("yes") || text.includes("yea")) {
+                if (text.includes("yes") || text.includes("yea")) {
                     session.data.phone = formatPhoneNumber(from);
                     session.step = STATES.EMAIL;
-                //     await sendToWhatsApp(from, "📧 Your current number will be used. Please provide your email address.");
-                // } else if (text.includes("no")) {
-                //     session.step = STATES.PHONE_INPUT;
-                //     await sendToWhatsApp(from, "📞 Please enter the phone with country code starting from +.");
-                // } else {
-                //     await sendToWhatsApp(from, "❌ Please reply with Yes or No.");
-                // }
+                    await sendToWhatsApp(from, "📧 Your current number will be used. Please provide your email address.");
+                } else if (text.includes("no")) {
+                    session.step = STATES.PHONE_INPUT;
+                    await sendToWhatsApp(from, "📞 Please enter the phone with country code starting from +.");
+                } else {
+                    await sendToWhatsApp(from, "❌ Please reply with Yes or No.");
+                }
                 break;
 
-            // case STATES.PHONE_INPUT:
-            //     if (!isValidPhone(textRaw)) {
-            //         await sendToWhatsApp(from, "❌ Invalid phone number, please enter a valid number.");
-            //         return res.sendStatus(200);
-            //     }
-            //     session.data.phone = formatPhoneNumber(textRaw);
-            //     session.step = STATES.EMAIL;
-            //     await sendToWhatsApp(from, "📧 Please provide your email address.");
-            //     break;
+            case STATES.PHONE_INPUT:
+                if (!isValidPhone(textRaw)) {
+                    await sendToWhatsApp(from, "❌ Invalid phone number, please enter a valid number.");
+                    return res.sendStatus(200);
+                }
+                session.data.phone = formatPhoneNumber(textRaw);
+                session.step = STATES.EMAIL;
+                await sendToWhatsApp(from, "📧 Please provide your email address.");
+                break;
 
             case STATES.EMAIL:
                 if (!isValidEmail(textRaw)) {
@@ -855,7 +857,7 @@ app.post('/webhook', async (req, res) => {
                     session.data.latitude = message.location.latitude;
                     session.data.longitude = message.location.longitude;
                     session.step = STATES.QUANTITY;
-                    await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
+                    await sendToWhatsApp(from, "📦 Please provide the Label.");
                 } else {
                     await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
                 }
@@ -881,12 +883,14 @@ app.post('/webhook', async (req, res) => {
                 summary += `📧 *Email:* ${session.data.email}\n`;
                 summary += `📍 *Address:* ${session.data.address}\n`;
                 summary += `🌆 *City:* ${session.data.city}\n`;
+                // summary += `🔖 *Label:* ${session.data.label}\n`;
                 summary += `🏠 *Street:* ${session.data.street}\n`;
                 summary += `🏢 *Building Name:* ${session.data.building_name}\n`;
                 summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;
                 summary += `📍 *Latitude:* ${session.data.latitude}\n`;
                 summary += `📍 *Longitude:* ${session.data.longitude}\n`;
                 summary += `📦 *Quantity:* ${session.data.quantity}\n`;
+                summary += `🛢 *Request Type:* ${session.data.type}\n\n`;
                 summary += `Is the information correct? Please reply with *Yes* or *No*`;
 
                 await sendToWhatsApp(from, summary);
@@ -898,11 +902,15 @@ app.post('/webhook', async (req, res) => {
                     const requestData = {
                         user_name: session.data.name,
                         email: session.data.email,
+                        phone_number: session.data.phone,
                         city: session.data.city,
+                        // label: session.data.label,
                         address: session.data.address,
                         street: session.data.street,
                         building_name: session.data.building_name,
                         flat_no: session.data.flat_no,
+                        latitude: session.data.latitude,
+                        longitude: session.data.longitude,
                         quantity: session.data.quantity
                     };
 
@@ -951,17 +959,17 @@ app.post('/webhook', async (req, res) => {
 
                 const fieldMap = {
                     1: "name",
-                    // 2: "phone",
-                    2: "email",
-                    3: "address",
-                    4: "city",
-                    // 6: "label",
-                    5: "street",
-                    6: "building_name",
-                    7: "flat_no",
-                    // 10: "latitude",
-                    // 11: "longitude",
-                    8: "quantity"
+                    2: "phone",
+                    3: "email",
+                    4: "address",
+                    5: "city",
+                    6: "label",
+                    7: "street",
+                    8: "building_name",
+                    9: "flat_no",
+                    10: "latitude",
+                    11: "longitude",
+                    12: "quantity"
                 };
 
                 const selectedField = fieldMap[fieldToModify];
@@ -979,15 +987,15 @@ app.post('/webhook', async (req, res) => {
                 await sendUpdatedSummary(from, session);
                 break;
 
-            // case "MODIFY_PHONE":
-            //     if (!isValidPhone(textRaw)) {
-            //         await sendToWhatsApp(from, "❌ Invalid phone number, please enter a valid number.");
-            //         return res.sendStatus(200);
-            //     }
-            //     session.data.phone = formatPhoneNumber(textRaw);
-            //     session.step = STATES.CONFIRMATION;
-            //     await sendUpdatedSummary(from, session);
-            //     break;
+            case "MODIFY_PHONE":
+                if (!isValidPhone(textRaw)) {
+                    await sendToWhatsApp(from, "❌ Invalid phone number, please enter a valid number.");
+                    return res.sendStatus(200);
+                }
+                session.data.phone = formatPhoneNumber(textRaw);
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
+                break;
 
             case "MODIFY_EMAIL":
                 if (!isValidEmail(textRaw)) {
@@ -1011,11 +1019,11 @@ app.post('/webhook', async (req, res) => {
                 await sendUpdatedSummary(from, session);
                 break;
 
-            // case "MODIFY_LABEL":
-            //     session.data.label = textRaw;
-            //     session.step = STATES.CONFIRMATION;
-            //     await sendUpdatedSummary(from, session);
-            //     break;
+            case "MODIFY_LABEL":
+                session.data.label = textRaw;
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
+                break;
 
             case "MODIFY_STREET":
                 session.data.street = textRaw;
@@ -1035,25 +1043,25 @@ app.post('/webhook', async (req, res) => {
                 await sendUpdatedSummary(from, session);
                 break;
 
-            // case "MODIFY_LATITUDE":
-            //     if (isNaN(textRaw) || textRaw.trim() === "") {
-            //         await sendToWhatsApp(from, "❌ Please enter a valid latitude.");
-            //         return res.sendStatus(200);
-            //     }
-            //     session.data.latitude = textRaw;
-            //     session.step = STATES.CONFIRMATION;
-            //     await sendUpdatedSummary(from, session);
-            //     break;
+            case "MODIFY_LATITUDE":
+                if (isNaN(textRaw) || textRaw.trim() === "") {
+                    await sendToWhatsApp(from, "❌ Please enter a valid latitude.");
+                    return res.sendStatus(200);
+                }
+                session.data.latitude = textRaw;
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
+                break;
 
-            // case "MODIFY_LONGITUDE":
-            //     if (isNaN(textRaw) || textRaw.trim() === "") {
-            //         await sendToWhatsApp(from, "❌ Please enter a valid longitude.");
-            //         return res.sendStatus(200);
-            //     }
-            //     session.data.longitude = textRaw;
-            //     session.step = STATES.CONFIRMATION;
-            //     await sendUpdatedSummary(from, session);
-            //     break;
+            case "MODIFY_LONGITUDE":
+                if (isNaN(textRaw) || textRaw.trim() === "") {
+                    await sendToWhatsApp(from, "❌ Please enter a valid longitude.");
+                    return res.sendStatus(200);
+                }
+                session.data.longitude = textRaw;
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
+                break;
 
             case "MODIFY_QUANTITY":
                 if (isNaN(textRaw) || textRaw.trim() === "") {
