@@ -1051,8 +1051,8 @@ app.post('/webhook', async (req, res) => {
                     session.step = "MODIFY_LOCATION";
                 }
                 else if (selectedField === "city") {
-                    await sendCitySelection(from);  // ✅ Show city selection directly
-                    session.step = STATES.MODIFY_CITY_SELECTION;
+                    await sendCitySelection(from);  // Trigger city selection when modifying the city
+                    session.step = STATES.MODIFY_CITY_SELECTION;  // Set step for city selection
                 }
                 else {
                     session.modifyField = selectedField;
@@ -1093,15 +1093,10 @@ app.post('/webhook', async (req, res) => {
                 session.step = STATES.CONFIRMATION;
                 await sendUpdatedSummary(from, session);
                 break;
-
-            case "MODIFY_CITY":
-                await sendCitySelection(from);  // ✅ Show city selection options again
-                session.step = STATES.MODIFY_CITY_SELECTION;  // ✅ Move to a new state for handling the selection
-                break;
-
+                
             case STATES.MODIFY_CITY_SELECTION:
-                if (message.interactive && message.interactive.button_reply) {  // ✅ Handle button replies
-                    const citySelection = message.interactive.button_reply.id;  // ✅ Get selected city ID
+                if (message.interactive && message.interactive.button_reply) {  // Handle button replies
+                    const citySelection = message.interactive.button_reply.id;  // Get selected city ID
 
                     const cityMap = {
                         "abu_dhabi": "Abu Dhabi",
@@ -1111,10 +1106,10 @@ app.post('/webhook', async (req, res) => {
 
                     if (cityMap[citySelection]) {
                         session.data.city = cityMap[citySelection];  // Update the city in session data
-                        session.step = STATES.CONFIRMATION;  // Transition to confirmation step after city is modified
+                        session.step = STATES.CONFIRMATION;  // Transition to confirmation step after city modification
 
-                        // Ensure all fields are updated and send the confirmation summary
-                        await sendUpdatedSummary(from, session);  // ✅ Show updated summary after modification
+                        // Send the confirmation summary after modification
+                        await sendUpdatedSummary(from, session);  // ✅ Show updated summary
                     } else {
                         await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided options.");
                         await sendCitySelection(from);  // Re-send city selection if invalid
@@ -1126,7 +1121,36 @@ app.post('/webhook', async (req, res) => {
                 break;
 
 
+            // case "MODIFY_CITY":
+            //     await sendCitySelection(from);  // ✅ Show city selection options again
+            //     session.step = STATES.MODIFY_CITY_SELECTION;  // ✅ Move to a new state for handling the selection
+            //     break;
 
+            // case STATES.MODIFY_CITY_SELECTION:
+            //     if (message.interactive && message.interactive.button_reply) {  // ✅ Handle button replies
+            //         const citySelection = message.interactive.button_reply.id;  // ✅ Get selected city ID
+
+            //         const cityMap = {
+            //             "abu_dhabi": "Abu Dhabi",
+            //             "dubai": "Dubai",
+            //             "sharjah": "Sharjah"
+            //         };
+
+            //         if (cityMap[citySelection]) {
+            //             session.data.city = cityMap[citySelection];  // Update the city in session data
+            //             session.step = STATES.CONFIRMATION;  // Transition to confirmation step after city is modified
+
+            //             // Ensure all fields are updated and send the confirmation summary
+            //             await sendUpdatedSummary(from, session);  // ✅ Show updated summary after modification
+            //         } else {
+            //             await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided options.");
+            //             await sendCitySelection(from);  // Re-send city selection if invalid
+            //         }
+            //     } else {
+            //         await sendToWhatsApp(from, "❌ Please select a city from the provided options.");
+            //         await sendCitySelection(from);  // Re-send the city selection buttons
+            //     }
+            //     break;
 
             case "MODIFY_STREET":
                 session.data.street = textRaw;
