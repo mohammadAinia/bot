@@ -646,18 +646,19 @@ app.post('/webhook', async (req, res) => {
 
                     await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
                 } else {
-                    // If the user sends anything other than a location, force them to send the location again
-                    await sendToWhatsApp(from, "❌ Invalid input. Please share your location using WhatsApp's location feature. Tap the 📎 icon and select 'Location'.");
+                    // Only send an error message if the location prompt hasn't been sent before
+                    if (!session.locationPromptSent) {
+                        await sendToWhatsApp(from, "❌ Invalid input. Please share your location using WhatsApp's location feature. Tap the 📎 icon and select 'Location'.");
+                        session.locationPromptSent = true; // Ensure it’s only sent once
+                    }
 
                     console.error("Invalid input received in LONGITUDE state:", textRaw);
                 }
                 break;
 
             case STATES.QUANTITY:
-                // Ignore the first empty message that might be automatically sent
                 if (session.awaitingQuantityInput) {
-                    session.awaitingQuantityInput = false; // Reset flag and ignore this first message
-                    return res.sendStatus(200);
+                    session.awaitingQuantityInput = false; // Reset flag but continue processing
                 }
 
                 if (textRaw.trim() === "" || isNaN(textRaw)) {
@@ -669,6 +670,7 @@ app.post('/webhook', async (req, res) => {
                 session.step = STATES.CONFIRMATION;
                 sendOrderSummary(from, session);
                 break;
+
 
             case STATES.CONFIRMATION:
                 // Ensure we only process button replies, ignore other inputs
