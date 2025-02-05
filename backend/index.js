@@ -478,64 +478,6 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(200);
         }
 
-        // If there is no session for the user, create one first
-        // if (!userSessions[from]) {
-        //     userSessions[from] = { step: STATES.WELCOME, data: {} };
-
-        //     // List of greeting phrases
-        //     const greetings = [
-        //         "hello", "hi", "hey", "greetings", "good day",
-        //         "good morning", "good afternoon", "good evening"
-        //     ];
-
-        //     let isGreeting = greetings.some(greeting => text.includes(greeting));
-
-        //     // let welcomeText = "";
-        //     // if (isGreeting) {
-        //     //     welcomeText = `Welcome to *Mohammed Oil Refining Company*.\n\nWe offer the following services:\n\n1️⃣ *Inquiries about our products and services*\n2️⃣ *Create a new request:*\n\nPlease send the *service number* you wish to request.`;
-        //     // } else {
-        //     //     welcomeText = defaultWelcomeMessage;
-        //     // }
-        //     // console.log(`isGreeting: ${isGreeting} | Received text: "${text}"`);
-        //     // await sendToWhatsApp(from, welcomeText);
-        //     // return res.sendStatus(200);
-        //     let welcomeText = "";
-        //     if (isGreeting) {
-        //         welcomeText = `Welcome to *Mohammed Oil Refining Company*.\n\nWe offer the following services:\n\n1️⃣ *Inquiries about our products and services*\n2️⃣ *Create a new request:*\n\nPlease select an option below:`;
-
-        //         await axios.post(process.env.WHATSAPP_API_URL, {
-        //             messaging_product: "whatsapp",
-        //             recipient_type: "individual",
-        //             to: from,
-        //             type: "interactive",
-        //             interactive: {
-        //                 type: "button",
-        //                 body: {
-        //                     text: welcomeText
-        //                 },
-        //                 action: {
-        //                     buttons: [
-        //                         { type: "reply", reply: { id: "faq_request", title: "🔍 Inquiries" } },
-        //                         { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
-        //                     ]
-        //                 }
-        //             }
-        //         }, {
-        //             headers: {
-        //                 "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-        //                 "Content-Type": "application/json"
-        //             }
-        //         });
-
-        //         return res.sendStatus(200);
-        //     } else {
-        //         welcomeText = defaultWelcomeMessage;
-        //     }
-        //     console.log(`isGreeting: ${isGreeting} | Received text: "${text}"`);
-        //     await sendToWhatsApp(from, welcomeText);
-        //     return res.sendStatus(200);
-        // }
-
         const session = userSessions[from];
 
         // Handle messages based on the current state
@@ -689,24 +631,6 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-            // case STATES.LONGITUDE:
-            //     if (message.location) {
-            //         session.data.latitude = message.location.latitude;
-            //         session.data.longitude = message.location.longitude;
-            //         session.step = STATES.QUANTITY;
-            //         session.awaitingQuantityInput = true; // Set flag to wait for input
-
-            //         await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
-            //     } else {
-            //         // Only send an error message if the location prompt hasn't been sent before
-            //         if (!session.locationPromptSent) {
-            //             await sendToWhatsApp(from, "❌ Invalid input. Please share your location using WhatsApp's location feature. Tap the 📎 icon and select 'Location'.");
-            //             session.locationPromptSent = true; // Ensure it’s only sent once
-            //         }
-
-            //         console.error("Invalid input received in LONGITUDE state:", textRaw);
-            //     }
-            //     break;
             case STATES.LONGITUDE:
                 if (message.location) {
                     const { latitude, longitude } = message.location;
@@ -762,26 +686,24 @@ app.post('/webhook', async (req, res) => {
             //     sendOrderSummary(from, session);
             //     break;
             case STATES.QUANTITY:
-                // Check if the system is awaiting quantity input
+                // If the system is already waiting for quantity input
                 if (session.awaitingQuantityInput) {
-                    // Validate the input
                     if (textRaw.trim() === "" || isNaN(textRaw)) {
                         await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
                         return res.sendStatus(200);
                     }
 
-                    // If input is valid, store it and move to the next state
+                    // If valid, store the quantity and move to the next step
                     session.data.quantity = textRaw;
-                    session.awaitingQuantityInput = false; // Reset the flag
+                    session.awaitingQuantityInput = false; // Reset flag
                     session.step = STATES.CONFIRMATION;
                     sendOrderSummary(from, session);
                 } else {
-                    // If not awaiting input, prompt the user to enter the quantity
-                    session.awaitingQuantityInput = true; // Set the flag
-                    await sendToWhatsApp(from, "Please enter the quantity:");
+                    // If the system is not awaiting input, set the flag and ask for quantity
+                    session.awaitingQuantityInput = true;
+                    await sendToWhatsApp(from, "📦 Please enter the quantity (in liters) of the product.");
                 }
                 break;
-
 
             case STATES.CONFIRMATION:
                 // Ensure we only process button replies, ignore other inputs
