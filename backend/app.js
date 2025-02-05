@@ -10,6 +10,11 @@ const PORT = process.env.PORT || 5000;
 app.use(cors({ origin: 'http://localhost:5173' }));
 app.use(bodyParser.json());
 
+
+app.get('/', (req, res) => {
+    res.send('Backend is running');
+});
+
 app.use('/admin', adminRoutes);
 app.use('/', webhookRoutes);
 
