@@ -797,7 +797,6 @@ app.post('/webhook', async (req, res) => {
 
         console.log(`📩 New message from ${from}: ${text}`);
 
-        // If there is no session for the user, create one first
         if (!userSessions[from]) {
             userSessions[from] = { step: STATES.WELCOME, data: {} };
 
@@ -807,53 +806,97 @@ app.post('/webhook', async (req, res) => {
                 "good morning", "good afternoon", "good evening"
             ];
 
-            let isGreeting = greetings.some(greeting => text.includes(greeting));
+            let isGreeting = greetings.some(greeting => text.toLowerCase().includes(greeting));
 
-            // let welcomeText = "";
-            // if (isGreeting) {
-            //     welcomeText = `Welcome to *Mohammed Oil Refining Company*.\n\nWe offer the following services:\n\n1️⃣ *Inquiries about our products and services*\n2️⃣ *Create a new request:*\n\nPlease send the *service number* you wish to request.`;
-            // } else {
-            //     welcomeText = defaultWelcomeMessage;
-            // }
-            // console.log(`isGreeting: ${isGreeting} | Received text: "${text}"`);
-            // await sendToWhatsApp(from, welcomeText);
-            // return res.sendStatus(200);
-            let welcomeText = "";
-            if (isGreeting) {
-                welcomeText = `Welcome to *Mohammed Oil Refining Company*.\n\nWe offer the following services:\n\n1️⃣ *Inquiries about our products and services*\n2️⃣ *Create a new request:*\n\nPlease select an option below:`;
+            let welcomeText = isGreeting
+                ? `Welcome to *Mohammed Oil Refining Company*.\n\nWe offer the following services:\n\n1️⃣ *Inquiries about our products and services*\n2️⃣ *Create a new request:*\n\nPlease select an option below:`
+                : `🌟 Welcome to *Mohammed Oil Refining Company* 🌟\n\nWe offer the following services:\n\n1️⃣ *Inquiries about our products and services*\n2️⃣ *Create a new request:*\n\nPlease select an option below:`;
 
-                await axios.post(process.env.WHATSAPP_API_URL, {
-                    messaging_product: "whatsapp",
-                    recipient_type: "individual",
-                    to: from,
-                    type: "interactive",
-                    interactive: {
-                        type: "button",
-                        body: {
-                            text: welcomeText
-                        },
-                        action: {
-                            buttons: [
-                                { type: "reply", reply: { id: "faq_request", title: "🔍 Inquiries" } },
-                                { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
-                            ]
-                        }
+            // Send interactive buttons (always included)
+            await axios.post(process.env.WHATSAPP_API_URL, {
+                messaging_product: "whatsapp",
+                recipient_type: "individual",
+                to: from,
+                type: "interactive",
+                interactive: {
+                    type: "button",
+                    body: {
+                        text: welcomeText
+                    },
+                    action: {
+                        buttons: [
+                            { type: "reply", reply: { id: "faq_request", title: "🔍 Inquiries" } },
+                            { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
+                        ]
                     }
-                }, {
-                    headers: {
-                        "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-                        "Content-Type": "application/json"
-                    }
-                });
+                }
+            }, {
+                headers: {
+                    "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                    "Content-Type": "application/json"
+                }
+            });
 
-                return res.sendStatus(200);
-            } else {
-                welcomeText = defaultWelcomeMessage;
-            }
-            console.log(`isGreeting: ${isGreeting} | Received text: "${text}"`);
-            await sendToWhatsApp(from, welcomeText);
             return res.sendStatus(200);
         }
+
+        // If there is no session for the user, create one first
+        // if (!userSessions[from]) {
+        //     userSessions[from] = { step: STATES.WELCOME, data: {} };
+
+        //     // List of greeting phrases
+        //     const greetings = [
+        //         "hello", "hi", "hey", "greetings", "good day",
+        //         "good morning", "good afternoon", "good evening"
+        //     ];
+
+        //     let isGreeting = greetings.some(greeting => text.includes(greeting));
+
+        //     // let welcomeText = "";
+        //     // if (isGreeting) {
+        //     //     welcomeText = `Welcome to *Mohammed Oil Refining Company*.\n\nWe offer the following services:\n\n1️⃣ *Inquiries about our products and services*\n2️⃣ *Create a new request:*\n\nPlease send the *service number* you wish to request.`;
+        //     // } else {
+        //     //     welcomeText = defaultWelcomeMessage;
+        //     // }
+        //     // console.log(`isGreeting: ${isGreeting} | Received text: "${text}"`);
+        //     // await sendToWhatsApp(from, welcomeText);
+        //     // return res.sendStatus(200);
+        //     let welcomeText = "";
+        //     if (isGreeting) {
+        //         welcomeText = `Welcome to *Mohammed Oil Refining Company*.\n\nWe offer the following services:\n\n1️⃣ *Inquiries about our products and services*\n2️⃣ *Create a new request:*\n\nPlease select an option below:`;
+
+        //         await axios.post(process.env.WHATSAPP_API_URL, {
+        //             messaging_product: "whatsapp",
+        //             recipient_type: "individual",
+        //             to: from,
+        //             type: "interactive",
+        //             interactive: {
+        //                 type: "button",
+        //                 body: {
+        //                     text: welcomeText
+        //                 },
+        //                 action: {
+        //                     buttons: [
+        //                         { type: "reply", reply: { id: "faq_request", title: "🔍 Inquiries" } },
+        //                         { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
+        //                     ]
+        //                 }
+        //             }
+        //         }, {
+        //             headers: {
+        //                 "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+        //                 "Content-Type": "application/json"
+        //             }
+        //         });
+
+        //         return res.sendStatus(200);
+        //     } else {
+        //         welcomeText = defaultWelcomeMessage;
+        //     }
+        //     console.log(`isGreeting: ${isGreeting} | Received text: "${text}"`);
+        //     await sendToWhatsApp(from, welcomeText);
+        //     return res.sendStatus(200);
+        // }
 
         const session = userSessions[from];
 
