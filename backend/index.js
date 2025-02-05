@@ -140,13 +140,8 @@ let guidanceMessage = "";
 
 
 // Default welcome message  
-const defaultWelcomeMessage = `🌟 Welcome to *Lootah Biofuels Refining Company* 🌟  
-                                    We offer the following services:  
-                                    1️⃣ *Inquiries about our products and services*  
-                                    2️⃣ *Create a new request:*  
-                              
+const defaultWelcomeMessage = `\ud83c\udf1f Welcome to *Lootah Biofuels Refining Company* \ud83c\udf1f\n\nYou can ask any question directly, and I will assist you. If you need further help, choose from the options below.`;
 
-                                    Please send the *service number* you wish to request.`;
 
 // Protected route: Get system messages  
 app.get('/admin/messages', authenticateToken, (req, res) => {
