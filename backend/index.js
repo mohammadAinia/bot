@@ -707,6 +707,51 @@ const sendCitySelection = async (to) => {
     }
 };
 
+const sendOrderSummary = async (to, session) => {
+    try {
+        let summary = `✅ *Order Summary:*\n\n`;
+        summary += `🔹 *Name:* ${session.data.name}\n`;
+        summary += `📞 *Phone Number:* ${session.data.phone}\n`;
+        summary += `📧 *Email:* ${session.data.email}\n`;
+        summary += `📍 *Address:* ${session.data.address}\n`;
+        summary += `🌆 *City:* ${session.data.city}\n`;
+        summary += `🏠 *Street:* ${session.data.street}\n`;
+        summary += `🏢 *Building Name:* ${session.data.building_name}\n`;
+        summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;
+        summary += `📍 *Latitude:* ${session.data.latitude}\n`;
+        summary += `📍 *Longitude:* ${session.data.longitude}\n`;
+        summary += `📦 *Quantity:* ${session.data.quantity}\n\n`;
+        summary += `Is the information correct? Please confirm below:`;
+
+        await axios.post(process.env.WHATSAPP_API_URL, {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: to,
+            type: "interactive",
+            interactive: {
+                type: "button",
+                body: {
+                    text: summary
+                },
+                action: {
+                    buttons: [
+                        { type: "reply", reply: { id: "yes_confirm", title: "Yes" } },
+                        { type: "reply", reply: { id: "no_correct", title: "No" } }
+                    ]
+                }
+            }
+        }, {
+            headers: {
+                "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                "Content-Type": "application/json"
+            }
+        });
+    } catch (error) {
+        console.error("❌ Failed to send order summary:", error.response?.data || error.message);
+    }
+};
+
+
 
 
 let dataStore = [];  // Array to temporarily store data
@@ -984,21 +1029,22 @@ app.post('/webhook', async (req, res) => {
                 session.data.quantity = textRaw;
                 session.step = STATES.CONFIRMATION;
 
-                let summary = `✅ *Order Summary:*\n\n`;
-                summary += `🔹 *Name:* ${session.data.name}\n`;
-                summary += `📞 *Phone Number:* ${session.data.phone}\n`;
-                summary += `📧 *Email:* ${session.data.email}\n`;
-                summary += `📍 *Address:* ${session.data.address}\n`;
-                summary += `🌆 *City:* ${session.data.city}\n`;
-                summary += `🏠 *Street:* ${session.data.street}\n`;
-                summary += `🏢 *Building Name:* ${session.data.building_name}\n`;
-                summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;
-                summary += `📍 *Latitude:* ${session.data.latitude}\n`;
-                summary += `📍 *Longitude:* ${session.data.longitude}\n`;
-                summary += `📦 *Quantity:* ${session.data.quantity}\n`;
-                summary += `Is the information correct? Please reply with *Yes* or *No*`;
+                // let summary = `✅ *Order Summary:*\n\n`;
+                // summary += `🔹 *Name:* ${session.data.name}\n`;
+                // summary += `📞 *Phone Number:* ${session.data.phone}\n`;
+                // summary += `📧 *Email:* ${session.data.email}\n`;
+                // summary += `📍 *Address:* ${session.data.address}\n`;
+                // summary += `🌆 *City:* ${session.data.city}\n`;
+                // summary += `🏠 *Street:* ${session.data.street}\n`;
+                // summary += `🏢 *Building Name:* ${session.data.building_name}\n`;
+                // summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;
+                // summary += `📍 *Latitude:* ${session.data.latitude}\n`;
+                // summary += `📍 *Longitude:* ${session.data.longitude}\n`;
+                // summary += `📦 *Quantity:* ${session.data.quantity}\n`;
+                // summary += `Is the information correct? Please reply with *Yes* or *No*`;
 
-                await sendToWhatsApp(from, summary);
+                // await sendToWhatsApp(from, summary);
+                sendOrderSummary(from, session)
                 break;
 
             case STATES.CONFIRMATION:
@@ -1123,35 +1169,6 @@ app.post('/webhook', async (req, res) => {
                 session.step = STATES.CONFIRMATION;
                 await sendUpdatedSummary(from, session);
                 break;
-
-            // case "MODIFY_CITY_SELECTION":
-            //     // Normalize the user input: trim spaces and convert to lowercase for comparison
-            //     const citySelection = textRaw.trim().toLowerCase();
-
-            //     // Map of valid city selections
-            //     const cityMap = {
-            //         "abu dhabi": "Abu Dhabi",
-            //         "dubai": "Dubai",
-            //         "sharjah": "Sharjah"
-            //     };
-
-            //     if (cityMap[citySelection]) {
-            //         session.data.city = cityMap[citySelection]; // Update the city in session data
-            //         session.step = STATES.CONFIRMATION; // Move to confirmation step
-            //         await sendUpdatedSummary(from, session); // Send updated summary
-            //     } else {
-            //         // If the city is invalid, prompt the user again
-            //         await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided list.");
-            //         await sendCitySelection(from); // Re-prompt the user to select a city
-            //     }
-            //     break;
-
-
-
-            // case "MODIFY_CITY":
-            //     await sendCitySelection(from);  // ✅ Show city selection options again
-            //     session.step = STATES.MODIFY_CITY_SELECTION;  // ✅ Move to a new state for handling the selection
-            //     break;
 
             case "MODIFY_CITY_SELECTION":
                 if (message.interactive && message.interactive.button_reply) {  // ✅ Handle button replies
