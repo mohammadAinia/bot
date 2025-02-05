@@ -26,9 +26,9 @@
 // app.use(bodyParser.json());
 
 // // Default route
-// app.get('/', (req, res) => {
-//     res.send('Backend is running');
-// });
+    // app.get('/', (req, res) => {
+    //     res.send('Backend is running');
+    // });
 
 // // Admin login endpoint
 // app.post('/admin/login', (req, res) => {
