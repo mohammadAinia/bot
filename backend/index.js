@@ -846,9 +846,44 @@ app.post('/webhook', async (req, res) => {
 
             let isGreeting = greetings.some(greeting => text.includes(greeting));
 
+            // let welcomeText = "";
+            // if (isGreeting) {
+            //     welcomeText = `Welcome to *Mohammed Oil Refining Company*.\n\nWe offer the following services:\n\n1️⃣ *Inquiries about our products and services*\n2️⃣ *Create a new request:*\n\nPlease send the *service number* you wish to request.`;
+            // } else {
+            //     welcomeText = defaultWelcomeMessage;
+            // }
+            // console.log(`isGreeting: ${isGreeting} | Received text: "${text}"`);
+            // await sendToWhatsApp(from, welcomeText);
+            // return res.sendStatus(200);
             let welcomeText = "";
             if (isGreeting) {
-                welcomeText = `Welcome to *Mohammed Oil Refining Company*.\n\nWe offer the following services:\n\n1️⃣ *Inquiries about our products and services*\n2️⃣ *Create a new request:*\n\nPlease send the *service number* you wish to request.`;
+                welcomeText = `Welcome to *Mohammed Oil Refining Company*.\n\nWe offer the following services:\n\n1️⃣ *Inquiries about our products and services*\n2️⃣ *Create a new request:*\n\nPlease select an option below:`;
+
+                await axios.post(process.env.WHATSAPP_API_URL, {
+                    messaging_product: "whatsapp",
+                    recipient_type: "individual",
+                    to: from,
+                    type: "interactive",
+                    interactive: {
+                        type: "button",
+                        body: {
+                            text: welcomeText
+                        },
+                        action: {
+                            buttons: [
+                                { type: "reply", reply: { id: "faq_request", title: "🔍 Inquiries" } },
+                                { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
+                            ]
+                        }
+                    }
+                }, {
+                    headers: {
+                        "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                        "Content-Type": "application/json"
+                    }
+                });
+
+                return res.sendStatus(200);
             } else {
                 welcomeText = defaultWelcomeMessage;
             }
@@ -862,14 +897,20 @@ app.post('/webhook', async (req, res) => {
         // Handle messages based on the current state
         switch (session.step) {
             case STATES.WELCOME:
-                if (convertArabicNumbers(text) === "1") {
-                    await sendToWhatsApp(from, "❓ Please send your question regarding our services or products.");
-                    session.step = STATES.FAQ;
-                } else if (convertArabicNumbers(text) === "2") {
-                    session.step = STATES.NAME;
-                    await sendToWhatsApp(from, "🔹 Please provide your full name.");
+                if (message.type === "interactive" && message.interactive.type === "button_reply") {
+                    const buttonId = message.interactive.button_reply.id; // Extract button ID
+
+                    if (buttonId === "faq_request") {
+                        await sendToWhatsApp(from, "❓ Please send your question regarding our services or products.");
+                        session.step = STATES.FAQ;
+                    } else if (buttonId === "new_request") {
+                        session.step = STATES.NAME;
+                        await sendToWhatsApp(from, "🔹 Please provide your full name.");
+                    } else {
+                        await sendToWhatsApp(from, "❌ Invalid option, please select a valid button.");
+                    }
                 } else {
-                    await sendToWhatsApp(from, "❌ Invalid option, please choose a number from the list.");
+                    await sendToWhatsApp(from, "❌ Invalid input. Please select an option using the buttons.");
                 }
                 break;
 
@@ -894,18 +935,18 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, "📧 Please provide your email address.");
                 break;
 
-            case STATES.PHONE_CONFIRM:
-                if (text.includes("yes") || text.includes("yea")) {
-                    session.data.phone = formatPhoneNumber(from);
-                    session.step = STATES.EMAIL;
-                    await sendToWhatsApp(from, "📧 Your current number will be used. Please provide your email address.");
-                } else if (text.includes("no")) {
-                    session.step = STATES.PHONE_INPUT;
-                    await sendToWhatsApp(from, "📞 Please enter the phone with country code starting from +.");
-                } else {
-                    await sendToWhatsApp(from, "❌ Please reply with Yes or No.");
-                }
-                break;
+            // case STATES.PHONE_CONFIRM:
+            //     if (text.includes("yes") || text.includes("yea")) {
+            //         session.data.phone = formatPhoneNumber(from);
+            //         session.step = STATES.EMAIL;
+            //         await sendToWhatsApp(from, "📧 Your current number will be used. Please provide your email address.");
+            //     } else if (text.includes("no")) {
+            //         session.step = STATES.PHONE_INPUT;
+            //         await sendToWhatsApp(from, "📞 Please enter the phone with country code starting from +.");
+            //     } else {
+            //         await sendToWhatsApp(from, "❌ Please reply with Yes or No.");
+            //     }
+            //     break;
 
             case STATES.PHONE_INPUT:
                 if (!isValidPhone(textRaw)) {
