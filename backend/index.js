@@ -196,7 +196,7 @@ const isValidEmail = (email) => {
 };
 
 const isValidPhone = (phone) => {
-    const regex = /^\+?\d{1,4}\s?\d{6,12}$/; 
+    const regex = /^\+?\d{1,4}\s?\d{6,12}$/;
     return regex.test(phone);
 };
 
@@ -630,14 +630,53 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
+            // case STATES.LONGITUDE:
+            //     if (message.location) {
+            //         session.data.latitude = message.location.latitude;
+            //         session.data.longitude = message.location.longitude;
+            //         session.step = STATES.QUANTITY;
+            //         session.awaitingQuantityInput = true; // Set flag to wait for input
+
+            //         await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
+            //     } else {
+            //         // Only send an error message if the location prompt hasn't been sent before
+            //         if (!session.locationPromptSent) {
+            //             await sendToWhatsApp(from, "❌ Invalid input. Please share your location using WhatsApp's location feature. Tap the 📎 icon and select 'Location'.");
+            //             session.locationPromptSent = true; // Ensure it’s only sent once
+            //         }
+
+            //         console.error("Invalid input received in LONGITUDE state:", textRaw);
+            //     }
+            //     break;
             case STATES.LONGITUDE:
                 if (message.location) {
-                    session.data.latitude = message.location.latitude;
-                    session.data.longitude = message.location.longitude;
-                    session.step = STATES.QUANTITY;
-                    session.awaitingQuantityInput = true; // Set flag to wait for input
+                    const { latitude, longitude } = message.location;
 
-                    await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
+                    // UAE geographical boundaries
+                    const UAE_BOUNDS = {
+                        minLat: 22.5,
+                        maxLat: 26.5,
+                        minLng: 51.6,
+                        maxLng: 56.5
+                    };
+
+                    // Validate if the location is within UAE
+                    if (
+                        latitude >= UAE_BOUNDS.minLat &&
+                        latitude <= UAE_BOUNDS.maxLat &&
+                        longitude >= UAE_BOUNDS.minLng &&
+                        longitude <= UAE_BOUNDS.maxLng
+                    ) {
+                        session.data.latitude = latitude;
+                        session.data.longitude = longitude;
+                        session.step = STATES.QUANTITY;
+                        session.awaitingQuantityInput = true; // Set flag to wait for input
+
+                        await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
+                    } else {
+                        await sendToWhatsApp(from, "❌ The location you shared is outside the UAE. Please send a valid location within the Emirates.");
+                        console.error("Location outside UAE received:", { latitude, longitude });
+                    }
                 } else {
                     // Only send an error message if the location prompt hasn't been sent before
                     if (!session.locationPromptSent) {
@@ -649,19 +688,39 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
+            // case STATES.QUANTITY:
+            //     if (session.awaitingQuantityInput) {
+            //         session.awaitingQuantityInput = false; // Reset flag but continue processing
+            //     }
+
+            //     if (textRaw.trim() === "" || isNaN(textRaw)) {
+            //         await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
+            //         return res.sendStatus(200);
+            //     }
+
+            //     session.data.quantity = textRaw;
+            //     session.step = STATES.CONFIRMATION;
+            //     sendOrderSummary(from, session);
+            //     break;
             case STATES.QUANTITY:
+                // Check if the system is awaiting quantity input
                 if (session.awaitingQuantityInput) {
-                    session.awaitingQuantityInput = false; // Reset flag but continue processing
-                }
+                    // Validate the input
+                    if (textRaw.trim() === "" || isNaN(textRaw)) {
+                        await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
+                        return res.sendStatus(200);
+                    }
 
-                if (textRaw.trim() === "" || isNaN(textRaw)) {
-                    await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
-                    return res.sendStatus(200);
+                    // If input is valid, store it and move to the next state
+                    session.data.quantity = textRaw;
+                    session.awaitingQuantityInput = false; // Reset the flag
+                    session.step = STATES.CONFIRMATION;
+                    sendOrderSummary(from, session);
+                } else {
+                    // If not awaiting input, prompt the user to enter the quantity
+                    session.awaitingQuantityInput = true; // Set the flag
+                    await sendToWhatsApp(from, "Please enter the quantity:");
                 }
-
-                session.data.quantity = textRaw;
-                session.step = STATES.CONFIRMATION;
-                sendOrderSummary(from, session);
                 break;
 
 
