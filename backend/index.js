@@ -1061,35 +1061,38 @@ app.post('/webhook', async (req, res) => {
 
             case STATES.LONGITUDE:
                 if (message.location) {
-                    // If the message contains a valid location, process it
                     session.data.latitude = message.location.latitude;
                     session.data.longitude = message.location.longitude;
                     session.step = STATES.QUANTITY;
+                    session.awaitingQuantityInput = true; // Set flag to wait for input
+
                     await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
                 } else {
-                    // If the message does not contain a location, check if the prompt has already been sent
                     if (!session.locationPromptSent) {
                         await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature. Tap the 📎 icon and select 'Location'.");
-                        session.locationPromptSent = true; // Mark the prompt as sent
+                        session.locationPromptSent = true;
                     }
-                    // Log invalid input for debugging
                     console.error("Invalid input received in LONGITUDE state:", textRaw);
                 }
                 break;
 
             case STATES.QUANTITY:
-                // Check if the user actually entered something before validating
-                if (textRaw.trim() === "") {
-                    return res.sendStatus(200); // Ignore empty message
+                // Ignore the first empty message that might be automatically sent
+                if (session.awaitingQuantityInput) {
+                    session.awaitingQuantityInput = false; // Reset flag and ignore this first message
+                    return res.sendStatus(200);
                 }
-                if (isNaN(textRaw)) {
+
+                if (textRaw.trim() === "" || isNaN(textRaw)) {
                     await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
                     return res.sendStatus(200);
                 }
+
                 session.data.quantity = textRaw;
                 session.step = STATES.CONFIRMATION;
                 sendOrderSummary(from, session);
                 break;
+
 
             case STATES.CONFIRMATION:
                 // Ensure we only process button replies, ignore other inputs
