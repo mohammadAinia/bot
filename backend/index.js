@@ -251,16 +251,10 @@ const isValidEmail = (email) => {
     return regex.test(email);
 };
 
-// const isValidPhone = (phone) => {
-//     const regex = /^\+971(5\d{1}\s?\d{3}\s?\d{3}|\s?4\d{2}\s?\d{4})$/;
-//     return regex.test(phone);
-// };
 const isValidPhone = (phone) => {
-    // Ensure phone starts with +971 and follows UAE number format
-    const regex = /^\+971(5[0-9]{1}[0-9]{7}|2[0-9]{7}|3[0-9]{7}|4[0-9]{7}|6[0-9]{7}|7[0-9]{7}|9[0-9]{7})$/;
+    const regex = /^\+971(5\d{1}\s?\d{3}\s?\d{3}|\s?4\d{2}\s?\d{4})$/;
     return regex.test(phone);
 };
-
 
 
 const sendCitySelection = async (to) => {
@@ -488,23 +482,6 @@ app.post('/webhook', async (req, res) => {
 
         // Handle messages based on the current state
         switch (session.step) {
-            // case STATES.WELCOME:
-            //     if (message.type === "interactive" && message.interactive.type === "button_reply") {
-            //         const buttonId = message.interactive.button_reply.id; // Extract button ID
-
-            //         if (buttonId === "faq_request") {
-            //             await sendToWhatsApp(from, "❓ Please send your question regarding our services or products.");
-            //             session.step = STATES.FAQ;
-            //         } else if (buttonId === "new_request") {
-            //             session.step = STATES.NAME;
-            //             await sendToWhatsApp(from, "🔹 Please provide your full name.");
-            //         } else {
-            //             await sendToWhatsApp(from, "❌ Invalid option, please select a valid button.");
-            //         }
-            //     } else {
-            //         await sendToWhatsApp(from, "❌ Invalid input. Please select an option using the buttons.");
-            //     }
-            //     break;
             case STATES.WELCOME:
                 if (message.type === "interactive" && message.interactive.type === "button_reply") {
                     const buttonId = message.interactive.button_reply.id; // Extract button ID
@@ -513,13 +490,6 @@ app.post('/webhook', async (req, res) => {
                         await sendToWhatsApp(from, "❓ Please send your question regarding our services or products.");
                         session.step = STATES.FAQ;
                     } else if (buttonId === "new_request") {
-                        // Check if the phone number is an Emirati number
-                        if (!isValidPhone(from)) {
-                            await sendToWhatsApp(from, "❌ Sorry, we only accept requests from UAE numbers (+971).");
-                            return res.sendStatus(200); // Stop further processing
-                        }
-
-                        // Proceed with request process if the number is valid
                         session.step = STATES.NAME;
                         await sendToWhatsApp(from, "🔹 Please provide your full name.");
                     } else {
@@ -529,7 +499,6 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(from, "❌ Invalid input. Please select an option using the buttons.");
                 }
                 break;
-
 
             case STATES.FAQ:
                 // Check if the user clicked the "End Chat" button
@@ -723,12 +692,10 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case STATES.CONFIRMATION:
-                // Ensure we only process button replies, ignore other inputs
                 if (message.type === "interactive" && message.interactive.type === "button_reply") {
                     const buttonId = message.interactive.button_reply.id; // Extract button ID
 
                     if (buttonId === "yes_confirm") {
-                        // Send data to external API
                         const requestData = {
                             user_name: session.data.name,
                             email: session.data.email,
@@ -744,6 +711,7 @@ app.post('/webhook', async (req, res) => {
                         };
 
                         console.log('Request Data:', requestData);
+
                         try {
                             const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
                                 headers: { 'Content-Type': 'application/json' },
@@ -761,12 +729,20 @@ app.post('/webhook', async (req, res) => {
                             if (error.response) {
                                 console.error('API Error Response:', error.response.data);
                                 console.error('API Status Code:', error.response.status);
+
+                                // Explicitly check for status code 422
+                                if (error.response.status === 422) {
+                                    await sendToWhatsApp(from, "❌ Your phone number must be Emirati to proceed with this request.");
+                                } else {
+                                    await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
+                                }
                             } else {
                                 console.error('Network or request error:', error.message);
+                                await sendToWhatsApp(from, "❌ Unable to reach the server. Please check your internet connection and try again.");
                             }
-                            await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
                         }
                         delete userSessions[from];
+
 
                     } else if (buttonId === "no_correct") {
                         session.step = STATES.MODIFY;
@@ -774,6 +750,59 @@ app.post('/webhook', async (req, res) => {
                     }
                 }
                 break;
+
+            // case STATES.CONFIRMATION:
+            //     // Ensure we only process button replies, ignore other inputs
+            //     if (message.type === "interactive" && message.interactive.type === "button_reply") {
+            //         const buttonId = message.interactive.button_reply.id; // Extract button ID
+
+            //         if (buttonId === "yes_confirm") {
+            //             // Send data to external API
+            //             const requestData = {
+            //                 user_name: session.data.name,
+            //                 email: session.data.email,
+            //                 phone_number: session.data.phone,
+            //                 city: session.data.city,
+            //                 address: session.data.address,
+            //                 street: session.data.street,
+            //                 building_name: session.data.building_name,
+            //                 flat_no: session.data.flat_no,
+            //                 latitude: session.data.latitude,
+            //                 longitude: session.data.longitude,
+            //                 quantity: session.data.quantity
+            //             };
+
+            //             console.log('Request Data:', requestData);
+            //             try {
+            //                 const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
+            //                     headers: { 'Content-Type': 'application/json' },
+            //                     timeout: 5000
+            //                 });
+
+            //                 if (response.status === 200) {
+            //                     console.log('API Response:', response.data);
+            //                     await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
+            //                 } else {
+            //                     console.error(`❌ API returned unexpected status code: ${response.status}`);
+            //                     await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
+            //                 }
+            //             } catch (error) {
+            //                 if (error.response) {
+            //                     console.error('API Error Response:', error.response.data);
+            //                     console.error('API Status Code:', error.response.status);
+            //                 } else {
+            //                     console.error('Network or request error:', error.message);
+            //                 }
+            //                 await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
+            //             }
+            //             delete userSessions[from];
+
+            //         } else if (buttonId === "no_correct") {
+            //             session.step = STATES.MODIFY;
+            //             await sendToWhatsApp(from, "Which information would you like to modify? Please reply with the corresponding number:\n\n1. Name\n2. Phone Number\n3. Email\n4. Address\n5. City\n6. Street\n7. Building Name\n8. Flat Number\n9. Location\n10. Quantity");
+            //         }
+            //     }
+            //     break;
 
             case STATES.MODIFY:
                 // Convert any Arabic digits in the text to English digits
@@ -925,5 +954,3 @@ app.post('/webhook', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Server is running on http://localhost:${PORT}`));
-
-//how
