@@ -6,33 +6,31 @@ import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 
-dotenv.config(); // ✅ تحميل متغيرات البيئة
+dotenv.config(); // Load environment variables
 
-// تحقق من المتغيرات
+// Validate required environment variables
 if (!process.env.OPENAI_API_KEY || !process.env.WHATSAPP_API_URL || !process.env.WHATSAPP_ACCESS_TOKEN) {
     console.error('❌ Missing required environment variables');
     process.exit(1);
 }
 
 const app = express();
+const PORT = process.env.PORT || 5000;
+const SECRET_KEY = process.env.SECRET_KEY || 'LoothTech12345';
 
 const ADMIN_USERNAME = 'admin';
-const ADMIN_PASSWORD = 'admin123'; // In a real-world scenario, hash this password
-const SECRET_KEY = process.env.SECRET_KEY || 'LoothTech12345'; // Use a strong secret key
+const ADMIN_PASSWORD = 'admin123';
 
-// Allow requests from your front-end's origin (e.g., http://localhost:5173)
-app.use(cors({
-    origin: 'http://localhost:5173',
-    // You can also allow multiple origins or use a function to check origins dynamically
-}));
-const PORT = process.env.PORT || 5000;
+// Middleware
+app.use(cors({ origin: 'http://localhost:5173' })); // Allow requests from front-end
 app.use(bodyParser.json());
 
+// Default route
 app.get('/', (req, res) => {
     res.send('Backend is running');
-})
+});
 
-// Login endpoint
+// Admin login endpoint
 app.post('/admin/login', (req, res) => {
     const { username, password } = req.body;
 
@@ -40,12 +38,12 @@ app.post('/admin/login', (req, res) => {
     if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
         // Generate JWT token
         const token = jwt.sign({ username }, SECRET_KEY, { expiresIn: '1h' });
-        res.json({ token });
-    } else {
-        res.status(401).json({ error: 'Invalid username or password' });
+        return res.json({ token });
     }
+    return res.status(401).json({ error: 'Invalid username or password' });
 });
 
+// Middleware to authenticate token
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -59,9 +57,9 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-// بيانات التحقق من Webhook
+// VERIFY Webhook
 const VERIFY_TOKEN = "Mohammad";
-// تحقق من الـ Webhook من Meta
+
 app.get("/webhook", (req, res) => {
     const mode = req.query["hub.mode"];
     const token = req.query["hub.verify_token"];
@@ -75,13 +73,17 @@ app.get("/webhook", (req, res) => {
     }
 });
 
+// System message for the virtual assistant  
 let systemMessage = `🌟 Welcome to Mohammed Oil Refining Company 🌟  
 The company specializes in oil re-refining, and working hours are from Sunday to Thursday, 9 AM to 2 PM.  
 You are the company's virtual assistant, and your task is to answer only questions related to the company, such as services, prices, or oil disposal requests.  
 If the question is not related to the company, respond with: "❌ Sorry, I can only answer questions related to our company's services."`;
 
-let guidanceMessage = ""; // Initially empty; can be updated by the admin
-// Receiving WhatsApp messages
+// Guidance message (initially empty, can be updated by the admin)  
+let guidanceMessage = "";
+
+
+// Default welcome message  
 const defaultWelcomeMessage = `🌟 Welcome to *Mohammed Oil Refining Company* 🌟  
                                     We offer the following services:  
                                     1️⃣ *Inquiries about our products and services*  
@@ -89,12 +91,13 @@ const defaultWelcomeMessage = `🌟 Welcome to *Mohammed Oil Refining Company* �
                               
 
                                     Please send the *service number* you wish to request.`;
-// New endpoint to retrieve the messages
-// Protected routes
+
+// Protected route: Get system messages  
 app.get('/admin/messages', authenticateToken, (req, res) => {
     res.json({ systemMessage, guidanceMessage, defaultWelcomeMessage });
 });
 
+// Protected route: Update system and guidance messages  
 app.post('/admin/update-messages', authenticateToken, (req, res) => {
     const { newSystemMessage, newGuidance } = req.body;
 
@@ -117,6 +120,7 @@ app.post('/admin/update-messages', authenticateToken, (req, res) => {
     res.json({ message: 'Messages updated successfully.' });
 });
 
+// Protected route: Update welcome message  
 app.post('/admin/update-welcome-message', authenticateToken, (req, res) => {
     const { newWelcomeMessage } = req.body;
 
@@ -135,13 +139,15 @@ const getOpenAIResponse = async (userMessage) => {
             { role: "system", content: systemMessage },  // Editable default message
         ];
 
-        // If a guidance message exists, include it as a second system message
+        // Include guidance message if available
         if (guidanceMessage && guidanceMessage.trim() !== "") {
             messages.push({ role: "system", content: guidanceMessage });
         }
 
-        messages.push({ role: "user", content: userMessage });  // User query
+        // Add user message
+        messages.push({ role: "user", content: userMessage });
 
+        // Send request to OpenAI API
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
             model: "gpt-4",
             messages,
@@ -190,7 +196,7 @@ const isValidEmail = (email) => {
 };
 
 const isValidPhone = (phone) => {
-    const regex = /^\+?\d{1,4}\s?\d{6,12}$/; // يسمح برمز الدولة والمسافة
+    const regex = /^\+?\d{1,4}\s?\d{6,12}$/; 
     return regex.test(phone);
 };
 
@@ -551,19 +557,6 @@ app.post('/webhook', async (req, res) => {
                 session.step = STATES.EMAIL;
                 await sendToWhatsApp(from, "📧 Please provide your email address.");
                 break;
-
-            // case STATES.PHONE_CONFIRM:
-            //     if (text.includes("yes") || text.includes("yea")) {
-            //         session.data.phone = formatPhoneNumber(from);
-            //         session.step = STATES.EMAIL;
-            //         await sendToWhatsApp(from, "📧 Your current number will be used. Please provide your email address.");
-            //     } else if (text.includes("no")) {
-            //         session.step = STATES.PHONE_INPUT;
-            //         await sendToWhatsApp(from, "📞 Please enter the phone with country code starting from +.");
-            //     } else {
-            //         await sendToWhatsApp(from, "❌ Please reply with Yes or No.");
-            //     }
-            //     break;
 
             case STATES.PHONE_INPUT:
                 if (!isValidPhone(textRaw)) {
