@@ -22,28 +22,6 @@ function Request({ setIsAuthenticated }) {
         });
     }, []);
 
-    const handleSystemMessageSubmit = (e) => {
-        e.preventDefault();
-        const token = localStorage.getItem('token');
-        axios.post('https://bot-wy40.onrender.com/admin/update-messages',
-            { newSystemMessage: systemMessage },
-            { headers: { Authorization: `Bearer ${token}` } }
-        )
-        .then((response) => console.log('System message updated:', response.data))
-        .catch((error) => console.error('Error updating system message:', error));
-    };
-
-    const handleGuidanceMessageSubmit = (e) => {
-        e.preventDefault();
-        const token = localStorage.getItem('token');
-        axios.post('https://bot-wy40.onrender.com/admin/update-messages',
-            { newGuidance: guidanceMessage },
-            { headers: { Authorization: `Bearer ${token}` } }
-        )
-        .then((response) => console.log('Guidance message updated:', response.data))
-        .catch((error) => console.error('Error updating guidance message:', error));
-    };
-
     const handleLogout = () => {
         localStorage.removeItem('token');
         setIsAuthenticated(false);
@@ -53,9 +31,23 @@ function Request({ setIsAuthenticated }) {
     return (
         <div className="request-container">
             <h1 className="header">Bot Guidance Interface</h1>
-            <button onClick={handleLogout} className="logout-btn">Logout</button>
+
+            {/* Button Container */}
+            <div className="button-container">
+                <button onClick={handleLogout} className="logout-btn">Logout</button>
+                <button onClick={() => navigate('/welcome-message')} className="navigate-btn">Go to Welcome Message</button>
+            </div>
+
             <div className="form-container">
-                <form className="form" onSubmit={handleSystemMessageSubmit}>
+                <form className="form" onSubmit={(e) => {
+                    e.preventDefault();
+                    axios.post('https://bot-wy40.onrender.com/admin/update-messages',
+                        { newSystemMessage: systemMessage },
+                        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+                    )
+                    .then((response) => console.log('System message updated:', response.data))
+                    .catch((error) => console.error('Error updating system message:', error));
+                }}>
                     <div className="form-group">
                         <label className="label" htmlFor="systemMessage">System Message:</label>
                         <textarea
@@ -69,22 +61,6 @@ function Request({ setIsAuthenticated }) {
                         />
                     </div>
                     <button type="submit" className="submit-btn">Save System Message</button>
-                </form>
-
-                <form className="form" onSubmit={handleGuidanceMessageSubmit}>
-                    <div className="form-group">
-                        <label className="label" htmlFor="guidanceMessage">Guidance Message:</label>
-                        <textarea
-                            id="guidanceMessage"
-                            className="textarea"
-                            rows={6}
-                            value={guidanceMessage}
-                            onChange={(e) => setGuidanceMessage(e.target.value)}
-                            placeholder="Enter guidance message"
-                            required
-                        />
-                    </div>
-                    <button type="submit" className="submit-btn">Save Guidance Message</button>
                 </form>
             </div>
         </div>

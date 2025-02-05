@@ -415,6 +415,7 @@ const sendUpdatedSummary = async (to, session) => {
     }
 };
 
+
 app.post('/webhook', async (req, res) => {
     try {
         console.log('Incoming Webhook Data:', req.body); // Log the incoming data for debugging
@@ -447,9 +448,7 @@ app.post('/webhook', async (req, res) => {
 
             let isGreeting = greetings.some(greeting => text.toLowerCase().includes(greeting));
 
-            let welcomeText = isGreeting
-                ? `Welcome to *Lootah Biofuels Refining Company*.\n\nWe offer the following services:\n\n1️⃣ *Inquiries about our products and services*\n2️⃣ *Create a new request:*\n\nPlease select an option below:`
-                : `🌟 Welcome to *Lootah Biofuels Refining Company* 🌟\n\nWe offer the following services:\n\n1️⃣ *Inquiries about our products and services*\n2️⃣ *Create a new request:*\n\nPlease select an option below:`;
+            let welcomeText = isGreeting ? defaultWelcomeMessage : defaultWelcomeMessage;
 
             // Send interactive buttons (always included)
             await axios.post(process.env.WHATSAPP_API_URL, {
@@ -750,59 +749,6 @@ app.post('/webhook', async (req, res) => {
                     }
                 }
                 break;
-
-            // case STATES.CONFIRMATION:
-            //     // Ensure we only process button replies, ignore other inputs
-            //     if (message.type === "interactive" && message.interactive.type === "button_reply") {
-            //         const buttonId = message.interactive.button_reply.id; // Extract button ID
-
-            //         if (buttonId === "yes_confirm") {
-            //             // Send data to external API
-            //             const requestData = {
-            //                 user_name: session.data.name,
-            //                 email: session.data.email,
-            //                 phone_number: session.data.phone,
-            //                 city: session.data.city,
-            //                 address: session.data.address,
-            //                 street: session.data.street,
-            //                 building_name: session.data.building_name,
-            //                 flat_no: session.data.flat_no,
-            //                 latitude: session.data.latitude,
-            //                 longitude: session.data.longitude,
-            //                 quantity: session.data.quantity
-            //             };
-
-            //             console.log('Request Data:', requestData);
-            //             try {
-            //                 const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
-            //                     headers: { 'Content-Type': 'application/json' },
-            //                     timeout: 5000
-            //                 });
-
-            //                 if (response.status === 200) {
-            //                     console.log('API Response:', response.data);
-            //                     await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
-            //                 } else {
-            //                     console.error(`❌ API returned unexpected status code: ${response.status}`);
-            //                     await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
-            //                 }
-            //             } catch (error) {
-            //                 if (error.response) {
-            //                     console.error('API Error Response:', error.response.data);
-            //                     console.error('API Status Code:', error.response.status);
-            //                 } else {
-            //                     console.error('Network or request error:', error.message);
-            //                 }
-            //                 await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
-            //             }
-            //             delete userSessions[from];
-
-            //         } else if (buttonId === "no_correct") {
-            //             session.step = STATES.MODIFY;
-            //             await sendToWhatsApp(from, "Which information would you like to modify? Please reply with the corresponding number:\n\n1. Name\n2. Phone Number\n3. Email\n4. Address\n5. City\n6. Street\n7. Building Name\n8. Flat Number\n9. Location\n10. Quantity");
-            //         }
-            //     }
-            //     break;
 
             case STATES.MODIFY:
                 // Convert any Arabic digits in the text to English digits

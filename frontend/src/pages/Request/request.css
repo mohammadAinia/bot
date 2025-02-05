@@ -83,6 +83,7 @@
 
 .logout-btn {
   padding: 10px 20px; /* Increased padding for bigger logout button */
+  margin-bottom: 15px;
   font-size: 1.1rem; /* Increased font size for logout button */
   color: #fff;
   background-color: #dc3545;
@@ -111,3 +112,5 @@
     width: 100%;
   }
 }
+
+
