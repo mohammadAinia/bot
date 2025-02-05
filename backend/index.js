@@ -1083,30 +1083,15 @@ app.post('/webhook', async (req, res) => {
                 }
                 session.data.quantity = textRaw;
                 session.step = STATES.CONFIRMATION;
-
-                // let summary = `✅ *Order Summary:*\n\n`;
-                // summary += `🔹 *Name:* ${session.data.name}\n`;
-                // summary += `📞 *Phone Number:* ${session.data.phone}\n`;
-                // summary += `📧 *Email:* ${session.data.email}\n`;
-                // summary += `📍 *Address:* ${session.data.address}\n`;
-                // summary += `🌆 *City:* ${session.data.city}\n`;
-                // summary += `🏠 *Street:* ${session.data.street}\n`;
-                // summary += `🏢 *Building Name:* ${session.data.building_name}\n`;
-                // summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;
-                // summary += `📍 *Latitude:* ${session.data.latitude}\n`;
-                // summary += `📍 *Longitude:* ${session.data.longitude}\n`;
-                // summary += `📦 *Quantity:* ${session.data.quantity}\n`;
-                // summary += `Is the information correct? Please reply with *Yes* or *No*`;
-
-                // await sendToWhatsApp(from, summary);
                 sendOrderSummary(from, session)
                 break;
             case STATES.CONFIRMATION:
+                // Ensure we only process button replies, ignore other inputs
                 if (message.type === "interactive" && message.interactive.type === "button_reply") {
                     const buttonId = message.interactive.button_reply.id; // Extract button ID
 
                     if (buttonId === "yes_confirm") {
-                        // Send data to the external API
+                        // Send data to external API
                         const requestData = {
                             user_name: session.data.name,
                             email: session.data.email,
@@ -1145,67 +1130,13 @@ app.post('/webhook', async (req, res) => {
                             await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
                         }
                         delete userSessions[from];
+
                     } else if (buttonId === "no_correct") {
                         session.step = STATES.MODIFY;
                         await sendToWhatsApp(from, "Which information would you like to modify? Please reply with the corresponding number:\n\n1. Name\n2. Phone Number\n3. Email\n4. Address\n5. City\n6. Street\n7. Building Name\n8. Flat Number\n9. Location\n10. Quantity");
-                    } else {
-                        await sendToWhatsApp(from, "❌ Invalid input. Please select *Yes* or *No* using the buttons.");
                     }
-                } else {
-                    await sendToWhatsApp(from, "❌ Invalid input. Please select *Yes* or *No* using the buttons.");
                 }
                 break;
-
-            // case STATES.CONFIRMATION:
-            //     if (text.includes("yes") || text.includes("yea")) {
-            //         // Send the data to the external API
-            //         const requestData = {
-            //             user_name: session.data.name,
-            //             email: session.data.email,
-            //             phone_number: session.data.phone,
-            //             city: session.data.city,
-            //             address: session.data.address,
-            //             street: session.data.street,
-            //             building_name: session.data.building_name,
-            //             flat_no: session.data.flat_no,
-            //             latitude: session.data.latitude,
-            //             longitude: session.data.longitude,
-            //             quantity: session.data.quantity
-            //         };
-
-            //         console.log('Request Data:', requestData);
-            //         try {
-            //             const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
-            //                 headers: {
-            //                     'Content-Type': 'application/json',
-            //                 },
-            //                 timeout: 5000
-            //             });
-
-            //             if (response.status === 200) {
-            //                 console.log('API Response:', response.data);
-            //                 await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
-            //             } else {
-            //                 console.error(`❌ API returned unexpected status code: ${response.status}`);
-            //                 await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
-            //             }
-            //         } catch (error) {
-            //             if (error.response) {
-            //                 console.error('API Error Response:', error.response.data);
-            //                 console.error('API Status Code:', error.response.status);
-            //             } else {
-            //                 console.error('Network or request error:', error.message);
-            //             }
-            //             await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
-            //         }
-            //         delete userSessions[from];
-            //     } else if (text.includes("no")) {
-            //         session.step = STATES.MODIFY;
-            //         await sendToWhatsApp(from, "Which information would you like to modify? Please reply with the corresponding number:\n\n1. Name\n2. Phone Number\n3. Email\n4. Address\n5. City\n6. Street\n7. Building Name\n8. Flat Number\n9. Location\n10. Quantity");
-            //     } else {
-            //         await sendToWhatsApp(from, "❌ Invalid input. Please reply with *Yes* or *No*.");
-            //     }
-            //     break;
 
             case STATES.MODIFY:
                 // Convert any Arabic digits in the text to English digits
