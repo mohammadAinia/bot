@@ -415,6 +415,25 @@ const sendUpdatedSummary = async (to, session) => {
     }
 };
 
+const sendInteractiveButtons = async (to, message, buttons) => {
+    await axios.post(process.env.WHATSAPP_API_URL, {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: to,
+        type: "interactive",
+        interactive: {
+            type: "button",
+            body: { text: message },
+            action: { buttons }
+        }
+    }, {
+        headers: {
+            "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+            "Content-Type": "application/json"
+        }
+    });
+};
+
 
 app.post('/webhook', async (req, res) => {
     try {
@@ -437,43 +456,15 @@ app.post('/webhook', async (req, res) => {
 
         console.log(`📩 New message from ${from}: ${text}`);
 
+        // Initialize user session if it doesn't exist
         if (!userSessions[from]) {
             userSessions[from] = { step: STATES.WELCOME, data: {} };
 
-            // List of greeting phrases
-            const greetings = [
-                "hello", "hi", "hey", "greetings", "good day",
-                "good morning", "good afternoon", "good evening"
-            ];
-
-            let isGreeting = greetings.some(greeting => text.toLowerCase().includes(greeting));
-
-            let welcomeText = isGreeting ? defaultWelcomeMessage : defaultWelcomeMessage;
-
-            // Send interactive buttons (always included)
-            await axios.post(process.env.WHATSAPP_API_URL, {
-                messaging_product: "whatsapp",
-                recipient_type: "individual",
-                to: from,
-                type: "interactive",
-                interactive: {
-                    type: "button",
-                    body: {
-                        text: welcomeText
-                    },
-                    action: {
-                        buttons: [
-                            { type: "reply", reply: { id: "faq_request", title: "🔍 Inquiries" } },
-                            { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
-                        ]
-                    }
-                }
-            }, {
-                headers: {
-                    "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-                    "Content-Type": "application/json"
-                }
-            });
+            // Send welcome message with options
+            await sendInteractiveButtons(from, defaultWelcomeMessage, [
+                { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
+                { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
+            ]);
             return res.sendStatus(200);
         }
 
@@ -482,73 +473,31 @@ app.post('/webhook', async (req, res) => {
         // Handle messages based on the current state
         switch (session.step) {
             case STATES.WELCOME:
-                if (message.type === "interactive" && message.interactive.type === "button_reply") {
-                    const buttonId = message.interactive.button_reply.id; // Extract button ID
+                // If the user sends a message (not a button reply), treat it as a question
+                if (message.type === "text") {
+                    const aiResponse = await getOpenAIResponse(textRaw);
+                    const reply = `${aiResponse}\n\nTo complete the inquiry, you can ask other questions. If you want to submit a request or contact us, choose from the following options:`;
 
-                    if (buttonId === "faq_request") {
-                        await sendToWhatsApp(from, "❓ Please send your question regarding our services or products.");
-                        session.step = STATES.FAQ;
+                    // Send the AI response with options to continue or proceed
+                    await sendInteractiveButtons(from, reply, [
+                        { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
+                        { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
+                    ]);
+                } else if (message.type === "interactive" && message.interactive.type === "button_reply") {
+                    const buttonId = message.interactive.button_reply.id;
+
+                    if (buttonId === "contact_us") {
+                        await sendToWhatsApp(from, "📞 You can contact us at support@example.com or call +1234567890.");
                     } else if (buttonId === "new_request") {
                         session.step = STATES.NAME;
                         await sendToWhatsApp(from, "🔹 Please provide your full name.");
                     } else {
                         await sendToWhatsApp(from, "❌ Invalid option, please select a valid button.");
                     }
-                } else {
-                    await sendToWhatsApp(from, "❌ Invalid input. Please select an option using the buttons.");
                 }
                 break;
 
-            case STATES.FAQ:
-                // Check if the user clicked the "End Chat" button
-                if (message.type === "interactive" && message.interactive.type === "button_reply") {
-                    const buttonId = message.interactive.button_reply.id; // Get button ID
-
-                    if (buttonId === "end_chat") {
-                        await sendToWhatsApp(from, "✅ The chat has been closed. If you need any future assistance, feel free to reach out to us.");
-                        delete userSessions[from];
-                        return res.sendStatus(200);
-                    }
-                    break;
-                }
-
-                // Handle text-based termination phrases (fallback for users who type them)
-                const terminationPhrases = ["thank you", "close", "end chat", "appreciate it"];
-                if (terminationPhrases.some(phrase => text.toLowerCase().includes(phrase))) {
-                    await sendToWhatsApp(from, "✅ The chat has been closed. If you need any future assistance, feel free to reach out to us.");
-                    delete userSessions[from];
-                    return res.sendStatus(200);
-                }
-
-                // Generate AI response
-                const aiResponse = await getOpenAIResponse(textRaw);
-                const reply = `${aiResponse}\n\nTo continue your inquiry, you can ask another question. If you want to end the conversation, please type 'thank you' or 'end chat'.`;
-
-                // Send WhatsApp interactive message with only the "End Chat" button
-                await axios.post(process.env.WHATSAPP_API_URL, {
-                    messaging_product: "whatsapp",
-                    recipient_type: "individual",
-                    to: from,
-                    type: "interactive",
-                    interactive: {
-                        type: "button",
-                        body: {
-                            text: reply
-                        },
-                        action: {
-                            buttons: [
-                                { type: "reply", reply: { id: "end_chat", title: "❌ End Chat" } }
-                            ]
-                        }
-                    }
-                }, {
-                    headers: {
-                        "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-                        "Content-Type": "application/json"
-                    }
-                });
-                break;
-
+//----------------------------------------------------------------------
             case STATES.NAME:
                 session.data.name = textRaw;
                 session.data.phone = formatPhoneNumber(from); // Automatically store the sender's number
@@ -900,3 +849,139 @@ app.post('/webhook', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Server is running on http://localhost:${PORT}`));
+
+
+
+
+
+
+            // console.log('Incoming Webhook Data:', req.body); // Log the incoming data for debugging
+
+            // const entry = req.body.entry?.[0];
+            // const changes = entry?.changes?.[0];
+            // const value = changes?.value;
+            // const messages = value?.messages;
+
+            // if (!messages || messages.length === 0) {
+            //     console.log('No messages received, returning early.');
+            //     return res.sendStatus(200);
+            // }
+
+            // const message = messages[0];
+            // const from = message.from;
+            // const textRaw = message.text?.body || "";
+            // const text = textRaw.toLowerCase().trim();
+
+            // console.log(`📩 New message from ${from}: ${text}`);
+
+            // if (!userSessions[from]) {
+            //     userSessions[from] = { step: STATES.WELCOME, data: {} };
+
+            //     // List of greeting phrases
+            //     const greetings = [
+            //         "hello", "hi", "hey", "greetings", "good day",
+            //         "good morning", "good afternoon", "good evening"
+            //     ];
+
+            //     let isGreeting = greetings.some(greeting => text.toLowerCase().includes(greeting));
+
+            //     let welcomeText = isGreeting ? defaultWelcomeMessage : defaultWelcomeMessage;
+
+            //     // Send interactive buttons (always included)
+            //     await axios.post(process.env.WHATSAPP_API_URL, {
+            //         messaging_product: "whatsapp",
+            //         recipient_type: "individual",
+            //         to: from,
+            //         type: "interactive",
+            //         interactive: {
+            //             type: "button",
+            //             body: {
+            //                 text: welcomeText
+            //             },
+            //             action: {
+            //                 buttons: [
+            //                     { type: "reply", reply: { id: "faq_request", title: "🔍 Inquiries" } },
+            //                     { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
+            //                 ]
+            //             }
+            //         }
+            //     }, {
+            //         headers: {
+            //             "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+            //             "Content-Type": "application/json"
+            //         }
+            //     });
+            //     return res.sendStatus(200);
+            // }
+
+            // const session = userSessions[from];
+
+            // // Handle messages based on the current state
+            // switch (session.step) {
+            //     case STATES.WELCOME:
+            //         if (message.type === "interactive" && message.interactive.type === "button_reply") {
+            //             const buttonId = message.interactive.button_reply.id; // Extract button ID
+
+            //             if (buttonId === "faq_request") {
+            //                 await sendToWhatsApp(from, "❓ Please send your question regarding our services or products.");
+            //                 session.step = STATES.FAQ;
+            //             } else if (buttonId === "new_request") {
+            //                 session.step = STATES.NAME;
+            //                 await sendToWhatsApp(from, "🔹 Please provide your full name.");
+            //             } else {
+            //                 await sendToWhatsApp(from, "❌ Invalid option, please select a valid button.");
+            //             }
+            //         } else {
+            //             await sendToWhatsApp(from, "❌ Invalid input. Please select an option using the buttons.");
+            //         }
+            //         break;
+
+            //     case STATES.FAQ:
+            //         // Check if the user clicked the "End Chat" button
+            //         if (message.type === "interactive" && message.interactive.type === "button_reply") {
+            //             const buttonId = message.interactive.button_reply.id; // Get button ID
+
+            //             if (buttonId === "end_chat") {
+            //                 await sendToWhatsApp(from, "✅ The chat has been closed. If you need any future assistance, feel free to reach out to us.");
+            //                 delete userSessions[from];
+            //                 return res.sendStatus(200);
+            //             }
+            //             break;
+            //         }
+
+            //         // Handle text-based termination phrases (fallback for users who type them)
+            //         const terminationPhrases = ["thank you", "close", "end chat", "appreciate it"];
+            //         if (terminationPhrases.some(phrase => text.toLowerCase().includes(phrase))) {
+            //             await sendToWhatsApp(from, "✅ The chat has been closed. If you need any future assistance, feel free to reach out to us.");
+            //             delete userSessions[from];
+            //             return res.sendStatus(200);
+            //         }
+
+            //         // Generate AI response
+            //         const aiResponse = await getOpenAIResponse(textRaw);
+            //         const reply = `${aiResponse}\n\nTo continue your inquiry, you can ask another question. If you want to end the conversation, please type 'thank you' or 'end chat'.`;
+
+            //         // Send WhatsApp interactive message with only the "End Chat" button
+            //         await axios.post(process.env.WHATSAPP_API_URL, {
+            //             messaging_product: "whatsapp",
+            //             recipient_type: "individual",
+            //             to: from,
+            //             type: "interactive",
+            //             interactive: {
+            //                 type: "button",
+            //                 body: {
+            //                     text: reply
+            //                 },
+            //                 action: {
+            //                     buttons: [
+            //                         { type: "reply", reply: { id: "end_chat", title: "❌ End Chat" } }
+            //                     ]
+            //                 }
+            //             }
+            //         }, {
+            //             headers: {
+            //                 "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+            //                 "Content-Type": "application/json"
+            //             }
+            //         });
+            //         break;
