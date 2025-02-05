@@ -138,10 +138,8 @@ For more details, visit: [Lootah Biofuels Website](https://www.lootahbiofuels.co
 // Guidance message (initially empty, can be updated by the admin)  
 let guidanceMessage = "";
 
-
 // Default welcome message  
 const defaultWelcomeMessage = `\ud83c\udf1f Welcome to *Lootah Biofuels Refining Company* \ud83c\udf1f\n\nYou can ask any question directly, and I will assist you. If you need further help, choose from the options below.`;
-
 
 // Protected route: Get system messages  
 app.get('/admin/messages', authenticateToken, (req, res) => {
