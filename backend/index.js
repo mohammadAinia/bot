@@ -1048,7 +1048,7 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case STATES.CONFIRMATION:
-                if (text.includes("yes") || text.includes("yea")) {
+                if (text.includes("yes_confirm")) {
                     // Send the data to the external API
                     const requestData = {
                         user_name: session.data.name,
@@ -1090,7 +1090,7 @@ app.post('/webhook', async (req, res) => {
                         await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
                     }
                     delete userSessions[from];
-                } else if (text.includes("no")) {
+                } else if (text.includes("no_correct")) {
                     session.step = STATES.MODIFY;
                     await sendToWhatsApp(from, "Which information would you like to modify? Please reply with the corresponding number:\n\n1. Name\n2. Phone Number\n3. Email\n4. Address\n5. City\n6. Street\n7. Building Name\n8. Flat Number\n9. Location\n10. Quantity");
                 } else {
