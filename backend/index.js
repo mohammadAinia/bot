@@ -914,19 +914,70 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
+            // case STATES.FAQ:
+            //     // List of phrases to end the conversation
+            //     const terminationPhrases = ["thank you", "close", "end chat", "appreciate it"];
+            //     if (terminationPhrases.some(phrase => text.includes(phrase))) {
+            //         await sendToWhatsApp(from, "The chat has been closed. If you need any future assistance, feel free to reach out to us.");
+            //         delete userSessions[from];
+            //         return res.sendStatus(200);
+            //     }
+
+            //     const aiResponse = await getOpenAIResponse(textRaw);
+            //     const reply = `${aiResponse}\n\nTo continue your inquiry, you can ask another question. If you want to end the conversation, please type 'thank you' or 'end chat'.`;
+            //     await sendToWhatsApp(from, reply);
+            //     break;
             case STATES.FAQ:
-                // List of phrases to end the conversation
+                // Check if the user clicked the "End Chat" button
+                if (message.type === "interactive" && message.interactive.type === "button_reply") {
+                    const buttonId = message.interactive.button_reply.id; // Get button ID
+
+                    if (buttonId === "end_chat") {
+                        await sendToWhatsApp(from, "✅ The chat has been closed. If you need any future assistance, feel free to reach out to us.");
+                        delete userSessions[from];
+                        return res.sendStatus(200);
+                    }
+                    break;
+                }
+
+                // Handle text-based termination phrases (fallback for users who type them)
                 const terminationPhrases = ["thank you", "close", "end chat", "appreciate it"];
-                if (terminationPhrases.some(phrase => text.includes(phrase))) {
-                    await sendToWhatsApp(from, "The chat has been closed. If you need any future assistance, feel free to reach out to us.");
+                if (terminationPhrases.some(phrase => text.toLowerCase().includes(phrase))) {
+                    await sendToWhatsApp(from, "✅ The chat has been closed. If you need any future assistance, feel free to reach out to us.");
                     delete userSessions[from];
                     return res.sendStatus(200);
                 }
 
+                // Generate AI response
                 const aiResponse = await getOpenAIResponse(textRaw);
                 const reply = `${aiResponse}\n\nTo continue your inquiry, you can ask another question. If you want to end the conversation, please type 'thank you' or 'end chat'.`;
-                await sendToWhatsApp(from, reply);
+
+                // Send WhatsApp interactive message with only the "End Chat" button
+                await axios.post(process.env.WHATSAPP_API_URL, {
+                    messaging_product: "whatsapp",
+                    recipient_type: "individual",
+                    to: from,
+                    type: "interactive",
+                    interactive: {
+                        type: "button",
+                        body: {
+                            text: reply
+                        },
+                        action: {
+                            buttons: [
+                                { type: "reply", reply: { id: "end_chat", title: "❌ End Chat" } }
+                            ]
+                        }
+                    }
+                }, {
+                    headers: {
+                        "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                        "Content-Type": "application/json"
+                    }
+                });
+
                 break;
+
 
             case STATES.NAME:
                 session.data.name = textRaw;
