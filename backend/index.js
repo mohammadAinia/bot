@@ -687,11 +687,7 @@ const sendOrderSummary = async (to, session) => {
     }
 };
 
-
-
-
 let dataStore = [];  // Array to temporarily store data
-
 
 function formatPhoneNumber(phoneNumber) {
     // إزالة أي مسافات أو رموز غير ضرورية
@@ -720,7 +716,6 @@ const STATES = {
     EMAIL: 3,
     ADDRESS: 4,
     CITY: 7,
-    // LABEL: 8,
     STREET: 9,
     BUILDING_NAME: 10,
     FLAT_NO: 11,
@@ -920,19 +915,6 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-            // case STATES.FAQ:
-            //     // List of phrases to end the conversation
-            //     const terminationPhrases = ["thank you", "close", "end chat", "appreciate it"];
-            //     if (terminationPhrases.some(phrase => text.includes(phrase))) {
-            //         await sendToWhatsApp(from, "The chat has been closed. If you need any future assistance, feel free to reach out to us.");
-            //         delete userSessions[from];
-            //         return res.sendStatus(200);
-            //     }
-
-            //     const aiResponse = await getOpenAIResponse(textRaw);
-            //     const reply = `${aiResponse}\n\nTo continue your inquiry, you can ask another question. If you want to end the conversation, please type 'thank you' or 'end chat'.`;
-            //     await sendToWhatsApp(from, reply);
-            //     break;
             case STATES.FAQ:
                 // Check if the user clicked the "End Chat" button
                 if (message.type === "interactive" && message.interactive.type === "button_reply") {
@@ -984,7 +966,6 @@ app.post('/webhook', async (req, res) => {
 
                 break;
 
-
             case STATES.NAME:
                 session.data.name = textRaw;
                 session.data.phone = formatPhoneNumber(from); // Automatically store the sender's number
@@ -1025,11 +1006,6 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, "📍 Please provide your full address.");
                 break;
 
-            // case STATES.ADDRESS:
-            //     session.data.address = textRaw;
-            //     session.step = STATES.CITY;
-            //     // await sendToWhatsApp(from, "📦 Please provide the City.");
-            //     break;
             case STATES.ADDRESS:
                 session.data.address = textRaw;
                 session.step = STATES.CITY_SELECTION;  // ✅ Move directly to CITY_SELECTION
@@ -1072,23 +1048,6 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, "🏠 Please provide the flat number.");
                 break;
 
-            // case STATES.FLAT_NO:
-            //     session.data.flat_no = textRaw;
-            //     session.step = STATES.LONGITUDE;
-            //     await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
-            //     break;
-
-            // // case STATES.LATITUDE:
-            // case STATES.LONGITUDE:
-            //     if (message.location) {
-            //         session.data.latitude = message.location.latitude;
-            //         session.data.longitude = message.location.longitude;
-            //         session.step = STATES.QUANTITY;
-            //         await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
-            //     } else {
-            //         await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
-            //     }
-            //     break;
             case STATES.FLAT_NO:
                 session.data.flat_no = textRaw;
                 session.step = STATES.LONGITUDE;
@@ -1118,16 +1077,20 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-
             case STATES.QUANTITY:
-                if (isNaN(textRaw) || textRaw.trim() === "") {
+                // Check if the user actually entered something before validating
+                if (textRaw.trim() === "") {
+                    return res.sendStatus(200); // Ignore empty message
+                }
+                if (isNaN(textRaw)) {
                     await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
                     return res.sendStatus(200);
                 }
                 session.data.quantity = textRaw;
                 session.step = STATES.CONFIRMATION;
-                sendOrderSummary(from, session)
+                sendOrderSummary(from, session);
                 break;
+
             case STATES.CONFIRMATION:
                 // Ensure we only process button replies, ignore other inputs
                 if (message.type === "interactive" && message.interactive.type === "button_reply") {
