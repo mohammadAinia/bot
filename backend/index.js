@@ -140,7 +140,7 @@ let guidanceMessage = "";
 
 
 // Default welcome message  
-const defaultWelcomeMessage = `🌟 Welcome to *Mohammed Oil Refining Company* 🌟  
+const defaultWelcomeMessage = `🌟 Welcome to *Lootah Biofuels Refining Company* 🌟  
                                     We offer the following services:  
                                     1️⃣ *Inquiries about our products and services*  
                                     2️⃣ *Create a new request:*  
@@ -454,8 +454,8 @@ app.post('/webhook', async (req, res) => {
             let isGreeting = greetings.some(greeting => text.toLowerCase().includes(greeting));
 
             let welcomeText = isGreeting
-                ? `Welcome to *Mohammed Oil Refining Company*.\n\nWe offer the following services:\n\n1️⃣ *Inquiries about our products and services*\n2️⃣ *Create a new request:*\n\nPlease select an option below:`
-                : `🌟 Welcome to *Mohammed Oil Refining Company* 🌟\n\nWe offer the following services:\n\n1️⃣ *Inquiries about our products and services*\n2️⃣ *Create a new request:*\n\nPlease select an option below:`;
+                ? `Welcome to *Lootah Biofuels Refining Company*.\n\nWe offer the following services:\n\n1️⃣ *Inquiries about our products and services*\n2️⃣ *Create a new request:*\n\nPlease select an option below:`
+                : `🌟 Welcome to *Lootah Biofuels Refining Company* 🌟\n\nWe offer the following services:\n\n1️⃣ *Inquiries about our products and services*\n2️⃣ *Create a new request:*\n\nPlease select an option below:`;
 
             // Send interactive buttons (always included)
             await axios.post(process.env.WHATSAPP_API_URL, {
