@@ -251,10 +251,16 @@ const isValidEmail = (email) => {
     return regex.test(email);
 };
 
+// const isValidPhone = (phone) => {
+//     const regex = /^\+971(5\d{1}\s?\d{3}\s?\d{3}|\s?4\d{2}\s?\d{4})$/;
+//     return regex.test(phone);
+// };
 const isValidPhone = (phone) => {
-    const regex = /^\+971(5\d{1}\s?\d{3}\s?\d{3}|\s?4\d{2}\s?\d{4})$/;
+    // Ensure phone starts with +971 and follows UAE number format
+    const regex = /^\+971(5[0-9]{1}[0-9]{7}|2[0-9]{7}|3[0-9]{7}|4[0-9]{7}|6[0-9]{7}|7[0-9]{7}|9[0-9]{7})$/;
     return regex.test(phone);
 };
+
 
 
 const sendCitySelection = async (to) => {
@@ -482,6 +488,23 @@ app.post('/webhook', async (req, res) => {
 
         // Handle messages based on the current state
         switch (session.step) {
+            // case STATES.WELCOME:
+            //     if (message.type === "interactive" && message.interactive.type === "button_reply") {
+            //         const buttonId = message.interactive.button_reply.id; // Extract button ID
+
+            //         if (buttonId === "faq_request") {
+            //             await sendToWhatsApp(from, "❓ Please send your question regarding our services or products.");
+            //             session.step = STATES.FAQ;
+            //         } else if (buttonId === "new_request") {
+            //             session.step = STATES.NAME;
+            //             await sendToWhatsApp(from, "🔹 Please provide your full name.");
+            //         } else {
+            //             await sendToWhatsApp(from, "❌ Invalid option, please select a valid button.");
+            //         }
+            //     } else {
+            //         await sendToWhatsApp(from, "❌ Invalid input. Please select an option using the buttons.");
+            //     }
+            //     break;
             case STATES.WELCOME:
                 if (message.type === "interactive" && message.interactive.type === "button_reply") {
                     const buttonId = message.interactive.button_reply.id; // Extract button ID
@@ -490,6 +513,13 @@ app.post('/webhook', async (req, res) => {
                         await sendToWhatsApp(from, "❓ Please send your question regarding our services or products.");
                         session.step = STATES.FAQ;
                     } else if (buttonId === "new_request") {
+                        // Check if the phone number is an Emirati number
+                        if (!isValidPhone(from)) {
+                            await sendToWhatsApp(from, "❌ Sorry, we only accept requests from UAE numbers (+971).");
+                            return res.sendStatus(200); // Stop further processing
+                        }
+
+                        // Proceed with request process if the number is valid
                         session.step = STATES.NAME;
                         await sendToWhatsApp(from, "🔹 Please provide your full name.");
                     } else {
@@ -499,6 +529,7 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(from, "❌ Invalid input. Please select an option using the buttons.");
                 }
                 break;
+
 
             case STATES.FAQ:
                 // Check if the user clicked the "End Chat" button
@@ -671,20 +702,6 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-            // case STATES.QUANTITY:
-            //     if (session.awaitingQuantityInput) {
-            //         session.awaitingQuantityInput = false; // Reset flag but continue processing
-            //     }
-
-            //     if (textRaw.trim() === "" || isNaN(textRaw)) {
-            //         await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
-            //         return res.sendStatus(200);
-            //     }
-
-            //     session.data.quantity = textRaw;
-            //     session.step = STATES.CONFIRMATION;
-            //     sendOrderSummary(from, session);
-            //     break;
             case STATES.QUANTITY:
                 // If the system is already waiting for quantity input
                 if (session.awaitingQuantityInput) {
