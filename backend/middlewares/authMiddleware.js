@@ -1,7 +1,8 @@
 import jwt from 'jsonwebtoken';
-import { SECRET_KEY } from '../config';
 
-export const authenticateToken = (req, res, next) => {
+const SECRET_KEY = process.env.SECRET_KEY || 'LoothTech12345';
+
+const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
@@ -13,3 +14,5 @@ export const authenticateToken = (req, res, next) => {
         next();
     });
 };
+
+export default authenticateToken;

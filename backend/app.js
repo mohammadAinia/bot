@@ -1,10 +1,8 @@
 import express from 'express';
-import dotenv from 'dotenv';
-import bodyParser from 'body-parser';
 import cors from 'cors';
-import apiRoutes from './routes/apiRoutes';
-
-dotenv.config(); // Load environment variables
+import bodyParser from 'body-parser';
+import adminRoutes from './routes/adminRoutes.js';
+import webhookRoutes from './routes/webhookRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -12,8 +10,7 @@ const PORT = process.env.PORT || 5000;
 app.use(cors({ origin: 'http://localhost:5173' }));
 app.use(bodyParser.json());
 
-app.use('/api', apiRoutes);
+app.use('/admin', adminRoutes);
+app.use('/', webhookRoutes);
 
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`🚀 Server is running on http://localhost:${PORT}`));

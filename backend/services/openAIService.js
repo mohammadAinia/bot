@@ -1,20 +1,17 @@
 import axios from 'axios';
 
-export const getOpenAIResponse = async (systemMessage, guidanceMessage, userMessage) => {
+const getOpenAIResponse = async (userMessage, systemMessage, guidanceMessage) => {
     try {
         const messages = [
-            { role: "system", content: systemMessage },  // Editable default message
+            { role: "system", content: systemMessage },
         ];
 
-        // Include guidance message if available
         if (guidanceMessage && guidanceMessage.trim() !== "") {
             messages.push({ role: "system", content: guidanceMessage });
         }
 
-        // Add user message
         messages.push({ role: "user", content: userMessage });
 
-        // Send request to OpenAI API
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
             model: "gpt-4",
             messages,
@@ -33,3 +30,5 @@ export const getOpenAIResponse = async (systemMessage, guidanceMessage, userMess
         return "❌ Sorry, an error occurred while processing your request.";
     }
 };
+
+export { getOpenAIResponse };
