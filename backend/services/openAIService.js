@@ -1,17 +1,25 @@
 import axios from 'axios';
 
+// Ensure systemMessage and guidanceMessage are always valid strings before use
 export const getOpenAIResponse = async (userMessage, systemMessage, guidanceMessage) => {
     try {
+        // If no system message is provided, use an empty string to avoid null errors
+        const validSystemMessage = systemMessage && typeof systemMessage === 'string' ? systemMessage : '';
+        const validGuidanceMessage = guidanceMessage && typeof guidanceMessage === 'string' ? guidanceMessage : '';
+
         const messages = [
-            { role: "system", content: systemMessage },
+            { role: "system", content: validSystemMessage },
         ];
 
-        if (guidanceMessage && guidanceMessage.trim() !== "") {
-            messages.push({ role: "system", content: guidanceMessage });
+        // Add guidanceMessage if valid
+        if (validGuidanceMessage) {
+            messages.push({ role: "system", content: validGuidanceMessage });
         }
 
+        // Add user message to the messages array
         messages.push({ role: "user", content: userMessage });
 
+        // Make the API call to OpenAI
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
             model: "gpt-4",
             messages,
