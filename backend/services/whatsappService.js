@@ -1,6 +1,8 @@
 import axios from 'axios';
 import { getOpenAIResponse } from './openAIService.js';
 import { getSystemMessages } from '../models/messageModel.js';
+import { isValidEmail, isValidPhone } from '../utils/validators.js';
+
 
 const userSessions = {};
 
