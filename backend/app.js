@@ -20,7 +20,7 @@ app.use('/webhook', webhookRoutes);
 app.use('/auth', authRoutes);
 
 app.get('/', (req, res) => {
-    res.send('Backend is running');
+    res.send('Backend is running on');
 });
 
 app.listen(PORT, () => console.log(`🚀 Server is running on http://localhost:${PORT}`));
