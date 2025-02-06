@@ -136,7 +136,139 @@ export const verifyWebhookToken = (token) => {
     return token === process.env.WEBHOOK_VERIFY_TOKEN;
 };
 
-export const handleIncomingMessage = async (req,res) => {
+function formatPhoneNumber(phoneNumber) {
+    // إزالة أي مسافات أو رموز غير ضرورية
+    let cleanedNumber = phoneNumber.replace(/\D/g, "");
+
+    // التأكد من أن الرقم يبدأ بـ "+"
+    if (!cleanedNumber.startsWith("+")) {
+        cleanedNumber = `+${cleanedNumber}`;
+    }
+    // إضافة مسافة بعد رمز الدولة (أول 3 أو 4 أرقام)
+    const match = cleanedNumber.match(/^\+(\d{1,4})(\d+)$/);
+    if (match) {
+        return `+${match[1]} ${match[2]}`; // إضافة المسافة بعد كود الدولة
+    }
+    return cleanedNumber; // إرجاع الرقم إذا لم ينطبق النمط
+}
+const sendOrderSummary = async (to, session) => {
+    try {
+        let summary = `✅ *Order Summary:*\n\n`;
+        summary += `🔹 *Name:* ${session.data.name}\n`;
+        summary += `📞 *Phone Number:* ${session.data.phone}\n`;
+        summary += `📧 *Email:* ${session.data.email}\n`;
+        summary += `📍 *Address:* ${session.data.address}\n`;
+        summary += `🌆 *City:* ${session.data.city}\n`;
+        summary += `🏠 *Street:* ${session.data.street}\n`;
+        summary += `🏢 *Building Name:* ${session.data.building_name}\n`;
+        summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;
+        summary += `📍 *Latitude:* ${session.data.latitude}\n`;
+        summary += `📍 *Longitude:* ${session.data.longitude}\n`;
+        summary += `📦 *Quantity:* ${session.data.quantity}\n\n`;
+        summary += `Is the information correct? Please confirm below:`;
+
+        await axios.post(process.env.WHATSAPP_API_URL, {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: to,
+            type: "interactive",
+            interactive: {
+                type: "button",
+                body: {
+                    text: summary
+                },
+                action: {
+                    buttons: [
+                        { type: "reply", reply: { id: "yes_confirm", title: "Yes" } },
+                        { type: "reply", reply: { id: "no_correct", title: "No" } }
+                    ]
+                }
+            }
+        }, {
+            headers: {
+                "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                "Content-Type": "application/json"
+            }
+        });
+    } catch (error) {
+        console.error("❌ Failed to send order summary:", error.response?.data || error.message);
+    }
+};
+const sendUpdatedSummary = async (to, session) => {
+    try {
+        let summary = `✅ *Updated Order Summary:*\n\n`;
+        summary += `🔹 *Name:* ${session.data.name}\n`;
+        summary += `📞 *Phone Number:* ${session.data.phone}\n`;
+        summary += `📧 *Email:* ${session.data.email}\n`;
+        summary += `📍 *Address:* ${session.data.address}\n`;
+        summary += `🌆 *City:* ${session.data.city}\n`;
+        summary += `🏠 *Street:* ${session.data.street}\n`;
+        summary += `🏢 *Building Name:* ${session.data.building_name}\n`;
+        summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;
+        summary += `📍 *Latitude:* ${session.data.latitude}\n`;
+        summary += `📍 *Longitude:* ${session.data.longitude}\n`;
+        summary += `📦 *Quantity:* ${session.data.quantity}\n\n`;
+        summary += `Is the information correct? Please confirm below:`;
+
+        await axios.post(process.env.WHATSAPP_API_URL, {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: to,
+            type: "interactive",
+            interactive: {
+                type: "button",
+                body: {
+                    text: summary
+                },
+                action: {
+                    buttons: [
+                        { type: "reply", reply: { id: "yes_confirm", title: "✅ Yes" } },
+                        { type: "reply", reply: { id: "no_correct", title: "❌ No" } }
+                    ]
+                }
+            }
+        }, {
+            headers: {
+                "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                "Content-Type": "application/json"
+            }
+        });
+    } catch (error) {
+        console.error("❌ Failed to send updated order summary:", error.response?.data || error.message);
+    }
+};
+const sendCitySelection = async (to) => {
+    try {
+        await axios.post(process.env.WHATSAPP_API_URL, {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: to,
+            type: "interactive",
+            interactive: {
+                type: "button",  // Use "button" for quick replies
+                body: {
+                    text: "🌆 Please select your city:"
+                },
+                action: {
+                    buttons: [
+                        { type: "reply", reply: { id: "abu_dhabi", title: "Abu Dhabi" } },
+                        { type: "reply", reply: { id: "dubai", title: "Dubai" } },
+                        { type: "reply", reply: { id: "sharjah", title: "Sharjah" } }
+                    ]
+                }
+            }
+        }, {
+            headers: {
+                "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                "Content-Type": "application/json"
+            }
+        });
+    } catch (error) {
+        console.error("❌ Failed to send city selection:", error.response?.data || error.message);
+    }
+};
+
+export const handleIncomingMessage = async (req, res) => {
     console.log('Incoming Webhook Data:', req.body); // Log the incoming data for debugging
 
     const entry = req.body.entry?.[0];
