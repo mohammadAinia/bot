@@ -1,8 +1,17 @@
 import jwt from 'jsonwebtoken';
 
 const SECRET_KEY = process.env.SECRET_KEY || 'LoothTech12345';
+const ADMIN_USERNAME = 'admin';
+const ADMIN_PASSWORD = 'admin123';
 
-const authenticateToken = (req, res, next) => {
+export const adminLogin = (username, password) => {
+    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+        return jwt.sign({ username }, SECRET_KEY, { expiresIn: '1h' });
+    }
+    return null;
+};
+
+export const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
@@ -14,5 +23,3 @@ const authenticateToken = (req, res, next) => {
         next();
     });
 };
-
-export default authenticateToken;

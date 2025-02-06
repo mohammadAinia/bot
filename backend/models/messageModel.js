@@ -61,9 +61,15 @@ For more details, visit: [Lootah Biofuels Website](https://www.lootahbiofuels.co
 let guidanceMessage = "";
 const defaultWelcomeMessage = `\ud83c\udf1f Welcome to *Lootah Biofuels Refining Company* \ud83c\udf1f\n\nYou can ask any question directly, and I will assist you. If you need further help, choose from the options below.`;
 
-const getMessages = () => ({ systemMessage, guidanceMessage, defaultWelcomeMessage });
-const updateSystemMessage = (newMessage) => (systemMessage = newMessage);
-const updateGuidanceMessage = (newMessage) => (guidanceMessage = newMessage);
-const updateWelcomeMessage = (newMessage) => (defaultWelcomeMessage = newMessage);
+export const getSystemMessages = () => {
+    return { systemMessage, guidanceMessage, defaultWelcomeMessage };
+};
 
-export { getMessages, updateSystemMessage, updateGuidanceMessage, updateWelcomeMessage };
+export const updateSystemMessages = (newSystemMessage, newGuidance) => {
+    if (newSystemMessage) systemMessage = newSystemMessage;
+    if (newGuidance) guidanceMessage = newGuidance;
+};
+
+export const updateWelcomeMessage = (newWelcomeMessage) => {
+    if (newWelcomeMessage) defaultWelcomeMessage = newWelcomeMessage;
+};

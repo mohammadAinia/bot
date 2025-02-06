@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const getOpenAIResponse = async (userMessage, systemMessage, guidanceMessage) => {
+export const getOpenAIResponse = async (userMessage, systemMessage, guidanceMessage) => {
     try {
         const messages = [
             { role: "system", content: systemMessage },
@@ -30,5 +30,3 @@ const getOpenAIResponse = async (userMessage, systemMessage, guidanceMessage) =>
         return "❌ Sorry, an error occurred while processing your request.";
     }
 };
-
-export { getOpenAIResponse };
