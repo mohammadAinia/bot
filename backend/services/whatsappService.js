@@ -2,6 +2,7 @@ import axios from 'axios';
 import { getOpenAIResponse } from './openAIService.js';
 import { getSystemMessages } from '../models/messageModel.js';
 import { isValidEmail, isValidPhone } from '../utils/validators.js';
+import { formatPhoneNumber, convertArabicNumbers } from '../utils/helpers.js';
 
 
 const userSessions = {};
@@ -138,21 +139,21 @@ export const verifyWebhookToken = (token) => {
     return token === process.env.WEBHOOK_VERIFY_TOKEN;
 };
 
-function formatPhoneNumber(phoneNumber) {
-    // إزالة أي مسافات أو رموز غير ضرورية
-    let cleanedNumber = phoneNumber.replace(/\D/g, "");
+// function formatPhoneNumber(phoneNumber) {
+//     // إزالة أي مسافات أو رموز غير ضرورية
+//     let cleanedNumber = phoneNumber.replace(/\D/g, "");
 
-    // التأكد من أن الرقم يبدأ بـ "+"
-    if (!cleanedNumber.startsWith("+")) {
-        cleanedNumber = `+${cleanedNumber}`;
-    }
-    // إضافة مسافة بعد رمز الدولة (أول 3 أو 4 أرقام)
-    const match = cleanedNumber.match(/^\+(\d{1,4})(\d+)$/);
-    if (match) {
-        return `+${match[1]} ${match[2]}`; // إضافة المسافة بعد كود الدولة
-    }
-    return cleanedNumber; // إرجاع الرقم إذا لم ينطبق النمط
-}
+//     // التأكد من أن الرقم يبدأ بـ "+"
+//     if (!cleanedNumber.startsWith("+")) {
+//         cleanedNumber = `+${cleanedNumber}`;
+//     }
+//     // إضافة مسافة بعد رمز الدولة (أول 3 أو 4 أرقام)
+//     const match = cleanedNumber.match(/^\+(\d{1,4})(\d+)$/);
+//     if (match) {
+//         return `+${match[1]} ${match[2]}`; // إضافة المسافة بعد كود الدولة
+//     }
+//     return cleanedNumber; // إرجاع الرقم إذا لم ينطبق النمط
+// }
 const sendOrderSummary = async (to, session) => {
     try {
         let summary = `✅ *Order Summary:*\n\n`;
