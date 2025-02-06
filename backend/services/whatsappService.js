@@ -5,7 +5,7 @@ import { getSystemMessages } from '../models/messageModel.js';
 const userSessions = {};
 
 export const handleIncomingMessage = async (body) => {
-    console.log('Incoming Webhook Data:', req.body); // Log the incoming data for debugging
+    console.log('Incoming Webhook Data:', body); // Log the incoming data for debugging
 
     const entry = req.body.entry?.[0];
     const changes = entry?.changes?.[0];
