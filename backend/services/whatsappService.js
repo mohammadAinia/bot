@@ -7,7 +7,7 @@ const userSessions = {};
 export const handleIncomingMessage = async (body) => {
     console.log('Incoming Webhook Data:', body); // Log the incoming data for debugging
 
-    const entry = req.body.entry?.[0];
+    const entry = body.entry?.[0];
     const changes = entry?.changes?.[0];
     const value = changes?.value;
     const messages = value?.messages;
