@@ -2,7 +2,7 @@ import { handleIncomingMessage } from '../services/whatsappService.js';
 
 export const handleWebhook = async (req, res) => {
     try {
-        await handleIncomingMessage(req.body);
+        await handleIncomingMessage(req,res);
         res.sendStatus(200);
     } catch (error) {
         console.error('❌ Error:', error);
