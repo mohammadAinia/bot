@@ -514,11 +514,20 @@ async function askForNextMissingField(session, from, missingFields) {
         console.error(`❌ No prompt found for missing field: ${nextMissingField}`);
     }
 }
+async function isQuestion(text) {
+    const prompt = `
+        Determine if the following text is a question. Respond with "true" if it is a question, otherwise respond with "false".
+        Text: ${text}
+    `;
+
+    const aiResponse = await getOpenAIResponse(prompt);
+    return aiResponse.trim().toLowerCase() === "true";
+}
 
 
 app.post('/webhook', async (req, res) => {
     try {
-        console.log('Incoming Webhook Data:', req.body); // Log the incoming data for debugging
+        console.log('Incoming Webhook Data:', req.body);
 
         const entry = req.body.entry?.[0];
         const changes = entry?.changes?.[0];
@@ -539,13 +548,7 @@ app.post('/webhook', async (req, res) => {
 
         // Initialize user session if it doesn't exist
         if (!userSessions[from]) {
-            // Create the session and immediately deduce the phone number from the "from" field.
-            userSessions[from] = {
-                step: STATES.WELCOME,
-                data: {
-                    phone: formatPhoneNumber(from) // Deduce the phone number automatically
-                }
-            };
+            userSessions[from] = { step: STATES.WELCOME, data: { phone: formatPhoneNumber(from) } };
 
             // Send welcome message with options
             await sendInteractiveButtons(from, defaultWelcomeMessage, [
@@ -557,30 +560,52 @@ app.post('/webhook', async (req, res) => {
 
         const session = userSessions[from];
 
-        if (!session.data.phone) {
-            session.data.phone = formatPhoneNumber(from)
-        }
+        // Check if the user is asking a question
+        const isUserAskingQuestion = await isQuestion(textRaw);
 
-        // If the conversation isn’t in the welcome stage and the text includes "question", answer using ChatGPT.
-        if (session.step !== STATES.WELCOME && textRaw.toLowerCase().includes("question")) {
+        if (isUserAskingQuestion) {
+            // Answer the question using ChatGPT
             const aiResponse = await getOpenAIResponse(textRaw);
+
+            // Send the answer to the user
             await sendToWhatsApp(from, aiResponse);
+
+            // Remind the user to continue with the request
+            const missingFields = getMissingFields(session.data);
+            if (missingFields.length > 0) {
+                const nextMissingField = missingFields[0];
+                const fieldPromptMap = {
+                    name: "🔹 Please provide your full name.",
+                    phone: "📞 Please provide your phone number.",
+                    email: "📧 Please provide your email address.",
+                    address: "📍 Please provide your full address.",
+                    city: "🌆 Please provide your city.",
+                    street: "🏠 Please provide your street name.",
+                    building_name: "🏢 Please provide your building name.",
+                    flat_no: "🏠 Please provide your flat number.",
+                    latitude: "📍 Please share your location using WhatsApp's location feature.",
+                    longitude: "📍 Please share your location using WhatsApp's location feature.",
+                    quantity: "📦 Please provide the quantity (in liters) of the product."
+                };
+
+                if (fieldPromptMap[nextMissingField]) {
+                    await sendToWhatsApp(from, `Let’s go back to complete the request. ${fieldPromptMap[nextMissingField]}`);
+                }
+            }
+
             return res.sendStatus(200);
         }
 
         // Handle messages based on the current state
         switch (session.step) {
-
             case STATES.WELCOME:
                 if (message.type === "text") {
                     const extractedData = await extractInformationFromText(textRaw);
 
-                    // Merge extracted data into the session (phone remains unchanged)
+                    // Merge extracted data into the session
                     session.data = { ...session.data, ...extractedData };
 
-                    session.data.phone = formatPhoneNumber(from);
-
-                    // Check for missing fields (phone is no longer required)
+                    // Check for missing fields
                     const missingFields = getMissingFields(session.data);
 
                     if (missingFields.length === 0) {
