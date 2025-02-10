@@ -308,7 +308,6 @@ const isValidPhone = (phone) => {
     return regex.test(phone);
 };
 
-
 const sendCitySelection = async (to) => {
     try {
         await axios.post(process.env.WHATSAPP_API_URL, {
@@ -317,7 +316,7 @@ const sendCitySelection = async (to) => {
             to: to,
             type: "interactive",
             interactive: {
-                type: "button",  // Use "button" for quick replies
+                type: "button",
                 body: {
                     text: "🌆 Please select your city:"
                 },
@@ -384,24 +383,17 @@ const sendOrderSummary = async (to, session) => {
     }
 };
 
-let dataStore = [];  // Array to temporarily store data
-
 function formatPhoneNumber(phoneNumber) {
-    // إزالة أي مسافات أو رموز غير ضرورية
     let cleanedNumber = phoneNumber.replace(/\D/g, "");
-
-    // التأكد من أن الرقم يبدأ بـ "+"
     if (!cleanedNumber.startsWith("+")) {
         cleanedNumber = `+${cleanedNumber}`;
     }
-    // إضافة مسافة بعد رمز الدولة (أول 3 أو 4 أرقام)
     const match = cleanedNumber.match(/^\+(\d{1,4})(\d+)$/);
     if (match) {
-        return `+${match[1]} ${match[2]}`; // إضافة المسافة بعد كود الدولة
+        return `+${match[1]} ${match[2]}`;
     }
-    return cleanedNumber; // إرجاع الرقم إذا لم ينطبق النمط
+    return cleanedNumber;
 }
-
 
 const STATES = {
     WELCOME: 0,
@@ -419,7 +411,7 @@ const STATES = {
     LONGITUDE: 13,
     QUANTITY: 6,
     CONFIRMATION: 5,
-    MODIFY: "modify"  // New state for modification
+    MODIFY: "modify"
 };
 
 const sendUpdatedSummary = async (to, session) => {
@@ -486,14 +478,13 @@ const sendInteractiveButtons = async (to, message, buttons) => {
 };
 
 function extractQuantity(text) {
-    const match = text.match(/\b\d+\b/); // Extracts only the first numeric value
-    return match ? match[0] : null; // Returns the number or null if not found
+    const match = text.match(/\b\d+\b/);
+    return match ? match[0] : null;
 }
 
 async function extractInformationFromText(text) {
-    // Extract quantity directly from the text
     const extractedData = {
-        quantity: extractQuantity(text) // Use extractQuantity function
+        quantity: extractQuantity(text)
     };
 
     const prompt = `
@@ -520,13 +511,12 @@ async function extractInformationFromText(text) {
 
     try {
         const aiExtractedData = JSON.parse(aiResponse);
-        return { ...aiExtractedData, ...extractedData }; // Merge AI-extracted data with manually extracted quantity
+        return { ...aiExtractedData, ...extractedData };
     } catch (e) {
         console.error("❌ Failed to parse AI response as JSON:", aiResponse);
-        return extractedData; // Return at least the manually extracted data
+        return extractedData;
     }
 }
-
 
 function getMissingFields(sessionData) {
     const requiredFields = [
@@ -545,13 +535,10 @@ function getMissingFields(sessionData) {
                 missingFields.push(field);
             }
         }
-        // For non-string values (like numbers), assume they are valid if they are not null or undefined.
     });
 
     return missingFields;
 }
-
-
 
 async function askForNextMissingField(session, from, missingFields) {
     if (missingFields.length === 0) {
@@ -559,10 +546,9 @@ async function askForNextMissingField(session, from, missingFields) {
         return await sendOrderSummary(from, session);
     }
 
-    const nextMissingField = missingFields[0]; // Get the first missing field
-    session.step = `ASK_${nextMissingField.toUpperCase()}`; // Set the step dynamically
+    const nextMissingField = missingFields[0];
+    session.step = `ASK_${nextMissingField.toUpperCase()}`;
 
-    // Define prompts for each missing field
     const fieldPromptMap = {
         name: "🔹 Please provide your full name.",
         phone: "📞 Please provide your phone number.",
@@ -583,6 +569,7 @@ async function askForNextMissingField(session, from, missingFields) {
         console.error(`❌ No prompt found for missing field: ${nextMissingField}`);
     }
 }
+
 async function isQuestion(text) {
     const prompt = `
         Determine if the following text is a question. Respond with "true" if it is a question, otherwise respond with "false".
@@ -648,7 +635,7 @@ app.post('/webhook', async (req, res) => {
             session.step = `ASK_${nextMissingField.toUpperCase()}`;
 
             // Send the AI response and prompt for the next missing field
-            await sendToWhatsApp(from, `${aiResponse}\n\nLet’s go back to complete the request. Please provide your ${nextMissingField}.`);
+            await sendToWhatsApp(from, `${aiResponse}\n\nPlease provide your ${nextMissingField}.`);
         }
 
         res.sendStatus(200);
@@ -657,71 +644,448 @@ app.post('/webhook', async (req, res) => {
         res.sendStatus(500);
     }
 });
+// const userSessions = {};
 
-app.post('/webhook', async (req, res) => {
-    try {
-        console.log('Incoming Webhook Data:', req.body);
+// const getOpenAIResponse = async (userMessage, session = null) => {
+//     try {
+//         const messages = [
+//             {
+//                 role: "system",
+//                 content: `
+//                     You are a helpful assistant for Lootah Biofuels. Your task is to guide users through the process of submitting a request for Used Cooking Oil (UCO) collection.
 
-        const entry = req.body.entry?.[0];
-        const changes = entry?.changes?.[0];
-        const value = changes?.value;
-        const messages = value?.messages;
+//                     The user needs to provide the following information:
+//                     - Name
+//                     - Phone Number
+//                     - Email Address
+//                     - Full Address
+//                     - City (e.g., Dubai, Sharjah, Abu Dhabi)
+//                     - Street Name
+//                     - Building Name
+//                     - Flat Number
+//                     - Location (latitude and longitude)
+//                     - Quantity of oil (in liters)
 
-        if (!messages || messages.length === 0) {
-            console.log('No messages received, returning early.');
-            return res.sendStatus(200);
-        }
+//                     If the user provides any of this information, extract it and store it. If the user asks a question, answer it politely and then guide them back to the request process.
 
-        const message = messages[0];
-        const from = message.from;
-        const textRaw = message.text?.body || "";
-        const text = textRaw.toLowerCase().trim();
+//                     Always respond in a friendly and professional tone.
+//                 `
+//             }
+//         ];
 
-        console.log(`📩 New message from ${from}: ${text}`);
+//         // Include session data if available
+//         if (session) {
+//             messages.push({
+//                 role: "system",
+//                 content: `Current session data: ${JSON.stringify(session.data)}`
+//             });
+//         }
 
-        // Initialize user session if it doesn't exist
-        if (!userSessions[from]) {
-            userSessions[from] = { step: STATES.WELCOME, data: { phone: formatPhoneNumber(from) } };
+//         // Add user message
+//         messages.push({ role: "user", content: userMessage });
 
-            // Send welcome message with options
-            await sendInteractiveButtons(from, defaultWelcomeMessage, [
-                { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
-                { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
-            ]);
-            return res.sendStatus(200);
-        }
+//         // Send request to OpenAI API
+//         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+//             model: "gpt-4",
+//             messages,
+//             max_tokens: 150,
+//             temperature: 0.7
+//         }, {
+//             headers: {
+//                 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+//                 'Content-Type': 'application/json'
+//             }
+//         });
 
-        const session = userSessions[from];
+//         return response.data.choices[0].message.content.trim();
+//     } catch (error) {
+//         console.error('❌ Error with OpenAI:', error.response?.data || error.message);
+//         return "❌ Sorry, an error occurred while processing your request.";
+//     }
+// };
 
-        // Use ChatGPT to handle the message
-        const aiResponse = await getOpenAIResponse(textRaw, session);
+// const sendToWhatsApp = async (to, message) => {
+//     try {
+//         await axios.post(process.env.WHATSAPP_API_URL, {
+//             messaging_product: 'whatsapp',
+//             recipient_type: 'individual',
+//             to: to,
+//             type: 'text',
+//             text: { body: message }
+//         }, {
+//             headers: {
+//                 'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+//                 'Content-Type': 'application/json'
+//             }
+//         });
+//     } catch (error) {
+//         console.error('❌ Failed to send message to WhatsApp:', error.response?.data || error.message);
+//     }
+// };
 
-        // Extract information from the user's message
-        const extractedData = await extractInformationFromText(textRaw);
-        session.data = { ...session.data, ...extractedData };
+// function convertArabicNumbers(input) {
+//     return input.replace(/[٠١٢٣٤٥٦٧٨٩]/g, d => "0123456789"["٠١٢٣٤٥٦٧٨٩".indexOf(d)]);
+// }
 
-        // Check for missing fields
-        const missingFields = getMissingFields(session.data);
+// const isValidEmail = (email) => {
+//     const regex = /^\S+@\S+\.\S+$/;
+//     return regex.test(email);
+// };
 
-        if (missingFields.length === 0) {
-            // If no fields are missing, proceed to confirmation
-            session.step = STATES.CONFIRMATION;
-            await sendOrderSummary(from, session);
-        } else {
-            // Ask for the next missing field
-            const nextMissingField = missingFields[0];
-            session.step = `ASK_${nextMissingField.toUpperCase()}`;
+// const isValidPhone = (phone) => {
+//     const regex = /^\+971(5\d{1}\s?\d{3}\s?\d{3}|\s?4\d{2}\s?\d{4})$/;
+//     return regex.test(phone);
+// };
 
-            // Send the AI response and prompt for the next missing field
-            await sendToWhatsApp(from, `${aiResponse}\n\nLet’s go back to complete the request. Please provide your ${nextMissingField}.`);
-        }
 
-        res.sendStatus(200);
-    } catch (error) {
-        console.error('❌ Error:', error.response?.data || error.message || error);
-        res.sendStatus(500);
-    }
-});
+// const sendCitySelection = async (to) => {
+//     try {
+//         await axios.post(process.env.WHATSAPP_API_URL, {
+//             messaging_product: "whatsapp",
+//             recipient_type: "individual",
+//             to: to,
+//             type: "interactive",
+//             interactive: {
+//                 type: "button",  // Use "button" for quick replies
+//                 body: {
+//                     text: "🌆 Please select your city:"
+//                 },
+//                 action: {
+//                     buttons: [
+//                         { type: "reply", reply: { id: "abu_dhabi", title: "Abu Dhabi" } },
+//                         { type: "reply", reply: { id: "dubai", title: "Dubai" } },
+//                         { type: "reply", reply: { id: "sharjah", title: "Sharjah" } }
+//                     ]
+//                 }
+//             }
+//         }, {
+//             headers: {
+//                 "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+//                 "Content-Type": "application/json"
+//             }
+//         });
+//     } catch (error) {
+//         console.error("❌ Failed to send city selection:", error.response?.data || error.message);
+//     }
+// };
+
+// const sendOrderSummary = async (to, session) => {
+//     try {
+//         let summary = `✅ *Order Summary:*\n\n`;
+//         summary += `🔹 *Name:* ${session.data.name}\n`;
+//         summary += `📞 *Phone Number:* ${session.data.phone}\n`;
+//         summary += `📧 *Email:* ${session.data.email}\n`;
+//         summary += `📍 *Address:* ${session.data.address}\n`;
+//         summary += `🌆 *City:* ${session.data.city}\n`;
+//         summary += `🏠 *Street:* ${session.data.street}\n`;
+//         summary += `🏢 *Building Name:* ${session.data.building_name}\n`;
+//         summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;
+//         summary += `📍 *Latitude:* ${session.data.latitude}\n`;
+//         summary += `📍 *Longitude:* ${session.data.longitude}\n`;
+//         summary += `📦 *Quantity:* ${session.data.quantity}\n\n`;
+//         summary += `Is the information correct? Please confirm below:`;
+
+//         await axios.post(process.env.WHATSAPP_API_URL, {
+//             messaging_product: "whatsapp",
+//             recipient_type: "individual",
+//             to: to,
+//             type: "interactive",
+//             interactive: {
+//                 type: "button",
+//                 body: {
+//                     text: summary
+//                 },
+//                 action: {
+//                     buttons: [
+//                         { type: "reply", reply: { id: "yes_confirm", title: "Yes" } },
+//                         { type: "reply", reply: { id: "no_correct", title: "No" } }
+//                     ]
+//                 }
+//             }
+//         }, {
+//             headers: {
+//                 "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+//                 "Content-Type": "application/json"
+//             }
+//         });
+//     } catch (error) {
+//         console.error("❌ Failed to send order summary:", error.response?.data || error.message);
+//     }
+// };
+
+// let dataStore = [];  // Array to temporarily store data
+
+// function formatPhoneNumber(phoneNumber) {
+//     // إزالة أي مسافات أو رموز غير ضرورية
+//     let cleanedNumber = phoneNumber.replace(/\D/g, "");
+
+//     // التأكد من أن الرقم يبدأ بـ "+"
+//     if (!cleanedNumber.startsWith("+")) {
+//         cleanedNumber = `+${cleanedNumber}`;
+//     }
+//     // إضافة مسافة بعد رمز الدولة (أول 3 أو 4 أرقام)
+//     const match = cleanedNumber.match(/^\+(\d{1,4})(\d+)$/);
+//     if (match) {
+//         return `+${match[1]} ${match[2]}`; // إضافة المسافة بعد كود الدولة
+//     }
+//     return cleanedNumber; // إرجاع الرقم إذا لم ينطبق النمط
+// }
+
+
+// const STATES = {
+//     WELCOME: 0,
+//     FAQ: "faq",
+//     NAME: 1,
+//     PHONE_CONFIRM: "phone_confirm",
+//     PHONE_INPUT: "phone_input",
+//     EMAIL: 3,
+//     ADDRESS: 4,
+//     CITY: 7,
+//     STREET: 9,
+//     BUILDING_NAME: 10,
+//     FLAT_NO: 11,
+//     LATITUDE: 12,
+//     LONGITUDE: 13,
+//     QUANTITY: 6,
+//     CONFIRMATION: 5,
+//     MODIFY: "modify"  // New state for modification
+// };
+
+// const sendUpdatedSummary = async (to, session) => {
+//     try {
+//         let summary = `✅ *Updated Order Summary:*\n\n`;
+//         summary += `🔹 *Name:* ${session.data.name}\n`;
+//         summary += `📞 *Phone Number:* ${session.data.phone}\n`;
+//         summary += `📧 *Email:* ${session.data.email}\n`;
+//         summary += `📍 *Address:* ${session.data.address}\n`;
+//         summary += `🌆 *City:* ${session.data.city}\n`;
+//         summary += `🏠 *Street:* ${session.data.street}\n`;
+//         summary += `🏢 *Building Name:* ${session.data.building_name}\n`;
+//         summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;
+//         summary += `📍 *Latitude:* ${session.data.latitude}\n`;
+//         summary += `📍 *Longitude:* ${session.data.longitude}\n`;
+//         summary += `📦 *Quantity:* ${session.data.quantity}\n\n`;
+//         summary += `Is the information correct? Please confirm below:`;
+
+//         await axios.post(process.env.WHATSAPP_API_URL, {
+//             messaging_product: "whatsapp",
+//             recipient_type: "individual",
+//             to: to,
+//             type: "interactive",
+//             interactive: {
+//                 type: "button",
+//                 body: {
+//                     text: summary
+//                 },
+//                 action: {
+//                     buttons: [
+//                         { type: "reply", reply: { id: "yes_confirm", title: "✅ Yes" } },
+//                         { type: "reply", reply: { id: "no_correct", title: "❌ No" } }
+//                     ]
+//                 }
+//             }
+//         }, {
+//             headers: {
+//                 "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+//                 "Content-Type": "application/json"
+//             }
+//         });
+//     } catch (error) {
+//         console.error("❌ Failed to send updated order summary:", error.response?.data || error.message);
+//     }
+// };
+
+// const sendInteractiveButtons = async (to, message, buttons) => {
+//     await axios.post(process.env.WHATSAPP_API_URL, {
+//         messaging_product: "whatsapp",
+//         recipient_type: "individual",
+//         to: to,
+//         type: "interactive",
+//         interactive: {
+//             type: "button",
+//             body: { text: message },
+//             action: { buttons }
+//         }
+//     }, {
+//         headers: {
+//             "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+//             "Content-Type": "application/json"
+//         }
+//     });
+// };
+
+// function extractQuantity(text) {
+//     const match = text.match(/\b\d+\b/); // Extracts only the first numeric value
+//     return match ? match[0] : null; // Returns the number or null if not found
+// }
+
+// async function extractInformationFromText(text) {
+//     // Extract quantity directly from the text
+//     const extractedData = {
+//         quantity: extractQuantity(text) // Use extractQuantity function
+//     };
+
+//     const prompt = `
+//         Extract the following information from the text and return a valid JSON object:
+//         {
+//           "name": "The user's full name or null",
+//           "phone": "The user's phone number or null",
+//           "email": "The user's email address or null",
+//           "address": "The user's full address or null",
+//           "city": "The user's city (e.g., Dubai, Sharjah, Abu Dhabi) or null",
+//           "street": "The user's street name or null",
+//           "building_name": "The user's building name or null",
+//           "flat_no": "The user's flat number or null",
+//           "latitude": "The user's latitude or null",
+//           "longitude": "The user's longitude or null"
+//         }
+        
+//         If any information is missing, assign null to that field.
+
+//         Text: ${text}
+//     `;
+
+//     const aiResponse = await getOpenAIResponse(prompt);
+
+//     try {
+//         const aiExtractedData = JSON.parse(aiResponse);
+//         return { ...aiExtractedData, ...extractedData }; // Merge AI-extracted data with manually extracted quantity
+//     } catch (e) {
+//         console.error("❌ Failed to parse AI response as JSON:", aiResponse);
+//         return extractedData; // Return at least the manually extracted data
+//     }
+// }
+
+
+// function getMissingFields(sessionData) {
+//     const requiredFields = [
+//         'name', 'email', 'address', 'city',
+//         'street', 'building_name', 'flat_no', 'latitude',
+//         'longitude', 'quantity'
+//     ];
+//     const missingFields = [];
+
+//     requiredFields.forEach(field => {
+//         const value = sessionData[field];
+//         if (value === null || value === undefined) {
+//             missingFields.push(field);
+//         } else if (typeof value === "string") {
+//             if (value.trim() === "" || value.trim().toLowerCase() === "null") {
+//                 missingFields.push(field);
+//             }
+//         }
+//         // For non-string values (like numbers), assume they are valid if they are not null or undefined.
+//     });
+
+//     return missingFields;
+// }
+
+
+
+// async function askForNextMissingField(session, from, missingFields) {
+//     if (missingFields.length === 0) {
+//         session.step = STATES.CONFIRMATION;
+//         return await sendOrderSummary(from, session);
+//     }
+
+//     const nextMissingField = missingFields[0]; // Get the first missing field
+//     session.step = `ASK_${nextMissingField.toUpperCase()}`; // Set the step dynamically
+
+//     // Define prompts for each missing field
+//     const fieldPromptMap = {
+//         name: "🔹 Please provide your full name.",
+//         phone: "📞 Please provide your phone number.",
+//         email: "📧 Please provide your email address.",
+//         address: "📍 Please provide your full address.",
+//         city: "🌆 Please provide your city.",
+//         street: "🏠 Please provide your street name.",
+//         building_name: "🏢 Please provide your building name.",
+//         flat_no: "🏠 Please provide your flat number.",
+//         latitude: "📍 Please share your location using WhatsApp's location feature.",
+//         longitude: "📍 Please share your location using WhatsApp's location feature.",
+//         quantity: "📦 Please provide the quantity (in liters) of the product."
+//     };
+
+//     if (fieldPromptMap[nextMissingField]) {
+//         await sendToWhatsApp(from, fieldPromptMap[nextMissingField]);
+//     } else {
+//         console.error(`❌ No prompt found for missing field: ${nextMissingField}`);
+//     }
+// }
+// async function isQuestion(text) {
+//     const prompt = `
+//         Determine if the following text is a question. Respond with "true" if it is a question, otherwise respond with "false".
+//         Text: ${text}
+//     `;
+
+//     const aiResponse = await getOpenAIResponse(prompt);
+//     return aiResponse.trim().toLowerCase() === "true";
+// }
+
+// app.post('/webhook', async (req, res) => {
+//     try {
+//         console.log('Incoming Webhook Data:', req.body);
+
+//         const entry = req.body.entry?.[0];
+//         const changes = entry?.changes?.[0];
+//         const value = changes?.value;
+//         const messages = value?.messages;
+
+//         if (!messages || messages.length === 0) {
+//             console.log('No messages received, returning early.');
+//             return res.sendStatus(200);
+//         }
+
+//         const message = messages[0];
+//         const from = message.from;
+//         const textRaw = message.text?.body || "";
+//         const text = textRaw.toLowerCase().trim();
+
+//         console.log(`📩 New message from ${from}: ${text}`);
+
+//         // Initialize user session if it doesn't exist
+//         if (!userSessions[from]) {
+//             userSessions[from] = { step: STATES.WELCOME, data: { phone: formatPhoneNumber(from) } };
+
+//             // Send welcome message with options
+//             await sendInteractiveButtons(from, defaultWelcomeMessage, [
+//                 { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
+//                 { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
+//             ]);
+//             return res.sendStatus(200);
+//         }
+
+//         const session = userSessions[from];
+
+//         // Use ChatGPT to handle the message
+//         const aiResponse = await getOpenAIResponse(textRaw, session);
+
+//         // Extract information from the user's message
+//         const extractedData = await extractInformationFromText(textRaw);
+//         session.data = { ...session.data, ...extractedData };
+
+//         // Check for missing fields
+//         const missingFields = getMissingFields(session.data);
+
+//         if (missingFields.length === 0) {
+//             // If no fields are missing, proceed to confirmation
+//             session.step = STATES.CONFIRMATION;
+//             await sendOrderSummary(from, session);
+//         } else {
+//             // Ask for the next missing field
+//             const nextMissingField = missingFields[0];
+//             session.step = `ASK_${nextMissingField.toUpperCase()}`;
+
+//             // Send the AI response and prompt for the next missing field
+//             await sendToWhatsApp(from, `${aiResponse}\n\nPlease provide your ${nextMissingField}.`);
+//         }
+
+//         res.sendStatus(200);
+//     } catch (error) {
+//         console.error('❌ Error:', error.response?.data || error.message || error);
+//         res.sendStatus(500);
+//     }
+// });
 
 // app.post('/webhook', async (req, res) => {
 //     try {
