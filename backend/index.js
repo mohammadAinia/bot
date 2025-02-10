@@ -222,9 +222,12 @@ const getOpenAIResponse = async (userMessage, session = null) => {
         const messages = [
             {
                 role: "system",
+                content: systemMessage // Include company information
+            },
+            {
+                role: "system",
                 content: `
                     You are a helpful assistant for Lootah Biofuels. Your task is to guide users through the process of submitting a request for Used Cooking Oil (UCO) collection.
-
                     The user needs to provide the following information:
                     - Name
                     - Phone Number
@@ -236,9 +239,7 @@ const getOpenAIResponse = async (userMessage, session = null) => {
                     - Flat Number
                     - Location (latitude and longitude)
                     - Quantity of oil (in liters)
-
                     If the user provides any of this information, extract it and store it. If the user asks a question, answer it politely and then guide them back to the request process.
-
                     Always respond in a friendly and professional tone.
                 `
             }
@@ -512,9 +513,9 @@ async function extractInformationFromText(text) {
     try {
         const aiExtractedData = JSON.parse(aiResponse);
         return { ...aiExtractedData, ...extractedData };
-    } catch (e) {
-        console.error("❌ Failed to parse AI response as JSON:", aiResponse);
-        return extractedData;
+    } catch (error) {
+        console.error("❌ AI response parsing failed:", aiResponse);
+        return extractedData; // Fallback to basic extraction
     }
 }
 
