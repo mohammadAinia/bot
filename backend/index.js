@@ -461,7 +461,7 @@ async function extractInformationFromText(text) {
 
 function getMissingFields(sessionData) {
     const requiredFields = [
-        'name', 'phone', 'email', 'address', 'city',
+        'name', 'email', 'address', 'city',
         'street', 'building_name', 'flat_no', 'latitude',
         'longitude', 'quantity'
     ];
@@ -476,6 +476,7 @@ function getMissingFields(sessionData) {
 
     return missingFields;
 }
+
 
 async function askForNextMissingField(session, from, missingFields) {
     if (missingFields.length === 0) {
@@ -532,7 +533,13 @@ app.post('/webhook', async (req, res) => {
 
         // Initialize user session if it doesn't exist
         if (!userSessions[from]) {
-            userSessions[from] = { step: STATES.WELCOME, data: {} };
+            // Create the session and immediately deduce the phone number from the "from" field.
+            userSessions[from] = {
+                step: STATES.WELCOME,
+                data: {
+                    phone: formatPhoneNumber(from) // Deduce the phone number automatically
+                }
+            };
 
             // Send welcome message with options
             await sendInteractiveButtons(from, defaultWelcomeMessage, [
@@ -544,6 +551,7 @@ app.post('/webhook', async (req, res) => {
 
         const session = userSessions[from];
 
+        // If the conversation isn’t in the welcome stage and the text includes "question", answer using ChatGPT.
         if (session.step !== STATES.WELCOME && textRaw.toLowerCase().includes("question")) {
             const aiResponse = await getOpenAIResponse(textRaw);
             await sendToWhatsApp(from, aiResponse);
@@ -557,10 +565,10 @@ app.post('/webhook', async (req, res) => {
                 if (message.type === "text") {
                     const extractedData = await extractInformationFromText(textRaw);
 
-                    // Merge extracted data into the session
+                    // Merge extracted data into the session (phone remains unchanged)
                     session.data = { ...session.data, ...extractedData };
 
-                    // Check for missing fields
+                    // Check for missing fields (phone is no longer required)
                     const missingFields = getMissingFields(session.data);
 
                     if (missingFields.length === 0) {
@@ -568,10 +576,9 @@ app.post('/webhook', async (req, res) => {
                         session.step = STATES.CONFIRMATION;
                         await sendOrderSummary(from, session);
                     } else {
-                        // Ask for the next missing field instead of jumping directly to confirmation
+                        // Ask for the next missing field
                         await askForNextMissingField(session, from, missingFields);
                     }
-
                 }
                 break;
 
@@ -579,7 +586,7 @@ app.post('/webhook', async (req, res) => {
             //----------------------------------------------------------------------
             case STATES.NAME:
                 session.data.name = textRaw;
-                session.data.phone = formatPhoneNumber(from); // Automatically store the sender's number
+                // The phone is already set in the session initialization
                 session.step = STATES.EMAIL;
                 await sendToWhatsApp(from, "📧 Please provide your email address.");
                 break;
@@ -728,23 +735,6 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
             }
-
-            case "ASK_PHONE": {
-                if (!isValidPhone(textRaw)) {
-                    await sendToWhatsApp(from, "❌ Invalid phone number. Please enter a valid Emirati phone number.");
-                    return res.sendStatus(200);
-                }
-                session.data.phone = formatPhoneNumber(textRaw);
-                const missingAfterPhone = getMissingFields(session.data);
-                if (missingAfterPhone.length === 0) {
-                    session.step = STATES.CONFIRMATION;
-                    await sendOrderSummary(from, session);
-                } else {
-                    await askForNextMissingField(session, from, missingAfterPhone);
-                }
-                break;
-            }
-
             case "ASK_EMAIL": {
                 if (!isValidEmail(textRaw)) {
                     await sendToWhatsApp(from, "❌ Invalid email address, please enter a valid one.");
