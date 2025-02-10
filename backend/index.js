@@ -428,50 +428,55 @@ const sendInteractiveButtons = async (to, message, buttons) => {
 };
 async function extractInformationFromText(text) {
     const prompt = `
-        Extract the following information from the text:
-        - name: The user's full name.
-        - phone: The user's phone number.
-        - email: The user's email address.
-        - address: The user's full address.
-        - city: The user's city (e.g., Dubai, Sharjah, Abu Dhabi).
-        - street: The user's street name.
-        - building_name: The user's building name.
-        - flat_no: The user's flat number.
-        - latitude: The user's latitude (if provided).
-        - longitude: The user's longitude (if provided).
-        - quantity: The quantity of oil in liters.
+        Extract the following information from the text and return a valid JSON object:
+        {
+          "name": "The user's full name or null",
+          "phone": "The user's phone number or null",
+          "email": "The user's email address or null",
+          "address": "The user's full address or null",
+          "city": "The user's city (e.g., Dubai, Sharjah, Abu Dhabi) or null",
+          "street": "The user's street name or null",
+          "building_name": "The user's building name or null",
+          "flat_no": "The user's flat number or null",
+          "latitude": "The user's latitude or null",
+          "longitude": "The user's longitude or null",
+          "quantity": "The quantity of oil in liters or null"
+        }
 
-        If any information is missing, return null for that field.
+        If any information is missing, assign null to that field.
 
         Text: ${text}
     `;
 
     const aiResponse = await getOpenAIResponse(prompt);
 
-    // Parse the AI response to extract structured data
-    const extractedData = {};
-    const fields = ['name', 'phone', 'email', 'address', 'city', 'street', 'building_name', 'flat_no', 'latitude', 'longitude', 'quantity'];
-
-    fields.forEach(field => {
-        const regex = new RegExp(`${field}: (.*)`);
-        const match = aiResponse.match(regex);
-        extractedData[field] = match ? match[1] : null;
-    });
-
-    return extractedData;
+    try {
+        const extractedData = JSON.parse(aiResponse);
+        return extractedData;
+    } catch (e) {
+        console.error("❌ Failed to parse AI response as JSON:", aiResponse);
+        return {};
+    }
 }
+
 function getMissingFields(sessionData) {
-    const requiredFields = ['name', 'phone', 'email', 'address', 'city', 'street', 'building_name', 'flat_no', 'latitude', 'longitude', 'quantity'];
+    const requiredFields = [
+        'name', 'phone', 'email', 'address', 'city',
+        'street', 'building_name', 'flat_no', 'latitude',
+        'longitude', 'quantity'
+    ];
     const missingFields = [];
 
     requiredFields.forEach(field => {
-        if (!sessionData[field]) {
+        const value = sessionData[field];
+        if (!value || value.trim() === "" || value.trim().toLowerCase() === "null") {
             missingFields.push(field);
         }
     });
 
     return missingFields;
 }
+
 async function askForNextMissingField(session, from, missingFields) {
     if (missingFields.length === 0) {
         session.step = STATES.CONFIRMATION;
@@ -547,30 +552,7 @@ app.post('/webhook', async (req, res) => {
 
         // Handle messages based on the current state
         switch (session.step) {
-            // case STATES.WELCOME:
-            //     // If the user sends a message (not a button reply), treat it as a question
-            //     if (message.type === "text") {
-            //         const aiResponse = await getOpenAIResponse(textRaw);
-            //         const reply = `${aiResponse}\n\nTo complete the inquiry, you can ask other questions. If you want to submit a request or contact us, choose from the following options:`;
 
-            //         // Send the AI response with options to continue or proceed
-            //         await sendInteractiveButtons(from, reply, [
-            //             { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
-            //             { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
-            //         ]);
-            //     } else if (message.type === "interactive" && message.interactive.type === "button_reply") {
-            //         const buttonId = message.interactive.button_reply.id;
-
-            //         if (buttonId === "contact_us") {
-            //             await sendToWhatsApp(from, "📞 You can contact us at support@example.com or call +1234567890.");
-            //         } else if (buttonId === "new_request") {
-            //             session.step = STATES.NAME;
-            //             await sendToWhatsApp(from, "🔹 Please provide your full name.");
-            //         } else {
-            //             await sendToWhatsApp(from, "❌ Invalid option, please select a valid button.");
-            //         }
-            //     }
-            //     break;
             case STATES.WELCOME:
                 if (message.type === "text") {
                     const extractedData = await extractInformationFromText(textRaw);
@@ -582,13 +564,14 @@ app.post('/webhook', async (req, res) => {
                     const missingFields = getMissingFields(session.data);
 
                     if (missingFields.length === 0) {
-                        // ✅ If no fields are missing, proceed to confirmation
+                        // If no fields are missing, proceed to confirmation
                         session.step = STATES.CONFIRMATION;
                         await sendOrderSummary(from, session);
                     } else {
-                        // ✅ Ask for the next missing field instead of jumping directly to confirmation
-                        askForNextMissingField(session, from, missingFields);
+                        // Ask for the next missing field instead of jumping directly to confirmation
+                        await askForNextMissingField(session, from, missingFields);
                     }
+                    
                 }
                 break;
 
@@ -1007,3 +990,29 @@ const extractDetailsFromMessage = async (messageText, session) => {
         await sendToWhatsApp(from, "❌ There was an error processing your request. Please try again.");
     }
 };
+
+
+// case STATES.WELCOME:
+//     // If the user sends a message (not a button reply), treat it as a question
+//     if (message.type === "text") {
+//         const aiResponse = await getOpenAIResponse(textRaw);
+//         const reply = `${aiResponse}\n\nTo complete the inquiry, you can ask other questions. If you want to submit a request or contact us, choose from the following options:`;
+
+//         // Send the AI response with options to continue or proceed
+//         await sendInteractiveButtons(from, reply, [
+//             { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
+//             { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
+//         ]);
+//     } else if (message.type === "interactive" && message.interactive.type === "button_reply") {
+//         const buttonId = message.interactive.button_reply.id;
+
+//         if (buttonId === "contact_us") {
+//             await sendToWhatsApp(from, "📞 You can contact us at support@example.com or call +1234567890.");
+//         } else if (buttonId === "new_request") {
+//             session.step = STATES.NAME;
+//             await sendToWhatsApp(from, "🔹 Please provide your full name.");
+//         } else {
+//             await sendToWhatsApp(from, "❌ Invalid option, please select a valid button.");
+//         }
+//     }
+//     break;
