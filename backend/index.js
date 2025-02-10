@@ -529,12 +529,8 @@ function getMissingFields(sessionData) {
 
     requiredFields.forEach(field => {
         const value = sessionData[field];
-        if (value === null || value === undefined) {
+        if (value === null || value === undefined || value.trim() === "" || value.trim().toLowerCase() === "null") {
             missingFields.push(field);
-        } else if (typeof value === "string") {
-            if (value.trim() === "" || value.trim().toLowerCase() === "null") {
-                missingFields.push(field);
-            }
         }
     });
 
@@ -616,27 +612,38 @@ app.post('/webhook', async (req, res) => {
 
         const session = userSessions[from];
 
-        // Use ChatGPT to handle the message
-        const aiResponse = await getOpenAIResponse(textRaw, session);
+        // Check if the user is asking a general question or initiating an order
+        const isGeneralQuestion = await isQuestion(textRaw);
+        const isOrderRequest = text.includes("new request") || text.includes("order") || text.includes("request");
 
-        // Extract information from the user's message
-        const extractedData = await extractInformationFromText(textRaw);
-        session.data = { ...session.data, ...extractedData };
+        if (isGeneralQuestion && !isOrderRequest) {
+            // Handle general questions
+            const aiResponse = await getOpenAIResponse(textRaw, session);
+            await sendToWhatsApp(from, aiResponse);
+            return res.sendStatus(200);
+        }
 
-        // Check for missing fields
-        const missingFields = getMissingFields(session.data);
+        // If the user is initiating an order, start the order process
+        if (isOrderRequest || session.step !== STATES.WELCOME) {
+            // Extract information from the user's message
+            const extractedData = await extractInformationFromText(textRaw);
+            session.data = { ...session.data, ...extractedData };
 
-        if (missingFields.length === 0) {
-            // If no fields are missing, proceed to confirmation
-            session.step = STATES.CONFIRMATION;
-            await sendOrderSummary(from, session);
-        } else {
-            // Ask for the next missing field
-            const nextMissingField = missingFields[0];
-            session.step = `ASK_${nextMissingField.toUpperCase()}`;
+            // Check for missing fields
+            const missingFields = getMissingFields(session.data);
 
-            // Send the AI response and prompt for the next missing field
-            await sendToWhatsApp(from, `${aiResponse}\n\nPlease provide your ${nextMissingField}.`);
+            if (missingFields.length === 0) {
+                // If no fields are missing, proceed to confirmation
+                session.step = STATES.CONFIRMATION;
+                await sendOrderSummary(from, session);
+            } else {
+                // Ask for the next missing field
+                const nextMissingField = missingFields[0];
+                session.step = `ASK_${nextMissingField.toUpperCase()}`;
+
+                // Send the AI response and prompt for the next missing field
+                await sendToWhatsApp(from, `Please provide your ${nextMissingField}.`);
+            }
         }
 
         res.sendStatus(200);
