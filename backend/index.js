@@ -469,13 +469,19 @@ function getMissingFields(sessionData) {
 
     requiredFields.forEach(field => {
         const value = sessionData[field];
-        if (!value || value.trim() === "" || value.trim().toLowerCase() === "null") {
+        if (value === null || value === undefined) {
             missingFields.push(field);
+        } else if (typeof value === "string") {
+            if (value.trim() === "" || value.trim().toLowerCase() === "null") {
+                missingFields.push(field);
+            }
         }
+        // For non-string values (like numbers), assume they are valid if they are not null or undefined.
     });
 
     return missingFields;
 }
+
 
 
 async function askForNextMissingField(session, from, missingFields) {
