@@ -426,7 +426,18 @@ const sendInteractiveButtons = async (to, message, buttons) => {
         }
     });
 };
+
+function extractQuantity(text) {
+    const match = text.match(/\b\d+\b/); // Extracts only the first numeric value
+    return match ? match[0] : null; // Returns the number or null if not found
+}
+
 async function extractInformationFromText(text) {
+    // Extract quantity directly from the text
+    const extractedData = {
+        quantity: extractQuantity(text) // Use extractQuantity function
+    };
+
     const prompt = `
         Extract the following information from the text and return a valid JSON object:
         {
@@ -439,8 +450,7 @@ async function extractInformationFromText(text) {
           "building_name": "The user's building name or null",
           "flat_no": "The user's flat number or null",
           "latitude": "The user's latitude or null",
-          "longitude": "The user's longitude or null",
-          "quantity": "The quantity of oil in liters or null"
+          "longitude": "The user's longitude or null"
         }
 
         If any information is missing, assign null to that field.
@@ -451,13 +461,14 @@ async function extractInformationFromText(text) {
     const aiResponse = await getOpenAIResponse(prompt);
 
     try {
-        const extractedData = JSON.parse(aiResponse);
-        return extractedData;
+        const aiExtractedData = JSON.parse(aiResponse);
+        return { ...aiExtractedData, ...extractedData }; // Merge AI-extracted data with manually extracted quantity
     } catch (e) {
         console.error("❌ Failed to parse AI response as JSON:", aiResponse);
-        return {};
+        return extractedData; // Return at least the manually extracted data
     }
 }
+
 
 function getMissingFields(sessionData) {
     const requiredFields = [
@@ -524,7 +535,6 @@ async function isQuestion(text) {
     return aiResponse.trim().toLowerCase() === "true";
 }
 
-
 app.post('/webhook', async (req, res) => {
     try {
         console.log('Incoming Webhook Data:', req.body);
@@ -559,6 +569,10 @@ app.post('/webhook', async (req, res) => {
         }
 
         const session = userSessions[from];
+
+        if (!session.data.phone) {
+            session.data.phone = formatPhoneNumber(from)
+        }
 
         // Check if the user is asking a question
         const isUserAskingQuestion = await isQuestion(textRaw);
@@ -607,6 +621,8 @@ app.post('/webhook', async (req, res) => {
 
                     // Check for missing fields
                     const missingFields = getMissingFields(session.data);
+                    session.data.phone = formatPhoneNumber(from);
+
 
                     if (missingFields.length === 0) {
                         // If no fields are missing, proceed to confirmation
@@ -743,22 +759,21 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case STATES.QUANTITY:
-                // If the system is already waiting for quantity input
                 if (session.awaitingQuantityInput) {
-                    if (textRaw.trim() === "" || isNaN(textRaw)) {
+                    const quantity = extractQuantity(textRaw);
+
+                    if (!quantity) {
                         await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
                         return res.sendStatus(200);
                     }
 
-                    // If valid, store the quantity and move to the next step
-                    session.data.quantity = textRaw;
-                    session.awaitingQuantityInput = false; // Reset flag
+                    session.data.quantity = quantity; // Store only the number
+                    session.awaitingQuantityInput = false;
                     session.step = STATES.CONFIRMATION;
                     sendOrderSummary(from, session);
                 } else {
-                    // If the system is not awaiting input, set the flag and ask for quantity
                     session.awaitingQuantityInput = true;
-                    await sendToWhatsApp(from, "📦 Please enter the quantity (in liters) of the product.");
+                    await sendToWhatsApp(from, "📦 Please enter the quantity (numeric values only).");
                 }
                 break;
             case "ASK_NAME": {
@@ -884,12 +899,16 @@ app.post('/webhook', async (req, res) => {
             }
 
             case "ASK_QUANTITY": {
-                if (isNaN(textRaw) || textRaw.trim() === "") {
+                const quantity = extractQuantity(textRaw);
+
+                if (!quantity) {
                     await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
                     return res.sendStatus(200);
                 }
-                session.data.quantity = textRaw;
+
+                session.data.quantity = quantity; // Store only the number
                 const missingAfterQuantity = getMissingFields(session.data);
+
                 if (missingAfterQuantity.length === 0) {
                     session.step = STATES.CONFIRMATION;
                     await sendOrderSummary(from, session);
@@ -1089,15 +1108,19 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-            case "MODIFY_QUANTITY":
-                if (isNaN(textRaw) || textRaw.trim() === "") {
+            case "MODIFY_QUANTITY": {
+                const quantity = extractQuantity(textRaw);
+
+                if (!quantity) {
                     await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
                     return res.sendStatus(200);
                 }
-                session.data.quantity = textRaw;
+
+                session.data.quantity = quantity; // Store only the number
                 session.step = STATES.CONFIRMATION;
                 await sendUpdatedSummary(from, session);
                 break;
+            }
 
             default:
                 await sendToWhatsApp(from, "❌ An unexpected error occurred. Please try again.");
