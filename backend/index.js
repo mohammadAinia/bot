@@ -557,6 +557,10 @@ app.post('/webhook', async (req, res) => {
 
         const session = userSessions[from];
 
+        if (!session.data.phone) {
+            session.data.phone = formatPhoneNumber(from)
+        }
+
         // If the conversation isn’t in the welcome stage and the text includes "question", answer using ChatGPT.
         if (session.step !== STATES.WELCOME && textRaw.toLowerCase().includes("question")) {
             const aiResponse = await getOpenAIResponse(textRaw);
@@ -573,6 +577,8 @@ app.post('/webhook', async (req, res) => {
 
                     // Merge extracted data into the session (phone remains unchanged)
                     session.data = { ...session.data, ...extractedData };
+
+                    session.data.phone = formatPhoneNumber(from);
 
                     // Check for missing fields (phone is no longer required)
                     const missingFields = getMissingFields(session.data);
