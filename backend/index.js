@@ -472,6 +472,37 @@ function getMissingFields(sessionData) {
 
     return missingFields;
 }
+async function askForNextMissingField(session, from, missingFields) {
+    if (missingFields.length === 0) {
+        session.step = STATES.CONFIRMATION;
+        return await sendOrderSummary(from, session);
+    }
+
+    const nextMissingField = missingFields[0]; // Get the first missing field
+    session.step = `ASK_${nextMissingField.toUpperCase()}`; // Set the step dynamically
+
+    // Define prompts for each missing field
+    const fieldPromptMap = {
+        name: "🔹 Please provide your full name.",
+        phone: "📞 Please provide your phone number.",
+        email: "📧 Please provide your email address.",
+        address: "📍 Please provide your full address.",
+        city: "🌆 Please provide your city.",
+        street: "🏠 Please provide your street name.",
+        building_name: "🏢 Please provide your building name.",
+        flat_no: "🏠 Please provide your flat number.",
+        latitude: "📍 Please share your location using WhatsApp's location feature.",
+        longitude: "📍 Please share your location using WhatsApp's location feature.",
+        quantity: "📦 Please provide the quantity (in liters) of the product."
+    };
+
+    if (fieldPromptMap[nextMissingField]) {
+        await sendToWhatsApp(from, fieldPromptMap[nextMissingField]);
+    } else {
+        console.error(`❌ No prompt found for missing field: ${nextMissingField}`);
+    }
+}
+
 
 app.post('/webhook', async (req, res) => {
     try {
@@ -551,44 +582,16 @@ app.post('/webhook', async (req, res) => {
                     const missingFields = getMissingFields(session.data);
 
                     if (missingFields.length === 0) {
-                        // If no fields are missing, proceed to confirmation
+                        // ✅ If no fields are missing, proceed to confirmation
                         session.step = STATES.CONFIRMATION;
                         await sendOrderSummary(from, session);
                     } else {
-                        // If fields are missing, ask for the next missing field
-                        const nextMissingField = missingFields[0];
-                        session.step = `ASK_${nextMissingField.toUpperCase()}`;
-
-                        // Send a prompt for the missing field
-                        const fieldPromptMap = {
-                            name: "🔹 Please provide your full name.",
-                            phone: "📞 Please provide your phone number.",
-                            email: "📧 Please provide your email address.",
-                            address: "📍 Please provide your full address.",
-                            city: "🌆 Please provide your city.",
-                            street: "🏠 Please provide your street name.",
-                            building_name: "🏢 Please provide your building name.",
-                            flat_no: "🏠 Please provide your flat number.",
-                            latitude: "📍 Please share your location using WhatsApp's location feature.",
-                            longitude: "📍 Please share your location using WhatsApp's location feature.",
-                            quantity: "📦 Please provide the quantity (in liters) of the product."
-                        };
-
-                        await sendToWhatsApp(from, fieldPromptMap[nextMissingField]);
-                    }
-                } else if (message.type === "interactive" && message.interactive.type === "button_reply") {
-                    const buttonId = message.interactive.button_reply.id;
-
-                    if (buttonId === "contact_us") {
-                        await sendToWhatsApp(from, "📞 You can contact us at support@example.com or call +1234567890.");
-                    } else if (buttonId === "new_request") {
-                        session.step = STATES.NAME;
-                        await sendToWhatsApp(from, "🔹 Please provide your full name.");
-                    } else {
-                        await sendToWhatsApp(from, "❌ Invalid option, please select a valid button.");
+                        // ✅ Ask for the next missing field instead of jumping directly to confirmation
+                        askForNextMissingField(session, from, missingFields);
                     }
                 }
                 break;
+
 
             //----------------------------------------------------------------------
             case STATES.NAME:
