@@ -427,7 +427,24 @@ const sendInteractiveButtons = async (to, message, buttons) => {
     });
 };
 async function extractInformationFromText(text) {
-    const prompt = `Extract the following information from the text: name, phone, email, address, city, street, building_name, flat_no, latitude, longitude, quantity. If any information is missing, return null for that field. Text: ${text}`;
+    const prompt = `
+        Extract the following information from the text:
+        - name: The user's full name.
+        - phone: The user's phone number.
+        - email: The user's email address.
+        - address: The user's full address.
+        - city: The user's city (e.g., Dubai, Sharjah, Abu Dhabi).
+        - street: The user's street name.
+        - building_name: The user's building name.
+        - flat_no: The user's flat number.
+        - latitude: The user's latitude (if provided).
+        - longitude: The user's longitude (if provided).
+        - quantity: The quantity of oil in liters.
+
+        If any information is missing, return null for that field.
+
+        Text: ${text}
+    `;
 
     const aiResponse = await getOpenAIResponse(prompt);
 
@@ -442,6 +459,18 @@ async function extractInformationFromText(text) {
     });
 
     return extractedData;
+}
+function getMissingFields(sessionData) {
+    const requiredFields = ['name', 'phone', 'email', 'address', 'city', 'street', 'building_name', 'flat_no', 'latitude', 'longitude', 'quantity'];
+    const missingFields = [];
+
+    requiredFields.forEach(field => {
+        if (!sessionData[field]) {
+            missingFields.push(field);
+        }
+    });
+
+    return missingFields;
 }
 
 app.post('/webhook', async (req, res) => {
@@ -515,20 +544,37 @@ app.post('/webhook', async (req, res) => {
                 if (message.type === "text") {
                     const extractedData = await extractInformationFromText(textRaw);
 
-                    // If the user provides enough information to start a request
-                    if (extractedData.name && extractedData.phone && extractedData.email) {
-                        session.data = { ...session.data, ...extractedData };
+                    // Merge extracted data into the session
+                    session.data = { ...session.data, ...extractedData };
+
+                    // Check for missing fields
+                    const missingFields = getMissingFields(session.data);
+
+                    if (missingFields.length === 0) {
+                        // If no fields are missing, proceed to confirmation
                         session.step = STATES.CONFIRMATION;
                         await sendOrderSummary(from, session);
                     } else {
-                        const aiResponse = await getOpenAIResponse(textRaw);
-                        const reply = `${aiResponse}\n\nTo complete the inquiry, you can ask other questions. If you want to submit a request or contact us, choose from the following options:`;
+                        // If fields are missing, ask for the next missing field
+                        const nextMissingField = missingFields[0];
+                        session.step = `ASK_${nextMissingField.toUpperCase()}`;
 
-                        // Send the AI response with options to continue or proceed
-                        await sendInteractiveButtons(from, reply, [
-                            { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
-                            { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
-                        ]);
+                        // Send a prompt for the missing field
+                        const fieldPromptMap = {
+                            name: "🔹 Please provide your full name.",
+                            phone: "📞 Please provide your phone number.",
+                            email: "📧 Please provide your email address.",
+                            address: "📍 Please provide your full address.",
+                            city: "🌆 Please provide your city.",
+                            street: "🏠 Please provide your street name.",
+                            building_name: "🏢 Please provide your building name.",
+                            flat_no: "🏠 Please provide your flat number.",
+                            latitude: "📍 Please share your location using WhatsApp's location feature.",
+                            longitude: "📍 Please share your location using WhatsApp's location feature.",
+                            quantity: "📦 Please provide the quantity (in liters) of the product."
+                        };
+
+                        await sendToWhatsApp(from, fieldPromptMap[nextMissingField]);
                     }
                 } else if (message.type === "interactive" && message.interactive.type === "button_reply") {
                     const buttonId = message.interactive.button_reply.id;
@@ -685,6 +731,33 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(from, "📦 Please enter the quantity (in liters) of the product.");
                 }
                 break;
+            case "ASK_NAME":
+                session.data.name = textRaw;
+                session.step = STATES.WELCOME; // Go back to check for more missing fields
+                await sendToWhatsApp(from, "✅ Name saved. Let's check for more missing information.");
+                break;
+
+            case "ASK_PHONE":
+                if (!isValidPhone(textRaw)) {
+                    await sendToWhatsApp(from, "❌ Invalid phone number. Please enter a valid Emirati phone number.");
+                    return res.sendStatus(200);
+                }
+                session.data.phone = formatPhoneNumber(textRaw);
+                session.step = STATES.WELCOME; // Go back to check for more missing fields
+                await sendToWhatsApp(from, "✅ Phone number saved. Let's check for more missing information.");
+                break;
+
+            case "ASK_EMAIL":
+                if (!isValidEmail(textRaw)) {
+                    await sendToWhatsApp(from, "❌ Invalid email address, please enter a valid one.");
+                    return res.sendStatus(200);
+                }
+                session.data.email = textRaw;
+                session.step = STATES.WELCOME; // Go back to check for more missing fields
+                await sendToWhatsApp(from, "✅ Email saved. Let's check for more missing information.");
+                break;
+
+            // Add similar cases for other fields (ADDRESS, CITY, STREET, etc.)
 
             case STATES.CONFIRMATION:
                 if (message.type === "interactive" && message.interactive.type === "button_reply") {
