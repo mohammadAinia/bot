@@ -571,7 +571,7 @@ app.post('/webhook', async (req, res) => {
                         // Ask for the next missing field instead of jumping directly to confirmation
                         await askForNextMissingField(session, from, missingFields);
                     }
-                    
+
                 }
                 break;
 
@@ -717,31 +717,161 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(from, "📦 Please enter the quantity (in liters) of the product.");
                 }
                 break;
-            case "ASK_NAME":
+            case "ASK_NAME": {
                 session.data.name = textRaw;
-                session.step = STATES.WELCOME; // Go back to check for more missing fields
-                await sendToWhatsApp(from, "✅ Name saved. Let's check for more missing information.");
+                const missingAfterName = getMissingFields(session.data);
+                if (missingAfterName.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    await askForNextMissingField(session, from, missingAfterName);
+                }
                 break;
+            }
 
-            case "ASK_PHONE":
+            case "ASK_PHONE": {
                 if (!isValidPhone(textRaw)) {
                     await sendToWhatsApp(from, "❌ Invalid phone number. Please enter a valid Emirati phone number.");
                     return res.sendStatus(200);
                 }
                 session.data.phone = formatPhoneNumber(textRaw);
-                session.step = STATES.WELCOME; // Go back to check for more missing fields
-                await sendToWhatsApp(from, "✅ Phone number saved. Let's check for more missing information.");
+                const missingAfterPhone = getMissingFields(session.data);
+                if (missingAfterPhone.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    await askForNextMissingField(session, from, missingAfterPhone);
+                }
                 break;
+            }
 
-            case "ASK_EMAIL":
+            case "ASK_EMAIL": {
                 if (!isValidEmail(textRaw)) {
                     await sendToWhatsApp(from, "❌ Invalid email address, please enter a valid one.");
                     return res.sendStatus(200);
                 }
                 session.data.email = textRaw;
-                session.step = STATES.WELCOME; // Go back to check for more missing fields
-                await sendToWhatsApp(from, "✅ Email saved. Let's check for more missing information.");
+                const missingAfterEmail = getMissingFields(session.data);
+                if (missingAfterEmail.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    await askForNextMissingField(session, from, missingAfterEmail);
+                }
                 break;
+            }
+
+            case "ASK_ADDRESS": {
+                session.data.address = textRaw;
+                const missingAfterAddress = getMissingFields(session.data);
+                if (missingAfterAddress.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    await askForNextMissingField(session, from, missingAfterAddress);
+                }
+                break;
+            }
+
+            case "ASK_CITY": {
+                session.data.city = textRaw;
+                const missingAfterCity = getMissingFields(session.data);
+                if (missingAfterCity.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    await askForNextMissingField(session, from, missingAfterCity);
+                }
+                break;
+            }
+
+            case "ASK_STREET": {
+                session.data.street = textRaw;
+                const missingAfterStreet = getMissingFields(session.data);
+                if (missingAfterStreet.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    await askForNextMissingField(session, from, missingAfterStreet);
+                }
+                break;
+            }
+
+            case "ASK_BUILDING_NAME": {
+                session.data.building_name = textRaw;
+                const missingAfterBuilding = getMissingFields(session.data);
+                if (missingAfterBuilding.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    await askForNextMissingField(session, from, missingAfterBuilding);
+                }
+                break;
+            }
+
+            case "ASK_FLAT_NO": {
+                session.data.flat_no = textRaw;
+                const missingAfterFlat = getMissingFields(session.data);
+                if (missingAfterFlat.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    await askForNextMissingField(session, from, missingAfterFlat);
+                }
+                break;
+            }
+
+            case "ASK_LATITUDE": {
+                if (message.location) {
+                    session.data.latitude = message.location.latitude;
+                    session.data.longitude = message.location.longitude;
+                    const missingAfterLocation = getMissingFields(session.data);
+                    if (missingAfterLocation.length === 0) {
+                        session.step = STATES.CONFIRMATION;
+                        await sendOrderSummary(from, session);
+                    } else {
+                        await askForNextMissingField(session, from, missingAfterLocation);
+                    }
+                } else {
+                    await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
+                }
+                break;
+            }
+
+            case "ASK_LONGITUDE": {
+                // In many cases latitude and longitude are provided together via location messages.
+                if (message.location) {
+                    session.data.latitude = message.location.latitude;
+                    session.data.longitude = message.location.longitude;
+                    const missingAfterLocation = getMissingFields(session.data);
+                    if (missingAfterLocation.length === 0) {
+                        session.step = STATES.CONFIRMATION;
+                        await sendOrderSummary(from, session);
+                    } else {
+                        await askForNextMissingField(session, from, missingAfterLocation);
+                    }
+                } else {
+                    await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
+                }
+                break;
+            }
+
+            case "ASK_QUANTITY": {
+                if (isNaN(textRaw) || textRaw.trim() === "") {
+                    await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
+                    return res.sendStatus(200);
+                }
+                session.data.quantity = textRaw;
+                const missingAfterQuantity = getMissingFields(session.data);
+                if (missingAfterQuantity.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    await askForNextMissingField(session, from, missingAfterQuantity);
+                }
+                break;
+            }
+
 
             // Add similar cases for other fields (ADDRESS, CITY, STREET, etc.)
 
