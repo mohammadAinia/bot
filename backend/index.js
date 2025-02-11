@@ -182,16 +182,59 @@ app.post('/admin/update-welcome-message', authenticateToken, (req, res) => {
     }
 });
 
-const getOpenAIResponse = async (userMessage) => {
+// const getOpenAIResponse = async (userMessage) => {
+//     try {
+//         const messages = [
+//             { role: "system", content: systemMessage },  // Editable default message
+//         ];
+
+//         if (guidanceMessage && guidanceMessage.trim() !== "") {
+//             messages.push({ role: "system", content: guidanceMessage });
+//         }
+
+//         messages.push({ role: "user", content: userMessage });
+
+//         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+//             model: "gpt-4",
+//             messages,
+//             max_tokens: 150,
+//             temperature: 0.7
+//         }, {
+//             headers: {
+//                 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+//                 'Content-Type': 'application/json'
+//             }
+//         });
+
+//         if (!response.data.choices || !response.data.choices[0] || !response.data.choices[0].message) {
+//             throw new Error("Invalid response structure from OpenAI API");
+//         }
+
+//         return response.data.choices[0].message.content.trim();
+//     } catch (error) {
+//         console.error('❌ Error with OpenAI:', error.response?.data || error.message);
+//         return "❌ Sorry, an error occurred while processing your request.";
+//     }
+// };
+const getOpenAIResponse = async (userMessage, context = "") => {
     try {
+        const systemMessage = `
+            You are a friendly and intelligent WhatsApp assistant for Lootah Biofuels. 
+            Your goal is to assist users in completing their orders and answering their questions in a professional yet warm tone.
+            Always respond concisely, use emojis sparingly, and maintain a helpful attitude.
+            If the user provides incomplete or unclear information, politely ask for clarification.
+        `;
+
         const messages = [
-            { role: "system", content: systemMessage },  // Editable default message
+            { role: "system", content: systemMessage },
         ];
 
-        if (guidanceMessage && guidanceMessage.trim() !== "") {
-            messages.push({ role: "system", content: guidanceMessage });
+        // Add context if provided
+        if (context && context.trim() !== "") {
+            messages.push({ role: "system", content: context });
         }
 
+        // Add the user's message
         messages.push({ role: "user", content: userMessage });
 
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
@@ -213,7 +256,7 @@ const getOpenAIResponse = async (userMessage) => {
         return response.data.choices[0].message.content.trim();
     } catch (error) {
         console.error('❌ Error with OpenAI:', error.response?.data || error.message);
-        return "❌ Sorry, an error occurred while processing your request.";
+        return "❌ Oops! Something went wrong. Please try again later.";
     }
 };
 
@@ -494,7 +537,31 @@ function getMissingFields(sessionData) {
     return missingFields;
 }
 
-async function askForNextMissingField(session, from, missingFields) {
+// async function askForNextMissingField(session, from, missingFields) {
+//     if (!session.greetingSent) {
+//         const greetingMessage = `Hey ${session.data.name || 'there'}! 👋 Ready to complete your order? Let's get started! 😊`;
+//         await sendToWhatsApp(from, greetingMessage);
+//         session.greetingSent = true;
+//     }
+
+//     if (missingFields.length === 0) {
+//         session.step = STATES.CONFIRMATION;
+//         return await sendOrderSummary(from, session);
+//     }
+
+//     const nextMissingField = missingFields[0];
+//     session.step = `ASK_${nextMissingField.toUpperCase()}`;
+
+//     const dynamicPrompt = `
+//         The user is submitting an order to Lootah Biofuels. Missing field: "${nextMissingField}". Ask for it briefly with a friendly tone and emojis.
+
+//         Example: "Hey, we just need your name to proceed! 😊"
+//     `;
+
+//     const dynamicResponse = await getOpenAIResponse(dynamicPrompt);
+//     await sendToWhatsApp(from, dynamicResponse);
+// }
+const askForNextMissingField = async (session, from, missingFields) => {
     if (!session.greetingSent) {
         const greetingMessage = `Hey ${session.data.name || 'there'}! 👋 Ready to complete your order? Let's get started! 😊`;
         await sendToWhatsApp(from, greetingMessage);
@@ -509,15 +576,15 @@ async function askForNextMissingField(session, from, missingFields) {
     const nextMissingField = missingFields[0];
     session.step = `ASK_${nextMissingField.toUpperCase()}`;
 
-    const dynamicPrompt = `
-        The user is submitting an order to Lootah Biofuels. Missing field: "${nextMissingField}". Ask for it briefly with a friendly tone and emojis.
-
-        Example: "Hey, we just need your name to proceed! 😊"
+    const context = `
+        The user is submitting an order to Lootah Biofuels. 
+        The missing field is: "${nextMissingField}". 
+        Ask for it in a friendly and concise way, using emojis if appropriate.
     `;
 
-    const dynamicResponse = await getOpenAIResponse(dynamicPrompt);
+    const dynamicResponse = await getOpenAIResponse("Ask for the missing field.", context);
     await sendToWhatsApp(from, dynamicResponse);
-}
+};
 
 
 
@@ -531,59 +598,89 @@ async function isQuestion(text) {
     const aiResponse = await getOpenAIResponse(prompt);
     return aiResponse.trim().toLowerCase() === "true";
 }
+// const generateWelcomeMessage = async () => {
+//     try {
+//         const systemPrompt = `
+//         You are a friendly WhatsApp assistant for Lootah Biofuels. 
+//         Generate a concise and engaging welcome message that:
+//         - Briefly introduces the company.
+//         - Encourages users to ask any questions or select from the available options.
+//         - Avoids unnecessary repetition.
+//         - Uses emojis sparingly and professionally.
+//         - Returns only the message text, without extra formatting.
+//         `;
+
+//         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+//             model: "gpt-4",
+//             messages: [{ role: "system", content: systemPrompt }],
+//             max_tokens: 100,
+//             temperature: 0.7
+//         }, {
+//             headers: {
+//                 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+//                 'Content-Type': 'application/json'
+//             }
+//         });
+
+//         return response.data.choices?.[0]?.message?.content?.trim() || "Welcome to Lootah Biofuels!";
+//     } catch (error) {
+//         console.error('❌ Error generating welcome message:', error.response?.data || error.message);
+//         return "🌟 Welcome to Lootah Biofuels Refining Company! 🌟\n\nYou can ask any question directly, and I will assist you. If you need further help, choose from the options below.";
+//     }
+// };
 const generateWelcomeMessage = async () => {
-    try {
-        const systemPrompt = `
+    const systemPrompt = `
         You are a friendly WhatsApp assistant for Lootah Biofuels. 
         Generate a concise and engaging welcome message that:
-        - Briefly introduces the company.
-        - Encourages users to ask any questions or select from the available options.
-        - Avoids unnecessary repetition.
-        - Uses emojis sparingly and professionally.
-        - Returns only the message text, without extra formatting.
-        `;
+        - Introduces the company in a warm and professional tone.
+        - Encourages users to ask questions or start a new request.
+        - Uses emojis sparingly to make the message lively but not overwhelming.
+    `;
 
-        const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-            model: "gpt-4",
-            messages: [{ role: "system", content: systemPrompt }],
-            max_tokens: 100,
-            temperature: 0.7
-        }, {
-            headers: {
-                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-                'Content-Type': 'application/json'
-            }
-        });
-
-        return response.data.choices?.[0]?.message?.content?.trim() || "Welcome to Lootah Biofuels!";
-    } catch (error) {
-        console.error('❌ Error generating welcome message:', error.response?.data || error.message);
-        return "🌟 Welcome to Lootah Biofuels Refining Company! 🌟\n\nYou can ask any question directly, and I will assist you. If you need further help, choose from the options below.";
-    }
+    return await getOpenAIResponse("Generate a welcome message.", systemPrompt);
 };
+// const generateMissingFieldPrompt = async (field) => {
+//     try {
+//         const fieldPromptMap = {
+//             name: "Ask the user to provide their full name. Keep it short, lively, and friendly with an emoji if possible.",
+//             phone: "Ask the user for their phone number in a friendly and casual tone. Include an emoji if it feels appropriate.",
+//             email: "Ask the user for their email address in a casual, short, and polite way, using emojis.",
+//             address: "Ask the user to provide their full address, but keep it simple and friendly with a casual tone.",
+//             city: "Ask the user for their city in a friendly, short way with some emojis.",
+//             street: "Ask the user for their street name, but keep it short and cheerful.",
+//             building_name: "Ask the user for their building name in a friendly and short tone.",
+//             flat_no: "Ask the user for their flat number, ensuring it's friendly and concise.",
+//             latitude: "Ask the user to share their live location via WhatsApp, keeping it casual with an emoji.",
+//             longitude: "Ask the user to share their live location via WhatsApp. Keep it brief and friendly.",
+//             quantity: "Ask the user how many liters they want in a friendly, short manner, with an emoji if appropriate."
+//         };
+
+//         if (!fieldPromptMap[field]) return null;
+
+//         return await getOpenAIResponse(fieldPromptMap[field]);
+//     } catch (error) {
+//         console.error('❌ Error generating missing field prompt:', error);
+//         return "I need more details to proceed. 😊";
+//     }
+// };
 const generateMissingFieldPrompt = async (field) => {
-    try {
-        const fieldPromptMap = {
-            name: "Ask the user to provide their full name. Keep it short, lively, and friendly with an emoji if possible.",
-            phone: "Ask the user for their phone number in a friendly and casual tone. Include an emoji if it feels appropriate.",
-            email: "Ask the user for their email address in a casual, short, and polite way, using emojis.",
-            address: "Ask the user to provide their full address, but keep it simple and friendly with a casual tone.",
-            city: "Ask the user for their city in a friendly, short way with some emojis.",
-            street: "Ask the user for their street name, but keep it short and cheerful.",
-            building_name: "Ask the user for their building name in a friendly and short tone.",
-            flat_no: "Ask the user for their flat number, ensuring it's friendly and concise.",
-            latitude: "Ask the user to share their live location via WhatsApp, keeping it casual with an emoji.",
-            longitude: "Ask the user to share their live location via WhatsApp. Keep it brief and friendly.",
-            quantity: "Ask the user how many liters they want in a friendly, short manner, with an emoji if appropriate."
-        };
+    const fieldPromptMap = {
+        name: "Ask the user to provide their full name in a friendly and casual tone. Example: 'May I have your full name, please? 😊'",
+        phone: "Ask the user for their phone number in a casual and friendly way. Example: 'Could you share your phone number with us? 📱'",
+        email: "Ask the user for their email address politely. Example: 'What’s your email address? We’ll use it to keep you updated! ✉️'",
+        address: "Ask the user for their full address in a simple and friendly way. Example: 'Could you provide your complete address? 🏠'",
+        city: "Ask the user to select their city from the options provided. Example: 'Which city are you located in? 🌆'",
+        street: "Ask the user for their street name in a cheerful tone. Example: 'What’s the name of your street? 🛣️'",
+        building_name: "Ask the user for their building name in a friendly way. Example: 'Could you tell us the name of your building? 🏢'",
+        flat_no: "Ask the user for their flat number politely. Example: 'What’s your flat number? 🏠'",
+        latitude: "Ask the user to share their live location via WhatsApp. Example: 'Could you share your live location so we can find you easily? 📍'",
+        longitude: "Ask the user to share their live location via WhatsApp. Example: 'Please share your live location to help us serve you better! 📍'",
+        quantity: "Ask the user how many liters they want in a friendly tone. Example: 'How many liters would you like to order? ⛽'"
+    };
 
-        if (!fieldPromptMap[field]) return null;
+    if (!fieldPromptMap[field]) return null;
 
-        return await getOpenAIResponse(fieldPromptMap[field]);
-    } catch (error) {
-        console.error('❌ Error generating missing field prompt:', error);
-        return "I need more details to proceed. 😊";
-    }
+    return await getOpenAIResponse(fieldPromptMap[field]);
 };
 
 app.post('/webhook', async (req, res) => {
@@ -683,8 +780,10 @@ app.post('/webhook', async (req, res) => {
             case STATES.NAME:
                 // Send the name to ChatGPT for validation
                 const nameValidationPrompt = `
-                    Please check if the following text is a valid name: "${textRaw}". If it seems like a random word or something unrelated to a name, respond with a suggestion to ask for a proper name.
-                `;
+                The user provided the following input: "${textRaw}". 
+                Determine if it is a valid name. If not, respond with a friendly suggestion to provide a proper name.
+                Example: "It looks like the name you provided might not be valid. Could you please provide your full name? 😊"
+            `;
 
                 const nameValidationResponse = await getOpenAIResponse(nameValidationPrompt);
 
@@ -730,8 +829,10 @@ app.post('/webhook', async (req, res) => {
             case STATES.ADDRESS:
                 // First, send the address to ChatGPT for validation
                 const addressValidationPrompt = `
-                        Please check if the following text is a valid address: "${textRaw}". If it's not a valid address, please respond with a suggestion to ask for a correct address.
-                    `;
+                The user provided the following input: "${textRaw}". 
+                Determine if it is a valid address. If not, respond with a friendly suggestion to provide a complete address.
+                Example: "It seems like the address you provided might be incomplete. Could you please provide your full address? 🏠"
+            `;
 
                 const addressValidationResponse = await getOpenAIResponse(addressValidationPrompt);
 
