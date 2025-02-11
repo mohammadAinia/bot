@@ -1144,7 +1144,7 @@ const areAllFieldsCollected = (session) => {
     try {
         const systemMessage = `
         You are a friendly assistant for a WhatsApp bot used by Lootah Biofuels. Your task is to guide users through the request submission process in an engaging and lively way, and answer any questions they have about the company.
-        
+
         **Instructions:**
         1. **Extract Data:** Parse the user's message to extract the following fields:
            - Name (e.g., "John" from "My name is John")
@@ -1153,7 +1153,7 @@ const areAllFieldsCollected = (session) => {
            - Apartment Number (e.g., "Apt 101")
            - City (e.g., "Dubai")
            - Oil Amount (e.g., "50 liters" → "50")
-        
+
         2. **Confirm Values:** After extracting a value, ask the user to confirm it (e.g., "Just to confirm, your name is John, right?").
         3. **Avoid Repetition:** Never ask for information already confirmed and stored in the session.
         4. **Session Data:** Here is the current session data: ${JSON.stringify(sessionData.data)}
@@ -1162,8 +1162,6 @@ const areAllFieldsCollected = (session) => {
         - Return a JSON object with two fields: 
           \`response\` (your reply to the user) 
           \`updates\` (key-value pairs of extracted data to save to the session)
-        - Example: 
-          {"response": "Got it! Is your email john@example.com?", "updates": {"email": "john@example.com"}}
         `;
 
         const messages = [
@@ -1172,11 +1170,11 @@ const areAllFieldsCollected = (session) => {
         ];
 
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-            model: "gpt-4",
+            model: "gpt-4-1106-preview", // ✅ Use the correct model
             messages,
             max_tokens: 300,
-            temperature: 0.2, // Lower temperature for structured output
-            response_format: { type: "json_object" } // Force JSON output
+            temperature: 0.2, 
+            response_format: "json"  // ✅ Use JSON mode correctly
         }, {
             headers: {
                 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
@@ -1184,18 +1182,14 @@ const areAllFieldsCollected = (session) => {
             }
         });
 
-        const rawResponse = response.data.choices?.[0]?.message?.content?.trim();
-        if (!rawResponse) throw new Error("Invalid response from OpenAI API");
+        const parsedResponse = response.data.choices?.[0]?.message?.content;
+        if (!parsedResponse) throw new Error("Invalid response from OpenAI API");
 
-        // Parse the JSON response
-        const parsedResponse = JSON.parse(rawResponse);
-        const { response: aiResponse, updates } = parsedResponse;
+        const { response: aiResponse, updates } = JSON.parse(parsedResponse);
 
         // Update session data with extracted values
         if (updates) {
-            Object.entries(updates).forEach(([key, value]) => {
-                sessionData.data[key] = value;
-            });
+            Object.assign(sessionData.data, updates);
         }
 
         return aiResponse;
@@ -1204,6 +1198,7 @@ const areAllFieldsCollected = (session) => {
         return "❌ Oops! Something went wrong, can you please try again?";
     }
 };
+    
   
 app.post('/webhook', async (req, res) => {
     try {
