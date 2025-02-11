@@ -1132,170 +1132,174 @@ async function isQuestion(text) {
 //         res.sendStatus(500);
 //     }
 // });
-const areAllFieldsCollected = (sessionData) => {
+// Helper function to check if all required fields have been collected.
+const areAllFieldsCollected = (session) => {
     const requiredFields = ["name", "email", "buildingName", "apartmentNumber", "city", "location", "oilAmount"];
-    return requiredFields.every(field => sessionData.data[field]);
-};
-
-
-const getOpenAIResponse = async (userMessage, sessionData) => {
+    return requiredFields.every(field => session.data[field]);
+  };
+  
+  // Improved extraction logic inside getOpenAIResponse:
+  // Only update a field if it hasn’t been set yet.
+  const getOpenAIResponse = async (userMessage, session) => {
     try {
-        const systemMessage = `
-        You are a friendly assistant for a WhatsApp bot used by Lootah Biofuels. Your task is to guide users through the request submission process in an engaging and lively way, and answer any questions they have about the company.
-        - Collect the following details: name, email, building name, apartment number, city, location, and amount of oil used.
-        - Be lively, friendly, and interactive in the conversation.
-        - After receiving a piece of information, ask the user to confirm or clarify it in a conversational way (e.g., "Got it! Just to confirm, your building name is X, right?").
-        - Use the information provided earlier to reduce repetition and keep the conversation flowing naturally.
-        - Ensure the user’s phone number is Emirati and ask for clarification if needed.
-        - Once all details are collected, summarize the information in a friendly manner and ask for confirmation before submitting.
-        - Here is the current session data: ${JSON.stringify(sessionData)}
-        `;
-
-        const messages = [
-            { role: "system", content: systemMessage },
-            { role: "user", content: userMessage }
-        ];
-
-        const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-            model: "gpt-4",
-            messages,
-            max_tokens: 300,
-            temperature: 0.8
-        }, {
-            headers: {
-                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-                'Content-Type': 'application/json'
-            }
-        });
-
-        if (!response.data.choices?.[0]?.message?.content) {
-            throw new Error("Invalid response from OpenAI API");
+      const systemMessage = `
+  You are a friendly assistant for a WhatsApp bot used by Lootah Biofuels.
+  Your task is to guide users through the request submission process in an engaging and lively way.
+  - Collect the following details: name, email, building name, apartment number, city, location, and amount of oil used.
+  - Be lively, friendly, and interactive. After receiving a piece of information, ask for confirmation or clarification (for example, "Got it! Just to confirm, your building name is X, right?").
+  - Use any information provided earlier to avoid repetition.
+  - Ensure the user’s phone number is Emirati and ask for clarification if needed.
+  - Once all details are collected, summarize the information in a friendly manner and ask for confirmation before submitting.
+  - Here is the current session data: ${JSON.stringify(session)}
+  `;
+  
+      const messages = [
+        { role: "system", content: systemMessage },
+        { role: "user", content: userMessage }
+      ];
+  
+      const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+        model: "gpt-4",
+        messages,
+        max_tokens: 300,
+        temperature: 0.8
+      }, {
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+          'Content-Type': 'application/json'
         }
-
-        const aiResponse = response.data.choices[0].message.content.trim();
-
-        // Extract and save fields from the user's message
-        if (userMessage.toLowerCase().includes("name")) {
-            sessionData.data.name = userMessage;
-        }
-        if (userMessage.toLowerCase().includes("email")) {
-            sessionData.data.email = userMessage;
-        }
-        if (userMessage.toLowerCase().includes("building")) {
-            sessionData.data.buildingName = userMessage;
-        }
-        if (userMessage.toLowerCase().includes("apartment")) {
-            sessionData.data.apartmentNumber = userMessage;
-        }
-        if (userMessage.toLowerCase().includes("city")) {
-            sessionData.data.city = userMessage;
-        }
-
-        return aiResponse;
+      });
+  
+      if (!response.data.choices?.[0]?.message?.content) {
+        throw new Error("Invalid response from OpenAI API");
+      }
+  
+      const aiResponse = response.data.choices[0].message.content.trim();
+  
+      // --- Extraction Logic (only update if not already provided) ---
+      // Note: This is a basic implementation. In a real-world scenario, you might use regex or NLP extraction.
+      if (!session.data.name && userMessage.toLowerCase().includes("name")) {
+        // Example: if the user writes "My name is Mohammad", we can try to extract the portion after "name is"
+        // For simplicity, we'll just store the entire message.
+        session.data.name = userMessage;
+      }
+      if (!session.data.email && userMessage.toLowerCase().includes("email")) {
+        session.data.email = userMessage;
+      }
+      if (!session.data.buildingName && userMessage.toLowerCase().includes("building")) {
+        session.data.buildingName = userMessage;
+      }
+      if (!session.data.apartmentNumber && userMessage.toLowerCase().includes("apartment")) {
+        session.data.apartmentNumber = userMessage;
+      }
+      if (!session.data.city && userMessage.toLowerCase().includes("city")) {
+        session.data.city = userMessage;
+      }
+      // (Oil amount is handled separately in the webhook below)
+  
+      return aiResponse;
     } catch (error) {
-        console.error('❌ Error with OpenAI:', error.response?.data || error.message);
-        return "❌ Oops! Something went wrong, can you please try again?";
+      console.error('❌ Error with OpenAI:', error.response?.data || error.message);
+      return "❌ Oops! Something went wrong, can you please try again?";
     }
-};
-
-
-app.post('/webhook', async (req, res) => {
+  };
+  
+  
+  app.post('/webhook', async (req, res) => {
     try {
-        const entry = req.body.entry?.[0];
-        const changes = entry?.changes?.[0];
-        const value = changes?.value;
-        const messages = value?.messages;
-
-        if (!messages || messages.length === 0) {
-            return res.sendStatus(200);
-        }
-
-        const message = messages[0];
-        const from = message.from;
-        const textRaw = message.text?.body || "";
-
-        // Initialize user session if it doesn't exist
-        if (!userSessions[from]) {
-            userSessions[from] = { data: { phone: formatPhoneNumber(from) } };
-        }
-
-        const session = userSessions[from];
-
-        // Check if the message contains location data
-        if (message.location) {
-            const { latitude, longitude, name: streetName } = message.location;
-            session.data.location = { latitude, longitude, streetName };
-            await sendToWhatsApp(from, "📍 Thanks for sharing your location! Let’s keep going.");
-            return res.sendStatus(200);
-        }
-
-        // If the message contains the amount of oil used, save it
-        if (textRaw.includes("liters") || textRaw.includes("liter")) {
-            const oilAmount = textRaw.match(/\d+/)?.[0]; // Extract the number
-            if (oilAmount) {
-                session.data.oilAmount = oilAmount;
-                await sendToWhatsApp(from, `👍 Got it! You’ve mentioned ${oilAmount} liters of oil. Let’s proceed.`);
-            } else {
-                await sendToWhatsApp(from, "🤔 Can you please share how much oil you used in liters?");
-            }
-            return res.sendStatus(200);
-        }
-
-        // Get ChatGPT's response based on the current session data
-        const aiResponse = await getOpenAIResponse(textRaw, session);
-
-        // Check if all required details are collected
-        if (areAllFieldsCollected(session)) {
-            const summary = `
-            🎉 Here's what I have so far:
-            - Name: ${session.data.name}
-            - Email: ${session.data.email}
-            - Phone: ${session.data.phone}
-            - Building Name: ${session.data.buildingName}
-            - Apartment Number: ${session.data.apartmentNumber}
-            - City: ${session.data.city}
-            - Location: Latitude: ${session.data.location.latitude}, Longitude: ${session.data.location.longitude}, Street: ${session.data.location.streetName}
-            - Oil Amount: ${session.data.oilAmount}
-
-            🙌 Should I go ahead and submit your request? Just reply "Yes" to confirm or "No" to edit.
-            `;
-            await sendToWhatsApp(from, summary);
-            session.step = "CONFIRMATION";
-            return res.sendStatus(200);
-        }
-
-        // Handle user confirmation
-        if (session.step === "CONFIRMATION" && textRaw.toLowerCase() === "yes") {
-            // Send the collected data to the API
-            const requestData = session.data;
-            try {
-                const apiResponse = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
-                    headers: { 'Content-Type': 'application/json' },
-                    timeout: 5000
-                });
-
-                if (apiResponse.status === 200) {
-                    await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We'll contact you soon.");
-                } else {
-                    await sendToWhatsApp(from, "❌ Something went wrong! Please try again later.");
-                }
-            } catch (error) {
-                await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
-            }
-
-            // Clear the session after submission
-            delete userSessions[from];
+      const entry = req.body.entry?.[0];
+      const changes = entry?.changes?.[0];
+      const value = changes?.value;
+      const messages = value?.messages;
+  
+      if (!messages || messages.length === 0) {
+        return res.sendStatus(200);
+      }
+  
+      const message = messages[0];
+      const from = message.from;
+      const textRaw = message.text?.body || "";
+  
+      // Initialize user session if it doesn't exist
+      if (!userSessions[from]) {
+        userSessions[from] = { data: { phone: formatPhoneNumber(from) } };
+      }
+      const session = userSessions[from];
+  
+      // Process location data sent via WhatsApp
+      if (message.location) {
+        const { latitude, longitude, name: streetName } = message.location;
+        session.data.location = { latitude, longitude, streetName };
+        await sendToWhatsApp(from, "📍 Thanks for sharing your location! Let's keep going.");
+        return res.sendStatus(200);
+      }
+  
+      // Process oil amount if the text contains "liter(s)"
+      if (textRaw.toLowerCase().includes("liter")) {
+        const oilAmountMatch = textRaw.match(/\d+/);
+        if (oilAmountMatch) {
+          session.data.oilAmount = oilAmountMatch[0];
+          await sendToWhatsApp(from, `👍 Got it! You've mentioned ${oilAmountMatch[0]} liters of oil. Let's proceed.`);
         } else {
-            // Send ChatGPT's response to the user
-            await sendToWhatsApp(from, aiResponse);
+          await sendToWhatsApp(from, "🤔 Please let me know the amount of oil used in liters.");
         }
-
-        res.sendStatus(200);
+        return res.sendStatus(200);
+      }
+  
+      // Get ChatGPT's dynamic response based on the current session data
+      const aiResponse = await getOpenAIResponse(textRaw, session);
+  
+      // Check if all required fields have been collected
+      if (areAllFieldsCollected(session)) {
+        // Build a concise summary
+        const summary = `
+  🎉 Here's what I have so far:
+  • Name: ${session.data.name}
+  • Email: ${session.data.email}
+  • Phone: ${session.data.phone}
+  • Building: ${session.data.buildingName}
+  • Apartment: ${session.data.apartmentNumber}
+  • City: ${session.data.city}
+  • Location: Latitude ${session.data.location.latitude}, Longitude ${session.data.location.longitude}, Street ${session.data.location.streetName}
+  • Oil Used: ${session.data.oilAmount} liters
+  
+  🙌 Should I submit your request? (Reply with "Yes" to confirm or "No" to edit.)
+  `;
+        await sendToWhatsApp(from, summary);
+        session.step = "CONFIRMATION";
+        return res.sendStatus(200);
+      }
+  
+      // If we're in confirmation step and user replies "yes", submit the request
+      if (session.step === "CONFIRMATION" && textRaw.toLowerCase() === "yes") {
+        const requestData = session.data;
+        try {
+          const apiResponse = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
+            headers: { 'Content-Type': 'application/json' },
+            timeout: 5000
+          });
+  
+          if (apiResponse.status === 200) {
+            await sendToWhatsApp(from, "✅ Your request has been submitted! We'll contact you soon.");
+          } else {
+            await sendToWhatsApp(from, "❌ Something went wrong! Please try again later.");
+          }
+        } catch (error) {
+          await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
+        }
+        delete userSessions[from]; // Clear session after submission
+      } else {
+        // Otherwise, just send the AI-generated response
+        await sendToWhatsApp(from, aiResponse);
+      }
+  
+      res.sendStatus(200);
     } catch (error) {
-        console.error('❌ Error:', error.response?.data || error.message || error);
-        res.sendStatus(500);
+      console.error('❌ Error:', error.response?.data || error.message || error);
+      res.sendStatus(500);
     }
-});
+  });
+  
 
 
 app.listen(PORT, () => console.log(`🚀 Server is running on http://localhost:${PORT}`));
