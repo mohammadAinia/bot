@@ -519,7 +519,11 @@ async function askForNextMissingField(session, from, missingFields) {
     };
 
     // Generate the prompt dynamically using ChatGPT
-    const dynamicPrompt = `The user is currently in the process of submitting an order. They have provided the following information: ${JSON.stringify(sessionContext)}. Now, they are missing the field "${nextMissingField}". Ask them for the missing information in a friendly and natural way.`;
+    const dynamicPrompt = `
+        The user is in the process of submitting an order. They have provided the following information: ${JSON.stringify(sessionContext)}.
+        Now, they are missing the field "${nextMissingField}". Please ask them for the missing information in a concise, friendly, and lively tone with emojis. Ensure the message is clear, encouraging, and short.
+        Example: "Can you share your full name with us? 😊"
+    `;
 
     // Get a dynamic response from ChatGPT
     const dynamicResponse = await getOpenAIResponse(dynamicPrompt);
@@ -527,6 +531,7 @@ async function askForNextMissingField(session, from, missingFields) {
     // Send the dynamic response
     await sendToWhatsApp(from, dynamicResponse);
 }
+
 
 async function isQuestion(text) {
     const prompt = `
@@ -570,17 +575,17 @@ const generateWelcomeMessage = async () => {
 const generateMissingFieldPrompt = async (field) => {
     try {
         const fieldPromptMap = {
-            name: "Ask the user to provide their full name.",
-            phone: "Ask the user for their phone number.",
-            email: "Ask the user to provide their email address.",
-            address: "Ask the user for their full address.",
-            city: "Ask the user for their city.",
-            street: "Ask the user for their street name.",
-            building_name: "Ask the user for their building name.",
-            flat_no: "Ask the user for their flat number.",
-            latitude: "Ask the user to share their live location via WhatsApp.",
-            longitude: "Ask the user to share their live location via WhatsApp.",
-            quantity: "Ask the user how many liters they want."
+            name: "Ask the user to provide their full name. Keep it short, lively, and friendly with an emoji if possible.",
+            phone: "Ask the user for their phone number in a friendly and casual tone. Include an emoji if it feels appropriate.",
+            email: "Ask the user for their email address in a casual, short, and polite way, using emojis.",
+            address: "Ask the user to provide their full address, but keep it simple and friendly with a casual tone.",
+            city: "Ask the user for their city in a friendly, short way with some emojis.",
+            street: "Ask the user for their street name, but keep it short and cheerful.",
+            building_name: "Ask the user for their building name in a friendly and short tone.",
+            flat_no: "Ask the user for their flat number, ensuring it's friendly and concise.",
+            latitude: "Ask the user to share their live location via WhatsApp, keeping it casual with an emoji.",
+            longitude: "Ask the user to share their live location via WhatsApp. Keep it brief and friendly.",
+            quantity: "Ask the user how many liters they want in a friendly, short manner, with an emoji if appropriate."
         };
 
         if (!fieldPromptMap[field]) return null;
@@ -588,9 +593,10 @@ const generateMissingFieldPrompt = async (field) => {
         return await getOpenAIResponse(fieldPromptMap[field]);
     } catch (error) {
         console.error('❌ Error generating missing field prompt:', error);
-        return "I need more details to proceed.";
+        return "I need more details to proceed. 😊";
     }
 };
+
 app.post('/webhook', async (req, res) => {
     try {
         console.log('Incoming Webhook Data:', req.body);
