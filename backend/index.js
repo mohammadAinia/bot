@@ -1174,7 +1174,7 @@ const areAllFieldsCollected = (session) => {
             messages,
             max_tokens: 300,
             temperature: 0.2, 
-            response_format: { type: "json" }  // ✅ Use JSON mode correctly
+            response_format: { type: "json_object" }  // ✅ Use JSON mode correctly
         }, {
             headers: {
                 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
