@@ -1132,7 +1132,10 @@ async function isQuestion(text) {
 //         res.sendStatus(500);
 //     }
 // });
-
+const areAllFieldsCollected = (sessionData) => {
+    const requiredFields = ["name", "email", "buildingName", "apartmentNumber", "city", "location", "oilAmount"];
+    return requiredFields.every(field => sessionData.data[field]);
+};
 
 
 const getOpenAIResponse = async (userMessage, sessionData) => {
@@ -1169,7 +1172,26 @@ const getOpenAIResponse = async (userMessage, sessionData) => {
             throw new Error("Invalid response from OpenAI API");
         }
 
-        return response.data.choices[0].message.content.trim();
+        const aiResponse = response.data.choices[0].message.content.trim();
+
+        // Extract and save fields from the user's message
+        if (userMessage.toLowerCase().includes("name")) {
+            sessionData.data.name = userMessage;
+        }
+        if (userMessage.toLowerCase().includes("email")) {
+            sessionData.data.email = userMessage;
+        }
+        if (userMessage.toLowerCase().includes("building")) {
+            sessionData.data.buildingName = userMessage;
+        }
+        if (userMessage.toLowerCase().includes("apartment")) {
+            sessionData.data.apartmentNumber = userMessage;
+        }
+        if (userMessage.toLowerCase().includes("city")) {
+            sessionData.data.city = userMessage;
+        }
+
+        return aiResponse;
     } catch (error) {
         console.error('❌ Error with OpenAI:', error.response?.data || error.message);
         return "❌ Oops! Something went wrong, can you please try again?";
@@ -1223,17 +1245,17 @@ app.post('/webhook', async (req, res) => {
         const aiResponse = await getOpenAIResponse(textRaw, session);
 
         // Check if all required details are collected
-        if (aiResponse.includes("All details collected!")) {
+        if (areAllFieldsCollected(session)) {
             const summary = `
             🎉 Here's what I have so far:
-            - Name: ${session.data.name || "Not provided"}
-            - Email: ${session.data.email || "Not provided"}
-            - Phone: ${session.data.phone || "Not provided"}
-            - Building Name: ${session.data.buildingName || "Not provided"}
-            - Apartment Number: ${session.data.apartmentNumber || "Not provided"}
-            - City: ${session.data.city || "Not provided"}
-            - Location: ${session.data.location ? `Latitude: ${session.data.location.latitude}, Longitude: ${session.data.location.longitude}, Street: ${session.data.location.streetName}` : "Not provided"}
-            - Oil Amount: ${session.data.oilAmount || "Not provided"}
+            - Name: ${session.data.name}
+            - Email: ${session.data.email}
+            - Phone: ${session.data.phone}
+            - Building Name: ${session.data.buildingName}
+            - Apartment Number: ${session.data.apartmentNumber}
+            - City: ${session.data.city}
+            - Location: Latitude: ${session.data.location.latitude}, Longitude: ${session.data.location.longitude}, Street: ${session.data.location.streetName}
+            - Oil Amount: ${session.data.oilAmount}
 
             🙌 Should I go ahead and submit your request? Just reply "Yes" to confirm or "No" to edit.
             `;
