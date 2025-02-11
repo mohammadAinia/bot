@@ -495,6 +495,14 @@ function getMissingFields(sessionData) {
 }
 
 async function askForNextMissingField(session, from, missingFields) {
+    // Check if the greeting has already been sent for this session
+    if (!session.greetingSent) {
+        // Send the greeting message only once
+        const greetingMessage = `Hello ${session.data.name || 'there'}! 👋 We're here to help you complete your order. Let's get started! 😊`;
+        await sendToWhatsApp(from, greetingMessage);
+        session.greetingSent = true;  // Mark greeting as sent
+    }
+
     if (missingFields.length === 0) {
         session.step = STATES.CONFIRMATION;
         return await sendOrderSummary(from, session);
@@ -518,19 +526,21 @@ async function askForNextMissingField(session, from, missingFields) {
         quantity: session.data.quantity,
     };
 
-    // Generate the prompt dynamically using ChatGPT
+    // Define the dynamic prompt for the missing field
     const dynamicPrompt = `
-        The user is in the process of submitting an order. They have provided the following information: ${JSON.stringify(sessionContext)}.
-        Now, they are missing the field "${nextMissingField}". Please ask them for the missing information in a concise, friendly, and lively tone with emojis. Ensure the message is clear, encouraging, and short.
-        Example: "Can you share your full name with us? 😊"
+        The user is in the process of submitting an order to Lootah Biofuels. They have already provided the following information: ${JSON.stringify(sessionContext)}.
+        Now, they are missing the field "${nextMissingField}". Please ask for this missing field in a friendly, short, and lively way, using emojis where appropriate (but sparingly). Ensure the message is encouraging and concise.
+
+        Example response: "Hey, we just need your name to proceed! 😊"
     `;
 
-    // Get a dynamic response from ChatGPT
+    // Get the dynamic response from OpenAI
     const dynamicResponse = await getOpenAIResponse(dynamicPrompt);
 
-    // Send the dynamic response
+    // Send the dynamic response to the user
     await sendToWhatsApp(from, dynamicResponse);
 }
+
 
 
 async function isQuestion(text) {
@@ -692,11 +702,27 @@ app.post('/webhook', async (req, res) => {
 
             //----------------------------------------------------------------------
             case STATES.NAME:
-                session.data.name = textRaw;
-                session.step = STATES.EMAIL;
-                const nameResponse = await getOpenAIResponse("The user just provided their name as " + textRaw + ". Now, ask them for their email address.");
-                await sendToWhatsApp(from, nameResponse);
+                // Send the name to ChatGPT for validation
+                const nameValidationPrompt = `
+                    Please check if the following text is a valid name: "${textRaw}". If it seems like a random word or something unrelated to a name, respond with a suggestion to ask for a proper name.
+                `;
+                
+                const nameValidationResponse = await getOpenAIResponse(nameValidationPrompt);
+            
+                if (nameValidationResponse.toLowerCase().includes('not a valid name') || nameValidationResponse.toLowerCase().includes('incorrect name')) {
+                    // If the response indicates that the input is not a valid name
+                    const invalidNameResponse = "❌ It looks like the name you provided might not be valid. Could you please provide your full name? 😊";
+                    await sendToWhatsApp(from, invalidNameResponse);
+                    session.step = STATES.NAME;  // Keep the user in the NAME state
+                } else {
+                    // If the response indicates that it seems like a valid name
+                    session.data.name = textRaw;
+                    session.step = STATES.EMAIL;
+                    const nameResponse = await getOpenAIResponse("The user just provided their name as " + textRaw + ". Now, ask them for their email address.");
+                    await sendToWhatsApp(from, nameResponse);
+                }
                 break;
+            
 
             case STATES.PHONE_INPUT:
                 if (!isValidPhone(textRaw)) {
@@ -722,12 +748,28 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, emailValidResponse);
                 break;
 
-            case STATES.ADDRESS:
-                session.data.address = textRaw;
-                session.step = STATES.CITY_SELECTION;
-                const addressResponse = await getOpenAIResponse("The user provided the address " + textRaw + ". Ask them to select a city.");
-                await sendCitySelection(from); // Immediate action with dynamic response
-                break;
+                case STATES.ADDRESS:
+                    // First, send the address to ChatGPT for validation
+                    const addressValidationPrompt = `
+                        Please check if the following text is a valid address: "${textRaw}". If it's not a valid address, please respond with a suggestion to ask for a correct address.
+                    `;
+                    
+                    const addressValidationResponse = await getOpenAIResponse(addressValidationPrompt);
+                
+                    if (addressValidationResponse.toLowerCase().includes('not a valid address') || addressValidationResponse.toLowerCase().includes('incorrect address')) {
+                        // If the response indicates that the input is not a valid address
+                        const invalidAddressResponse = "❌ It looks like the address you provided might not be valid. Could you please provide a complete address? 🏠";
+                        await sendToWhatsApp(from, invalidAddressResponse);
+                        session.step = STATES.ADDRESS;  // Keep the user in the ADDRESS state
+                    } else {
+                        // If the response indicates that it seems like a valid address
+                        session.data.address = textRaw;
+                        session.step = STATES.CITY_SELECTION;
+                        const addressResponse = await getOpenAIResponse("The user provided the address " + textRaw + ". Ask them to select a city.");
+                        await sendCitySelection(from); // Immediate action with dynamic response
+                    }
+                    break;
+                
 
             case STATES.CITY_SELECTION:
                 if (message.interactive && message.interactive.button_reply) {
