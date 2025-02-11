@@ -1174,7 +1174,7 @@ const areAllFieldsCollected = (session) => {
             messages,
             max_tokens: 300,
             temperature: 0.2, 
-            response_format: "json"  // ✅ Use JSON mode correctly
+            response_format: { type: "json" }  // ✅ Use JSON mode correctly
         }, {
             headers: {
                 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
@@ -1198,7 +1198,7 @@ const areAllFieldsCollected = (session) => {
         return "❌ Oops! Something went wrong, can you please try again?";
     }
 };
-    
+
   
 app.post('/webhook', async (req, res) => {
     try {
