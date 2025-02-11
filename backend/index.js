@@ -1138,13 +1138,13 @@ async function isQuestion(text) {
 const getOpenAIResponse = async (userMessage, sessionData) => {
     try {
         const systemMessage = `
-        You are a helpful assistant for a WhatsApp bot used by Lootah Biofuels. Your task is to guide users through a request submission process and answer any questions they have related to the company.
-        - Collect the following details from the user: name, email, building name, apartment number, city, and location.
-        - If the user shares their location via WhatsApp, extract the latitude, longitude, and street name from it.
-        - Only ask for missing details, avoiding repetition of questions.
-        - Be aware of the session context, including previously provided information.
-        - Ensure the user’s phone number is Emirati.
-        - Once all details are collected, generate a summary of the collected information and ask the user to confirm before submitting.
+        You are a friendly assistant for a WhatsApp bot used by Lootah Biofuels. Your task is to guide users through the request submission process in an engaging and lively way, and answer any questions they have about the company.
+        - Collect the following details: name, email, building name, apartment number, city, location, and amount of oil used.
+        - Be lively, friendly, and interactive in the conversation.
+        - After receiving a piece of information, ask the user to confirm or clarify it in a conversational way (e.g., "Got it! Just to confirm, your building name is X, right?").
+        - Use the information provided earlier to reduce repetition and keep the conversation flowing naturally.
+        - Ensure the user’s phone number is Emirati and ask for clarification if needed.
+        - Once all details are collected, summarize the information in a friendly manner and ask for confirmation before submitting.
         - Here is the current session data: ${JSON.stringify(sessionData)}
         `;
 
@@ -1172,12 +1172,9 @@ const getOpenAIResponse = async (userMessage, sessionData) => {
         return response.data.choices[0].message.content.trim();
     } catch (error) {
         console.error('❌ Error with OpenAI:', error.response?.data || error.message);
-        return "❌ Sorry, an error occurred while processing your request.";
+        return "❌ Oops! Something went wrong, can you please try again?";
     }
 };
-
-
-
 
 
 app.post('/webhook', async (req, res) => {
@@ -1206,7 +1203,19 @@ app.post('/webhook', async (req, res) => {
         if (message.location) {
             const { latitude, longitude, name: streetName } = message.location;
             session.data.location = { latitude, longitude, streetName };
-            await sendToWhatsApp(from, "📍 Thanks for sharing your location! Let's proceed.");
+            await sendToWhatsApp(from, "📍 Thanks for sharing your location! Let’s keep going.");
+            return res.sendStatus(200);
+        }
+
+        // If the message contains the amount of oil used, save it
+        if (textRaw.includes("liters") || textRaw.includes("liter")) {
+            const oilAmount = textRaw.match(/\d+/)?.[0]; // Extract the number
+            if (oilAmount) {
+                session.data.oilAmount = oilAmount;
+                await sendToWhatsApp(from, `👍 Got it! You’ve mentioned ${oilAmount} liters of oil. Let’s proceed.`);
+            } else {
+                await sendToWhatsApp(from, "🤔 Can you please share how much oil you used in liters?");
+            }
             return res.sendStatus(200);
         }
 
@@ -1215,9 +1224,8 @@ app.post('/webhook', async (req, res) => {
 
         // Check if all required details are collected
         if (aiResponse.includes("All details collected!")) {
-            // Generate a summary of the collected data
             const summary = `
-            Here's what I have so far:
+            🎉 Here's what I have so far:
             - Name: ${session.data.name || "Not provided"}
             - Email: ${session.data.email || "Not provided"}
             - Phone: ${session.data.phone || "Not provided"}
@@ -1225,10 +1233,10 @@ app.post('/webhook', async (req, res) => {
             - Apartment Number: ${session.data.apartmentNumber || "Not provided"}
             - City: ${session.data.city || "Not provided"}
             - Location: ${session.data.location ? `Latitude: ${session.data.location.latitude}, Longitude: ${session.data.location.longitude}, Street: ${session.data.location.streetName}` : "Not provided"}
+            - Oil Amount: ${session.data.oilAmount || "Not provided"}
 
-            Should I proceed with this request? (Reply with "Yes" or "No")
+            🙌 Should I go ahead and submit your request? Just reply "Yes" to confirm or "No" to edit.
             `;
-
             await sendToWhatsApp(from, summary);
             session.step = "CONFIRMATION";
             return res.sendStatus(200);
@@ -1245,9 +1253,9 @@ app.post('/webhook', async (req, res) => {
                 });
 
                 if (apiResponse.status === 200) {
-                    await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
+                    await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We'll contact you soon.");
                 } else {
-                    await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
+                    await sendToWhatsApp(from, "❌ Something went wrong! Please try again later.");
                 }
             } catch (error) {
                 await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
@@ -1266,5 +1274,6 @@ app.post('/webhook', async (req, res) => {
         res.sendStatus(500);
     }
 });
+
 
 app.listen(PORT, () => console.log(`🚀 Server is running on http://localhost:${PORT}`));
