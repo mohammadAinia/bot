@@ -1170,11 +1170,11 @@ const areAllFieldsCollected = (session) => {
         ];
 
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-            model: "gpt-4-1106-preview", // ✅ Use the correct model
+            model: "gpt-4-1106-preview", // Use the correct model
             messages,
             max_tokens: 300,
-            temperature: 0.2, 
-            response_format: { type: "json_object" }  // ✅ Use JSON mode correctly
+            temperature: 0.2,
+            response_format: { type: "json_object" } // Force JSON output
         }, {
             headers: {
                 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
