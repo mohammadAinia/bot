@@ -759,23 +759,31 @@ app.post('/webhook', async (req, res) => {
         // Handle messages based on the current state
         switch (session.step) {
             case STATES.WELCOME:
-                if (message.type === "text") {
-                    const extractedData = await extractInformationFromText(textRaw);
+                if (message.interactive && message.interactive.button_reply) {
+                    const buttonId = message.interactive.button_reply.id;
 
-                    // Merge extracted data into the session
+                    if (buttonId === "new_request") {
+                        // Reset session data for a new request
+                        session.data = { phone: formatPhoneNumber(from) };
+                        session.step = STATES.NAME;
+
+                        // Ask for the user's name
+                        const namePrompt = await generateMissingFieldPrompt("name");
+                        await sendToWhatsApp(from, namePrompt);
+                    } else if (buttonId === "contact_us") {
+                        // Handle "Contact Us" button
+                        await sendToWhatsApp(from, "You can reach us at support@example.com. 📞");
+                    }
+                } else if (message.type === "text") {
+                    // Handle text input (if any)
+                    const extractedData = await extractInformationFromText(textRaw);
                     session.data = { ...session.data, ...extractedData };
 
-                    // Check for missing fields
                     const missingFields = getMissingFields(session.data);
-                    session.data.phone = formatPhoneNumber(from);
-
-
                     if (missingFields.length === 0) {
-                        // If no fields are missing, proceed to confirmation
                         session.step = STATES.CONFIRMATION;
                         await sendOrderSummary(from, session);
                     } else {
-                        // Ask for the next missing field
                         await askForNextMissingField(session, from, missingFields);
                     }
                 }
@@ -936,8 +944,8 @@ app.post('/webhook', async (req, res) => {
                     }
                 } else {
                     if (!session.locationPromptSent) {
-                        const locationErrorResponse = await getOpenAIResponse("User didn't provide location. Ask them to share their location.");
-                        await sendToWhatsApp(from, locationErrorResponse);
+                        const missingPrompt = await generateMissingFieldPrompt("longitude");
+                        await sendToWhatsApp(from, missingPrompt);
                         session.locationPromptSent = true;
                     }
                 }
