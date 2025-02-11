@@ -503,27 +503,31 @@ async function askForNextMissingField(session, from, missingFields) {
     const nextMissingField = missingFields[0]; // Get the first missing field
     session.step = `ASK_${nextMissingField.toUpperCase()}`; // Set the step dynamically
 
-    // Define prompts for each missing field
-    const fieldPromptMap = {
-        name: "🔹 Please provide your full name.",
-        phone: "📞 Please provide your phone number.",
-        email: "📧 Please provide your email address.",
-        address: "📍 Please provide your full address.",
-        city: "🌆 Please provide your city.",
-        street: "🏠 Please provide your street name.",
-        building_name: "🏢 Please provide your building name.",
-        flat_no: "🏠 Please provide your flat number.",
-        latitude: "📍 Please share your location using WhatsApp's location feature.",
-        longitude: "📍 Please share your location using WhatsApp's location feature.",
-        quantity: "📦 Please provide the quantity (in liters) of the product."
+    // Gather session context to pass to ChatGPT for dynamic responses
+    const sessionContext = {
+        name: session.data.name,
+        phone: session.data.phone,
+        email: session.data.email,
+        address: session.data.address,
+        city: session.data.city,
+        street: session.data.street,
+        building_name: session.data.building_name,
+        flat_no: session.data.flat_no,
+        latitude: session.data.latitude,
+        longitude: session.data.longitude,
+        quantity: session.data.quantity,
     };
 
-    if (fieldPromptMap[nextMissingField]) {
-        await sendToWhatsApp(from, fieldPromptMap[nextMissingField]);
-    } else {
-        console.error(`❌ No prompt found for missing field: ${nextMissingField}`);
-    }
+    // Generate the prompt dynamically using ChatGPT
+    const dynamicPrompt = `The user is currently in the process of submitting an order. They have provided the following information: ${JSON.stringify(sessionContext)}. Now, they are missing the field "${nextMissingField}". Ask them for the missing information in a friendly and natural way.`;
+
+    // Get a dynamic response from ChatGPT
+    const dynamicResponse = await getChatGPTResponse(dynamicPrompt);
+
+    // Send the dynamic response
+    await sendToWhatsApp(from, dynamicResponse);
 }
+
 async function isQuestion(text) {
     const prompt = `
         Determine if the following text is a question. Respond with "true" if it is a question, otherwise respond with "false".
