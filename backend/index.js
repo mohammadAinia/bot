@@ -674,7 +674,7 @@ const generateMissingFieldPrompt = async (field) => {
         street: "Ask the user for their street name in a cheerful tone. Example: 'What’s the name of your street? 🛣️'",
         building_name: "Ask the user for their building name in a friendly way. Example: 'Could you tell us the name of your building? 🏢'",
         flat_no: "Ask the user for their flat number politely. Example: 'What’s your flat number? 🏠'",
-        latitude: "Ask the user to share their live location via WhatsApp. Example: 'Could you share your live location so we can find you easily? 📍'",
+        latitude: "Ask the user to share their live location via WhatsApp. Example: 'Please share your live location to help us serve you better! 📍'",
         longitude: "Ask the user to share their live location via WhatsApp. Example: 'Please share your live location to help us serve you better! 📍'",
         quantity: "Ask the user how many liters they want in a friendly tone. Example: 'How many liters would you like to order? ⛽'"
     };
