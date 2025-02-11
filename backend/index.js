@@ -1141,7 +1141,7 @@ const getOpenAIResponse = async (userMessage, sessionData) => {
         You are a helpful assistant for a WhatsApp bot used by Lootah Biofuels. Your task is to guide users through a request submission process and answer any questions they have related to the company.
         - Collect the following details from the user: name, email, building name, apartment number, city, and location.
         - If the user shares their location via WhatsApp, extract the latitude, longitude, and street name from it.
-        - Ask for missing details in a natural, friendly way, without listing fields explicitly.
+        - Only ask for missing details, avoiding repetition of questions.
         - Be aware of the session context, including previously provided information.
         - Ensure the user’s phone number is Emirati.
         - Once all details are collected, generate a summary of the collected information and ask the user to confirm before submitting.
@@ -1179,26 +1179,21 @@ const getOpenAIResponse = async (userMessage, sessionData) => {
 
 
 
+
 app.post('/webhook', async (req, res) => {
     try {
-        console.log('Incoming Webhook Data:', req.body);
-
         const entry = req.body.entry?.[0];
         const changes = entry?.changes?.[0];
         const value = changes?.value;
         const messages = value?.messages;
 
         if (!messages || messages.length === 0) {
-            console.log('No messages received, returning early.');
             return res.sendStatus(200);
         }
 
         const message = messages[0];
         const from = message.from;
         const textRaw = message.text?.body || "";
-        const text = textRaw.toLowerCase().trim();
-
-        console.log(`📩 New message from ${from}: ${text}`);
 
         // Initialize user session if it doesn't exist
         if (!userSessions[from]) {
@@ -1211,18 +1206,18 @@ app.post('/webhook', async (req, res) => {
         if (message.location) {
             const { latitude, longitude, name: streetName } = message.location;
             session.data.location = { latitude, longitude, streetName };
-            await sendToWhatsApp(from, "📍 Thanks for sharing your location! Let’s proceed.");
+            await sendToWhatsApp(from, "📍 Thanks for sharing your location! Let's proceed.");
             return res.sendStatus(200);
         }
 
-        // Get ChatGPT's response
+        // Get ChatGPT's response based on the current session data
         const aiResponse = await getOpenAIResponse(textRaw, session);
 
-        // Check if ChatGPT has collected all required information
+        // Check if all required details are collected
         if (aiResponse.includes("All details collected!")) {
             // Generate a summary of the collected data
             const summary = `
-            Here’s what I have so far:
+            Here's what I have so far:
             - Name: ${session.data.name || "Not provided"}
             - Email: ${session.data.email || "Not provided"}
             - Phone: ${session.data.phone || "Not provided"}
@@ -1230,7 +1225,7 @@ app.post('/webhook', async (req, res) => {
             - Apartment Number: ${session.data.apartmentNumber || "Not provided"}
             - City: ${session.data.city || "Not provided"}
             - Location: ${session.data.location ? `Latitude: ${session.data.location.latitude}, Longitude: ${session.data.location.longitude}, Street: ${session.data.location.streetName}` : "Not provided"}
-            
+
             Should I proceed with this request? (Reply with "Yes" or "No")
             `;
 
@@ -1240,7 +1235,7 @@ app.post('/webhook', async (req, res) => {
         }
 
         // Handle user confirmation
-        if (session.step === "CONFIRMATION" && text === "yes") {
+        if (session.step === "CONFIRMATION" && textRaw.toLowerCase() === "yes") {
             // Send the collected data to the API
             const requestData = session.data;
             try {
@@ -1250,26 +1245,12 @@ app.post('/webhook', async (req, res) => {
                 });
 
                 if (apiResponse.status === 200) {
-                    console.log('API Response:', apiResponse.data);
                     await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
                 } else {
-                    console.error(`❌ API returned unexpected status code: ${apiResponse.status}`);
                     await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
                 }
             } catch (error) {
-                if (error.response) {
-                    console.error('API Error Response:', error.response.data);
-                    console.error('API Status Code:', error.response.status);
-
-                    if (error.response.status === 422) {
-                        await sendToWhatsApp(from, "❌ Your phone number must be Emirati to proceed with this request.");
-                    } else {
-                        await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
-                    }
-                } else {
-                    console.error('Network or request error:', error.message);
-                    await sendToWhatsApp(from, "❌ Unable to reach the server. Please check your internet connection and try again.");
-                }
+                await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
             }
 
             // Clear the session after submission
@@ -1285,4 +1266,5 @@ app.post('/webhook', async (req, res) => {
         res.sendStatus(500);
     }
 });
+
 app.listen(PORT, () => console.log(`🚀 Server is running on http://localhost:${PORT}`));
