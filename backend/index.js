@@ -1143,34 +1143,27 @@ const areAllFieldsCollected = (session) => {
   const getOpenAIResponse = async (userMessage, sessionData) => {
     try {
         const systemMessage = `
-        You are an assistant helping with WhatsApp request submissions for Lootah Biofuels.
-        Extract relevant user details from the message and return them in structured JSON format.
-
-        **Extract and return these fields if available:**
-        - name (e.g., "John" from "I'm John")
-        - email (e.g., "john@example.com")
-        - buildingName (e.g., "Sunrise Tower")
-        - apartmentNumber (e.g., "Apt 101")
-        - city (e.g., "Dubai")
-        - oilAmount (e.g., "50 liters" → "50")
-        - location (if the user shares one)
+        You are a friendly assistant for a WhatsApp bot used by Lootah Biofuels. Your task is to guide users through the request submission process in an engaging and lively way, and answer any questions they have about the company.
         
-        **Response Format:**
-        Return a structured JSON object like:
-        {
-          "updates": {
-            "name": "John",
-            "email": "john@example.com",
-            "buildingName": "Sunrise Tower",
-            "apartmentNumber": "101",
-            "city": "Dubai",
-            "oilAmount": "50"
-          },
-          "response": "Thank you! Now, could you please share your location?"
-        }
+        **Instructions:**
+        1. **Extract Data:** Parse the user's message to extract the following fields:
+           - Name (e.g., "John" from "My name is John")
+           - Email (e.g., "john@example.com")
+           - Building Name (e.g., "Sunrise Tower")
+           - Apartment Number (e.g., "Apt 101")
+           - City (e.g., "Dubai")
+           - Oil Amount (e.g., "50 liters" → "50")
+        
+        2. **Confirm Values:** After extracting a value, ask the user to confirm it (e.g., "Just to confirm, your name is John, right?").
+        3. **Avoid Repetition:** Never ask for information already confirmed and stored in the session.
+        4. **Session Data:** Here is the current session data: ${JSON.stringify(sessionData.data)}
 
-        **Current Session Data:**
-        ${JSON.stringify(sessionData.data)}
+        **Response Format:**
+        - Return a JSON object with two fields: 
+          \`response\` (your reply to the user) 
+          \`updates\` (key-value pairs of extracted data to save to the session)
+        - Example: 
+          {"response": "Got it! Is your email john@example.com?", "updates": {"email": "john@example.com"}}
         `;
 
         const messages = [
@@ -1179,35 +1172,11 @@ const areAllFieldsCollected = (session) => {
         ];
 
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-            model: "gpt-4-1106-preview", // Supports function calling
+            model: "gpt-4",
             messages,
             max_tokens: 300,
-            temperature: 0.2,
-            functions: [{
-                name: "extract_user_data",
-                description: "Extracts user details and returns them in structured format",
-                parameters: {
-                    type: "object",
-                    properties: {
-                        updates: {
-                            type: "object",
-                            description: "Extracted data",
-                            properties: {
-                                name: { type: "string", description: "User's name" },
-                                email: { type: "string", description: "User's email" },
-                                buildingName: { type: "string", description: "Building name" },
-                                apartmentNumber: { type: "string", description: "Apartment number" },
-                                city: { type: "string", description: "City" },
-                                oilAmount: { type: "string", description: "Amount of oil in liters" }
-                            }
-                        },
-                        response: {
-                            type: "string",
-                            description: "Message to send back to the user"
-                        }
-                    }
-                }
-            }]
+            temperature: 0.2, // Lower temperature for structured output
+            response_format: { type: "json_object" } // Force JSON output
         }, {
             headers: {
                 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
@@ -1215,23 +1184,24 @@ const areAllFieldsCollected = (session) => {
             }
         });
 
-        const openaiResponse = response.data;
-        const functionCall = openaiResponse.choices?.[0]?.message?.function_call;
+        const rawResponse = response.data.choices?.[0]?.message?.content?.trim();
+        if (!rawResponse) throw new Error("Invalid response from OpenAI API");
 
-        if (functionCall) {
-            const parsedData = JSON.parse(functionCall.arguments);
-            const { updates, response } = parsedData;
+        // Parse the JSON response
+        const parsedResponse = JSON.parse(rawResponse);
+        const { response: aiResponse, updates } = parsedResponse;
 
-            // Update session with extracted data
-            Object.assign(sessionData.data, updates);
-
-            return response;
-        } else {
-            return "I didn't quite get that. Can you please clarify?";
+        // Update session data with extracted values
+        if (updates) {
+            Object.entries(updates).forEach(([key, value]) => {
+                sessionData.data[key] = value;
+            });
         }
+
+        return aiResponse;
     } catch (error) {
-        console.error('❌ OpenAI Error:', error.response?.data || error.message);
-        return "❌ Something went wrong, please try again.";
+        console.error('❌ Error with OpenAI:', error.response?.data || error.message);
+        return "❌ Oops! Something went wrong, can you please try again?";
     }
 };
   
@@ -1248,7 +1218,7 @@ app.post('/webhook', async (req, res) => {
 
         const message = messages[0];
         const from = message.from;
-        const textRaw = message.text?.body?.trim() || "";
+        const textRaw = message.text?.body || "";
 
         // Initialize user session if it doesn't exist
         if (!userSessions[from]) {
@@ -1261,44 +1231,20 @@ app.post('/webhook', async (req, res) => {
         if (message.location) {
             const { latitude, longitude, name: streetName } = message.location;
             session.data.location = { latitude, longitude, streetName };
-            await sendToWhatsApp(from, "📍 Thanks for sharing your location! Let’s keep going.");
+            await sendToWhatsApp(from, "📍 Thanks for sharing your location! Let’s proceed.");
             return res.sendStatus(200);
         }
 
-        // Handle oil amount input
-        const oilMatch = textRaw.match(/(\d+)\s*liters?/i);
-        if (oilMatch) {
-            session.data.oilAmount = oilMatch[1];
-            await sendToWhatsApp(from, `👍 Got it! You’ve mentioned ${oilMatch[1]} liters of oil. Let’s proceed.`);
-            return res.sendStatus(200);
-        }
-
-        // Handle confirmation step
-        if (session.step === "CONFIRMATION") {
-            if (textRaw.toLowerCase() === "yes") {
-                try {
-                    const apiResponse = await axios.post(
-                        'https://api.lootahbiofuels.com/api/v1/whatsapp_request',
-                        session.data,
-                        { headers: { 'Content-Type': 'application/json' }, timeout: 5000 }
-                    );
-
-                    if (apiResponse.status === 200) {
-                        await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We'll contact you soon.");
-                    } else {
-                        await sendToWhatsApp(from, "❌ Something went wrong! Please try again later.");
-                    }
-                } catch (error) {
-                    console.error("❌ Submission Error:", error.response?.data || error.message);
-                    await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
-                }
-                delete userSessions[from];
-                return res.sendStatus(200);
-            } else if (textRaw.toLowerCase() === "no") {
-                await sendToWhatsApp(from, "🔄 No problem! Let’s edit your details. What would you like to change?");
-                session.step = "EDITING";
-                return res.sendStatus(200);
+        // Handle oil amount
+        if (textRaw.match(/liters?/i)) {
+            const oilAmount = textRaw.match(/\d+/)?.[0];
+            if (oilAmount) {
+                session.data.oilAmount = oilAmount;
+                await sendToWhatsApp(from, `👍 Got it! You’ve mentioned ${oilAmount} liters of oil. Let’s proceed.`);
+            } else {
+                await sendToWhatsApp(from, "🤔 Can you please share how much oil you used in liters?");
             }
+            return res.sendStatus(200);
         }
 
         // Get ChatGPT's response
@@ -1308,23 +1254,45 @@ app.post('/webhook', async (req, res) => {
         if (areAllFieldsCollected(session)) {
             const summary = `
             🎉 Here's what I have so far:
-            - Name: ${session.data.name || "Not provided"}
-            - Email: ${session.data.email || "Not provided"}
+            - Name: ${session.data.name}
+            - Email: ${session.data.email}
             - Phone: ${session.data.phone}
-            - Building Name: ${session.data.buildingName || "Not provided"}
-            - Apartment Number: ${session.data.apartmentNumber || "Not provided"}
-            - City: ${session.data.city || "Not provided"}
-            - Location: ${session.data.location ? `Latitude: ${session.data.location.latitude}, Longitude: ${session.data.location.longitude}, Street: ${session.data.location.streetName || "Not provided"}` : "Not provided"}
-            - Oil Amount: ${session.data.oilAmount || "Not provided"} liters
+            - Building Name: ${session.data.buildingName}
+            - Apartment Number: ${session.data.apartmentNumber}
+            - City: ${session.data.city}
+            - Location: Latitude: ${session.data.location.latitude}, Longitude: ${session.data.location.longitude}, Street: ${session.data.location.streetName}
+            - Oil Amount: ${session.data.oilAmount}
 
-            🙌 Should I go ahead and submit your request? Just reply "Yes" to confirm or "No" to edit.`;
+            🙌 Should I go ahead and submit your request? Just reply "Yes" to confirm or "No" to edit.
+            `;
             await sendToWhatsApp(from, summary);
             session.step = "CONFIRMATION";
             return res.sendStatus(200);
         }
 
-        // Continue conversation
-        await sendToWhatsApp(from, aiResponse);
+        // Handle confirmation
+        if (session.step === "CONFIRMATION" && textRaw.toLowerCase() === "yes") {
+            const requestData = session.data;
+            try {
+                const apiResponse = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
+                    headers: { 'Content-Type': 'application/json' },
+                    timeout: 5000
+                });
+
+                if (apiResponse.status === 200) {
+                    await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We'll contact you soon.");
+                } else {
+                    await sendToWhatsApp(from, "❌ Something went wrong! Please try again later.");
+                }
+            } catch (error) {
+                await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
+            }
+
+            delete userSessions[from];
+        } else {
+            await sendToWhatsApp(from, aiResponse);
+        }
+
         res.sendStatus(200);
     } catch (error) {
         console.error('❌ Error:', error.response?.data || error.message || error);
