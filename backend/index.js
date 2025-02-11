@@ -683,42 +683,45 @@ app.post('/webhook', async (req, res) => {
             //----------------------------------------------------------------------
             case STATES.NAME:
                 session.data.name = textRaw;
-                // The phone is already set in the session initialization
                 session.step = STATES.EMAIL;
-                await sendToWhatsApp(from, "📧 Please provide your email address.");
+                const nameResponse = await getChatGPTResponse("The user just provided their name as " + textRaw + ". Now, ask them for their email address.");
+                await sendToWhatsApp(from, nameResponse);
                 break;
 
             case STATES.PHONE_INPUT:
                 if (!isValidPhone(textRaw)) {
-                    await sendToWhatsApp(from, "❌ Invalid phone number. Please enter a valid Emirati phone number.");
+                    const phoneResponse = await getChatGPTResponse("User entered an invalid phone number " + textRaw + ". Ask them to enter a valid Emirati phone number.");
+                    await sendToWhatsApp(from, phoneResponse);
                     return res.sendStatus(200);
                 }
                 session.data.phone = formatPhoneNumber(textRaw);
                 session.step = STATES.EMAIL;
-                await sendToWhatsApp(from, "📧 Please provide your email address.");
+                const phoneValidResponse = await getChatGPTResponse("The user entered a valid phone number " + textRaw + ". Now, ask them for their email address.");
+                await sendToWhatsApp(from, phoneValidResponse);
                 break;
-
-
 
             case STATES.EMAIL:
                 if (!isValidEmail(textRaw)) {
-                    await sendToWhatsApp(from, "❌ Invalid email address, please enter a valid one.");
+                    const emailResponse = await getChatGPTResponse("User entered an invalid email address " + textRaw + ". Ask them to enter a valid email address.");
+                    await sendToWhatsApp(from, emailResponse);
                     return res.sendStatus(200);
                 }
                 session.data.email = textRaw;
                 session.step = STATES.ADDRESS;
-                await sendToWhatsApp(from, "📍 Please provide your full address.");
+                const emailValidResponse = await getChatGPTResponse("The user entered a valid email address " + textRaw + ". Now, ask them for their full address.");
+                await sendToWhatsApp(from, emailValidResponse);
                 break;
 
             case STATES.ADDRESS:
                 session.data.address = textRaw;
-                session.step = STATES.CITY_SELECTION;  // ✅ Move directly to CITY_SELECTION
-                return await sendCitySelection(from);   // ✅ Immediately send the city selection and return
+                session.step = STATES.CITY_SELECTION;
+                const addressResponse = await getChatGPTResponse("The user provided the address " + textRaw + ". Ask them to select a city.");
+                await sendCitySelection(from); // Immediate action with dynamic response
+                break;
 
             case STATES.CITY_SELECTION:
-                if (message.interactive && message.interactive.button_reply) {  // ✅ Handle button replies
-                    const citySelection = message.interactive.button_reply.id;  // ✅ Get selected city ID
-
+                if (message.interactive && message.interactive.button_reply) {
+                    const citySelection = message.interactive.button_reply.id;
                     const cityMap = {
                         "abu_dhabi": "Abu Dhabi",
                         "dubai": "Dubai",
@@ -728,45 +731,47 @@ app.post('/webhook', async (req, res) => {
                     if (cityMap[citySelection]) {
                         session.data.city = cityMap[citySelection];
                         session.step = STATES.STREET;
-                        await sendToWhatsApp(from, `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`);
+                        const cityResponse = await getChatGPTResponse("The user selected the city " + cityMap[citySelection] + ". Now, ask them for the street name.");
+                        await sendToWhatsApp(from, cityResponse);
                     } else {
-                        await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided options.");
-                        await sendCitySelection(from); // Re-send city selection if invalid
+                        const invalidCityResponse = await getChatGPTResponse("The user made an invalid city selection. Ask them to choose from the provided options.");
+                        await sendToWhatsApp(from, invalidCityResponse);
+                        await sendCitySelection(from); // Re-send city selection
                     }
                 } else {
-                    await sendToWhatsApp(from, "❌ Please select a city from the provided options.");
-                    await sendCitySelection(from); // Re-send the city selection buttons
+                    const noCityResponse = await getChatGPTResponse("The user didn't select a city. Ask them to choose from the provided options.");
+                    await sendToWhatsApp(from, noCityResponse);
+                    await sendCitySelection(from); // Re-send city selection buttons
                 }
                 break;
 
             case STATES.STREET:
                 session.data.street = textRaw;
                 session.step = STATES.BUILDING_NAME;
-                await sendToWhatsApp(from, "🏢 Please provide the building name.");
+                const streetResponse = await getChatGPTResponse("User provided the street " + textRaw + ". Ask them for the building name.");
+                await sendToWhatsApp(from, streetResponse);
                 break;
 
             case STATES.BUILDING_NAME:
                 session.data.building_name = textRaw;
                 session.step = STATES.FLAT_NO;
-                await sendToWhatsApp(from, "🏠 Please provide the flat number.");
+                const buildingResponse = await getChatGPTResponse("User provided the building name " + textRaw + ". Ask them for the flat number.");
+                await sendToWhatsApp(from, buildingResponse);
                 break;
 
             case STATES.FLAT_NO:
                 session.data.flat_no = textRaw;
                 session.step = STATES.LONGITUDE;
-
-                // Only send the location prompt if it hasn't been sent already
+                const flatResponse = await getChatGPTResponse("User provided the flat number " + textRaw + ". Ask them to share their location.");
                 if (!session.locationPromptSent) {
-                    await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature. Tap the 📎 icon and select 'Location'.");
-                    session.locationPromptSent = true; // Mark the prompt as sent
+                    await sendToWhatsApp(from, flatResponse);
+                    session.locationPromptSent = true;
                 }
                 break;
 
             case STATES.LONGITUDE:
                 if (message.location) {
                     const { latitude, longitude } = message.location;
-
-                    // UAE geographical boundaries
                     const UAE_BOUNDS = {
                         minLat: 22.5,
                         maxLat: 26.5,
@@ -774,7 +779,6 @@ app.post('/webhook', async (req, res) => {
                         maxLng: 56.5
                     };
 
-                    // Validate if the location is within UAE
                     if (
                         latitude >= UAE_BOUNDS.minLat &&
                         latitude <= UAE_BOUNDS.maxLat &&
@@ -784,42 +788,42 @@ app.post('/webhook', async (req, res) => {
                         session.data.latitude = latitude;
                         session.data.longitude = longitude;
                         session.step = STATES.QUANTITY;
-                        session.awaitingQuantityInput = true; // Set flag to wait for input
-
-                        await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
+                        session.awaitingQuantityInput = true;
+                        const locationResponse = await getChatGPTResponse("User shared a valid location within the UAE. Now, ask them for the quantity.");
+                        await sendToWhatsApp(from, locationResponse);
                     } else {
-                        await sendToWhatsApp(from, "❌ The location you shared is outside the UAE. Please send a valid location within the Emirates.");
-                        console.error("Location outside UAE received:", { latitude, longitude });
+                        const invalidLocationResponse = await getChatGPTResponse("User shared an invalid location outside the UAE. Ask them to provide a valid location within the UAE.");
+                        await sendToWhatsApp(from, invalidLocationResponse);
                     }
                 } else {
-                    // Only send an error message if the location prompt hasn't been sent before
                     if (!session.locationPromptSent) {
-                        await sendToWhatsApp(from, "❌ Invalid input. Please share your location using WhatsApp's location feature. Tap the 📎 icon and select 'Location'.");
-                        session.locationPromptSent = true; // Ensure it’s only sent once
+                        const locationErrorResponse = await getChatGPTResponse("User didn't provide location. Ask them to share their location.");
+                        await sendToWhatsApp(from, locationErrorResponse);
+                        session.locationPromptSent = true;
                     }
-
-                    console.error("Invalid input received in LONGITUDE state:", textRaw);
                 }
                 break;
 
             case STATES.QUANTITY:
                 if (session.awaitingQuantityInput) {
                     const quantity = extractQuantity(textRaw);
-
                     if (!quantity) {
-                        await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
+                        const quantityErrorResponse = await getChatGPTResponse("User entered an invalid quantity " + textRaw + ". Ask them to enter a valid quantity.");
+                        await sendToWhatsApp(from, quantityErrorResponse);
                         return res.sendStatus(200);
                     }
-
-                    session.data.quantity = quantity; // Store only the number
+                    session.data.quantity = quantity;
                     session.awaitingQuantityInput = false;
                     session.step = STATES.CONFIRMATION;
-                    sendOrderSummary(from, session);
+                    const orderSummaryResponse = await getChatGPTResponse("User entered a valid quantity " + quantity + ". Provide a summary and confirmation.");
+                    sendOrderSummary(from, session, orderSummaryResponse);
                 } else {
                     session.awaitingQuantityInput = true;
-                    await sendToWhatsApp(from, "📦 Please enter the quantity (numeric values only).");
+                    const quantityRequestResponse = await getChatGPTResponse("Ask the user to provide the quantity of the product in liters.");
+                    await sendToWhatsApp(from, quantityRequestResponse);
                 }
                 break;
+
             case "ASK_NAME": {
                 session.data.name = textRaw;
                 const missingAfterName = getMissingFields(session.data);
