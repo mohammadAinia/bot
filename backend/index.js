@@ -222,7 +222,7 @@ const getOpenAIResponse = async (userMessage, context = "") => {
             You are a friendly and intelligent WhatsApp assistant for Lootah Biofuels. 
             Your goal is to assist users in completing their orders and answering their questions in a professional yet warm tone.
             Always respond concisely, use emojis sparingly, and maintain a helpful attitude.
-            If the user provides incomplete or unclear information, politely ask for clarification.
+            Do not start your responses with greetings like "Hello" or "Hi" unless explicitly asked to.
         `;
 
         const messages = [
@@ -580,6 +580,7 @@ const askForNextMissingField = async (session, from, missingFields) => {
         The user is submitting an order to Lootah Biofuels. 
         The missing field is: "${nextMissingField}". 
         Ask for it in a friendly and concise way, using emojis if appropriate.
+        Do not start the message with a greeting like "Hello" or "Hi".
     `;
 
     const dynamicResponse = await getOpenAIResponse("Ask for the missing field.", context);
@@ -680,7 +681,12 @@ const generateMissingFieldPrompt = async (field) => {
 
     if (!fieldPromptMap[field]) return null;
 
-    return await getOpenAIResponse(fieldPromptMap[field]);
+    const prompt = `
+        ${fieldPromptMap[field]}
+        Do not start the message with a greeting like "Hello" or "Hi".
+    `;
+
+    return await getOpenAIResponse(prompt);
 };
 
 app.post('/webhook', async (req, res) => {
@@ -783,6 +789,7 @@ app.post('/webhook', async (req, res) => {
                 The user provided the following input: "${textRaw}". 
                 Determine if it is a valid name. If not, respond with a friendly suggestion to provide a proper name.
                 Example: "It looks like the name you provided might not be valid. Could you please provide your full name? 😊"
+                Do not start the message with a greeting like "Hello" or "Hi".
             `;
 
                 const nameValidationResponse = await getOpenAIResponse(nameValidationPrompt);
@@ -832,6 +839,7 @@ app.post('/webhook', async (req, res) => {
                 The user provided the following input: "${textRaw}". 
                 Determine if it is a valid address. If not, respond with a friendly suggestion to provide a complete address.
                 Example: "It seems like the address you provided might be incomplete. Could you please provide your full address? 🏠"
+                Do not start the message with a greeting like "Hello" or "Hi".
             `;
 
                 const addressValidationResponse = await getOpenAIResponse(addressValidationPrompt);
