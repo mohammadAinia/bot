@@ -1143,27 +1143,23 @@ const areAllFieldsCollected = (session) => {
   const getOpenAIResponse = async (userMessage, sessionData) => {
     try {
         const systemMessage = `
-        You are a friendly assistant for a WhatsApp bot used by Lootah Biofuels. Your task is to guide users through the request submission process in an engaging and lively way, and answer any questions they have about the company.
-        
-        **Instructions:**
-        1. **Extract Data:** Parse the user's message to extract the following fields:
-           - Name (e.g., "John" from "My name is John")
-           - Email (e.g., "john@example.com")
-           - Building Name (e.g., "Sunrise Tower")
-           - Apartment Number (e.g., "Apt 101")
-           - City (e.g., "Dubai")
-           - Oil Amount (e.g., "50 liters" → "50")
-        
-        2. **Confirm Values:** After extracting a value, ask the user to confirm it (e.g., "Just to confirm, your name is John, right?").
-        3. **Avoid Repetition:** Never ask for information already confirmed and stored in the session.
-        4. **Session Data:** Here is the current session data: ${JSON.stringify(sessionData.data)}
+        You are a smart assistant for a WhatsApp bot used by Lootah Biofuels. 
+        Your task is to extract relevant details from the user's message and update their session data.
 
-        **Response Format:**
-        - Return a JSON object with two fields: 
-          \`response\` (your reply to the user) 
-          \`updates\` (key-value pairs of extracted data to save to the session)
-        - Example: 
-          {"response": "Got it! Is your email john@example.com?", "updates": {"email": "john@example.com"}}
+        **Extract the following details** (if present in the message):
+        - Name (e.g., "John" from "My name is John")
+        - Email (e.g., "john@example.com")
+        - Building Name (e.g., "Sunrise Tower")
+        - Apartment Number (e.g., "Apt 101")
+        - City (e.g., "Dubai")
+        - Oil Amount (e.g., "50 liters" → "50")
+
+        **Rules:**
+        - **Do not ask for confirmation** if the extracted value is clear.
+        - If any information is missing, **ask only for that specific data**.
+        - Respond in a natural, friendly manner.
+        
+        **Current session data:** ${JSON.stringify(sessionData.data)}
         `;
 
         const messages = [
@@ -1175,8 +1171,7 @@ const areAllFieldsCollected = (session) => {
             model: "gpt-4",
             messages,
             max_tokens: 300,
-            temperature: 0.2, // Lower temperature for structured output
-            response_format: { type: "json_object" } // Force JSON output
+            temperature: 0.2
         }, {
             headers: {
                 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
@@ -1184,18 +1179,23 @@ const areAllFieldsCollected = (session) => {
             }
         });
 
-        const rawResponse = response.data.choices?.[0]?.message?.content?.trim();
-        if (!rawResponse) throw new Error("Invalid response from OpenAI API");
+        const aiResponse = response.data.choices?.[0]?.message?.content?.trim();
+        if (!aiResponse) throw new Error("Invalid response from OpenAI API");
 
-        // Parse the JSON response
-        const parsedResponse = JSON.parse(rawResponse);
-        const { response: aiResponse, updates } = parsedResponse;
+        // **Extract and store details in session data**
+        const extractions = {
+            name: userMessage.match(/my name is (.+)/i)?.[1],
+            email: userMessage.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/)?.[0],
+            buildingName: userMessage.match(/building (.+)/i)?.[1],
+            apartmentNumber: userMessage.match(/apartment (\w+)/i)?.[1],
+            city: userMessage.match(/city (.+)/i)?.[1],
+            oilAmount: userMessage.match(/\b(\d+)\s*liters?\b/i)?.[1]
+        };
 
-        // Update session data with extracted values
-        if (updates) {
-            Object.entries(updates).forEach(([key, value]) => {
+        for (const [key, value] of Object.entries(extractions)) {
+            if (value && !sessionData.data[key]) {
                 sessionData.data[key] = value;
-            });
+            }
         }
 
         return aiResponse;
@@ -1204,6 +1204,7 @@ const areAllFieldsCollected = (session) => {
         return "❌ Oops! Something went wrong, can you please try again?";
     }
 };
+
   
   
   app.post('/webhook', async (req, res) => {
