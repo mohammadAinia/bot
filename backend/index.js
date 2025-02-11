@@ -563,6 +563,30 @@ const generateWelcomeMessage = async () => {
         return "🌟 Welcome to Lootah Biofuels Refining Company! 🌟\n\nYou can ask any question directly, and I will assist you. If you need further help, choose from the options below.";
     }
 };
+const generateMissingFieldPrompt = async (field) => {
+    try {
+        const fieldPromptMap = {
+            name: "Ask the user to provide their full name.",
+            phone: "Ask the user for their phone number.",
+            email: "Ask the user to provide their email address.",
+            address: "Ask the user for their full address.",
+            city: "Ask the user for their city.",
+            street: "Ask the user for their street name.",
+            building_name: "Ask the user for their building name.",
+            flat_no: "Ask the user for their flat number.",
+            latitude: "Ask the user to share their live location via WhatsApp.",
+            longitude: "Ask the user to share their live location via WhatsApp.",
+            quantity: "Ask the user how many liters they want."
+        };
+
+        if (!fieldPromptMap[field]) return null;
+
+        return await getOpenAIResponse(fieldPromptMap[field]);
+    } catch (error) {
+        console.error('❌ Error generating missing field prompt:', error);
+        return "I need more details to proceed.";
+    }
+};
 app.post('/webhook', async (req, res) => {
     try {
         console.log('Incoming Webhook Data:', req.body);
@@ -620,22 +644,10 @@ app.post('/webhook', async (req, res) => {
             const missingFields = getMissingFields(session.data);
             if (missingFields.length > 0) {
                 const nextMissingField = missingFields[0];
-                const fieldPromptMap = {
-                    name: "🔹 Please provide your full name.",
-                    phone: "📞 Please provide your phone number.",
-                    email: "📧 Please provide your email address.",
-                    address: "📍 Please provide your full address.",
-                    city: "🌆 Please provide your city.",
-                    street: "🏠 Please provide your street name.",
-                    building_name: "🏢 Please provide your building name.",
-                    flat_no: "🏠 Please provide your flat number.",
-                    latitude: "📍 Please share your location using WhatsApp's location feature.",
-                    longitude: "📍 Please share your location using WhatsApp's location feature.",
-                    quantity: "📦 Please provide the quantity (in liters) of the product."
-                };
+                const missingPrompt = await generateMissingFieldPrompt(nextMissingField);
 
-                if (fieldPromptMap[nextMissingField]) {
-                    await sendToWhatsApp(from, `Let’s go back to complete the request. ${fieldPromptMap[nextMissingField]}`);
+                if (missingPrompt) {
+                    await sendToWhatsApp(from, `Let’s go back to complete the request. ${missingPrompt}`);
                 }
             }
 
@@ -1170,7 +1182,7 @@ app.post('/webhook', async (req, res) => {
 //     const requiredFields = ["name", "email", "buildingName", "apartmentNumber", "city", "location", "oilAmount"];
 //     return requiredFields.every(field => session.data[field]);
 //   };
-  
+
 //   // Improved extraction logic inside getOpenAIResponse:
 //   // Only update a field if it hasn’t been set yet.
 //   const getOpenAIResponse = async (userMessage, sessionData) => {
@@ -1232,7 +1244,7 @@ app.post('/webhook', async (req, res) => {
 //     }
 // };
 
-  
+
 // app.post('/webhook', async (req, res) => {
 //     try {
 //         const entry = req.body.entry?.[0];
