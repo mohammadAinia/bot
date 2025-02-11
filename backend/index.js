@@ -533,7 +533,36 @@ async function isQuestion(text) {
     const aiResponse = await getOpenAIResponse(prompt);
     return aiResponse.trim().toLowerCase() === "true";
 }
+const generateWelcomeMessage = async () => {
+    try {
+        const systemPrompt = `
+        You are a friendly WhatsApp assistant for Lootah Biofuels. 
+        Generate a concise and engaging welcome message that:
+        - Briefly introduces the company.
+        - Encourages users to ask any questions or select from the available options.
+        - Avoids unnecessary repetition.
+        - Uses emojis sparingly and professionally.
+        - Returns only the message text, without extra formatting.
+        `;
 
+        const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+            model: "gpt-4",
+            messages: [{ role: "system", content: systemPrompt }],
+            max_tokens: 100,
+            temperature: 0.7
+        }, {
+            headers: {
+                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        return response.data.choices?.[0]?.message?.content?.trim() || "Welcome to Lootah Biofuels!";
+    } catch (error) {
+        console.error('❌ Error generating welcome message:', error.response?.data || error.message);
+        return "🌟 Welcome to Lootah Biofuels Refining Company! 🌟\n\nYou can ask any question directly, and I will assist you. If you need further help, choose from the options below.";
+    }
+};
 app.post('/webhook', async (req, res) => {
     try {
         console.log('Incoming Webhook Data:', req.body);
@@ -559,8 +588,12 @@ app.post('/webhook', async (req, res) => {
         if (!userSessions[from]) {
             userSessions[from] = { step: STATES.WELCOME, data: { phone: formatPhoneNumber(from) } };
 
+
+            const welcomeMessage = await generateWelcomeMessage();
+
+
             // Send welcome message with options
-            await sendInteractiveButtons(from, defaultWelcomeMessage, [
+            await sendInteractiveButtons(from, welcomeMessage, [
                 { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
                 { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
             ]);
