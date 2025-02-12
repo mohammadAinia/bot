@@ -555,13 +555,13 @@ const askForNextMissingField = async (session, from) => {
     const dynamicResponse = await getOpenAIResponse(context);
     await sendToWhatsApp(from, dynamicResponse);
 };
-async function isQuestion(text) {
+async function isQuestionOrRequest(text) {
     const prompt = `
-        Determine if the following text is a question or a greeting.
-        Respond with:
-        - "question" if the text is a genuine question.
-        - "greeting" if the text is a casual greeting like "hi", "hello", "who are you".
-        - "other" if the text is neither a question nor a greeting.
+        Determine the type of input based on the following rules:
+        - If the text is a request to submit an order (e.g., "I want to make a request", "I need to submit a request", "New order request"), return "request".
+        - If the text is a general question, return "question".
+        - If the text is a casual greeting like "hi", "hello", return "greeting".
+        - If it doesn’t fit into any of these categories, return "other".
 
         Text: "${text}"
     `;
@@ -569,8 +569,25 @@ async function isQuestion(text) {
     const aiResponse = await getOpenAIResponse(prompt);
     const response = aiResponse.trim().toLowerCase();
 
-    return response === "question" ? true : response === "greeting" ? false : "other";
+    return response;
 }
+
+// async function isQuestion(text) {
+//     const prompt = `
+//         Determine if the following text is a question or a greeting.
+//         Respond with:
+//         - "question" if the text is a genuine question.
+//         - "greeting" if the text is a casual greeting like "hi", "hello", "who are you".
+//         - "other" if the text is neither a question nor a greeting.
+
+//         Text: "${text}"
+//     `;
+
+//     const aiResponse = await getOpenAIResponse(prompt);
+//     const response = aiResponse.trim().toLowerCase();
+
+//     return response === "question" ? true : response === "greeting" ? false : "other";
+// }
 
 // const generateWelcomeMessage = async () => {
 //     try {
@@ -718,9 +735,9 @@ app.post('/webhook', async (req, res) => {
         // Initialize user session if it doesn't exist
         if (!userSessions[from]) {
             userSessions[from] = { step: STATES.WELCOME, data: { phone: formatPhoneNumber(from) } };
-        
+
             const welcomeMessage = await generateWelcomeMessage();
-        
+
             // Send welcome message with options
             await sendInteractiveButtons(from, welcomeMessage, [
                 { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
@@ -728,39 +745,54 @@ app.post('/webhook', async (req, res) => {
             ]);
             return res.sendStatus(200);
         }
-        
+
 
         const session = userSessions[from];
 
         if (!session.data.phone) {
             session.data.phone = formatPhoneNumber(from);
         }
+        const inputType = await isQuestionOrRequest(textRaw);
 
-        // Check if the user is asking a question
-        const isUserAskingQuestion = await isQuestion(textRaw);
+        if (inputType === "request") {
+            // Reset session data and start the request process
+            session.data = { phone: formatPhoneNumber(from) };
+            session.step = STATES.NAME;
 
-        if (isUserAskingQuestion) {
-            // Answer the question using ChatGPT
+            const namePrompt = await generateMissingFieldPrompt("name");
+            await sendToWhatsApp(from, namePrompt);
+            return res.sendStatus(200);
+        } else if (inputType === "question") {
+            // Handle questions as usual
             const aiResponse = await getOpenAIResponse(textRaw);
-
-            // Send the answer to the user
             await sendToWhatsApp(from, aiResponse);
-
-            // If the user was in the middle of a request, remind them to continue
-            if (session.step !== STATES.WELCOME) {
-                const missingFields = getMissingFields(session.data);
-                if (missingFields.length > 0) {
-                    const nextMissingField = missingFields[0];
-                    const missingPrompt = await generateMissingFieldPrompt(nextMissingField);
-
-                    if (missingPrompt) {
-                        await sendToWhatsApp(from, `Let’s go back to complete the request. ${missingPrompt}`);
-                    }
-                }
-            }
-
             return res.sendStatus(200);
         }
+        // Check if the user is asking a question
+        // const isUserAskingQuestion = await isQuestion(textRaw);
+
+        // if (isUserAskingQuestion) {
+        //     // Answer the question using ChatGPT
+        //     const aiResponse = await getOpenAIResponse(textRaw);
+
+        //     // Send the answer to the user
+        //     await sendToWhatsApp(from, aiResponse);
+
+        //     // If the user was in the middle of a request, remind them to continue
+        //     if (session.step !== STATES.WELCOME) {
+        //         const missingFields = getMissingFields(session.data);
+        //         if (missingFields.length > 0) {
+        //             const nextMissingField = missingFields[0];
+        //             const missingPrompt = await generateMissingFieldPrompt(nextMissingField);
+
+        //             if (missingPrompt) {
+        //                 await sendToWhatsApp(from, `Let’s go back to complete the request. ${missingPrompt}`);
+        //             }
+        //         }
+        //     }
+
+        //     return res.sendStatus(200);
+        // }
 
         // Handle messages based on the current state
         switch (session.step) {
