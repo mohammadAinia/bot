@@ -690,15 +690,20 @@ const generateMissingFieldPrompt = async (field) => {
 };
 const analyzeInput = async (input, expectedField) => {
     const prompt = `
-        The user provided the following input: "${input}". 
-        The expected field is: "${expectedField}".
-        Determine if the input matches the expected field. If not, suggest what the user should provide instead.
-        Example: "It looks like you provided an email address instead of a phone number. Could you please provide your phone number? 📱"
+        The user was asked to provide their "${expectedField}". 
+        They responded with: "${input}". 
+        
+        Determine if this response matches the expected field. If it does, respond with "valid". 
+        If it does not match, identify the actual type of input they provided (e.g., phone number, email, address) 
+        and generate a polite correction message.
+
+        Example correction: "That looks like a phone number. Could you please provide your full address instead? 🏠"
     `;
 
     const response = await getOpenAIResponse(prompt);
     return response;
 };
+
 
 app.post('/webhook', async (req, res) => {
     try {
@@ -853,25 +858,18 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case STATES.ADDRESS:
-                const addressValidationPrompt = `
-                        The user provided the following input: "${textRaw}". 
-                        Determine if it is a valid address. If not, respond with a friendly suggestion to provide a complete address.
-                        Example: "It seems like the address you provided might be incomplete. Could you please provide your full address? 🏠"
-                        Do not start the message with a greeting like "Hello" or "Hi".
-                    `;
+                const validationResponse = await analyzeInput(textRaw, "address");
 
-                const addressValidationResponse = await getOpenAIResponse(addressValidationPrompt);
-
-                if (addressValidationResponse.toLowerCase().includes('not a valid address') || addressValidationResponse.toLowerCase().includes('incorrect address')) {
-                    await handleInvalidInput(from, textRaw, 'address');
-                    session.step = STATES.ADDRESS;  // Keep the user in the ADDRESS state
-                } else {
+                if (validationResponse.toLowerCase().includes("valid")) {
                     session.data.address = textRaw;
                     session.step = STATES.CITY_SELECTION;
-                    const addressResponse = await getOpenAIResponse("The user provided the address " + textRaw + ". Ask them to select a city.");
-                    await sendCitySelection(from); // Immediate action with dynamic response
+                    await sendCitySelection(from); // Ask for city selection
+                } else {
+                    await sendToWhatsApp(from, validationResponse); // Send correction message
+                    session.step = STATES.ADDRESS; // Keep user in the same state
                 }
                 break;
+
 
             case STATES.CITY_SELECTION:
                 if (message.interactive && message.interactive.button_reply) {
