@@ -311,8 +311,7 @@ const sendCitySelection = async (to) => {
                     buttons: [
                         { type: "reply", reply: { id: "abu_dhabi", title: "Abu Dhabi" } },
                         { type: "reply", reply: { id: "dubai", title: "Dubai" } },
-                        { type: "reply", reply: { id: "umm_al_quwain", title: "Umm Al Quwain" } },
-                        { type: "reply", reply: { id: "al_khaimah", title: "Al Khaimah" } }
+                        { type: "reply", reply: { id: "sharjah", title: "Sharjah" } }
                     ]
                 }
             }
@@ -326,7 +325,6 @@ const sendCitySelection = async (to) => {
         console.error("❌ Failed to send city selection:", error.response?.data || error.message);
     }
 };
-
 
 const sendOrderSummary = async (to, session) => {
     try {
@@ -840,33 +838,31 @@ app.post('/webhook', async (req, res) => {
                 break;
 
 
-                case STATES.CITY_SELECTION:
-                    if (message.interactive && message.interactive.button_reply) {
-                        const citySelection = message.interactive.button_reply.id;
-                        const cityMap = {
-                            "abu_dhabi": "Abu Dhabi",
-                            "dubai": "Dubai",
-                            "umm_al_quwain": "Umm Al Quwain",
-                            "al_khaimah": "Al Khaimah"
-                        };
-                
-                        if (cityMap[citySelection]) {
-                            session.data.city = cityMap[citySelection];
-                            session.step = STATES.STREET;
-                            const cityResponse = await getOpenAIResponse(`The user selected the city ${cityMap[citySelection]}. Now, ask them for the street name.`);
-                            await sendToWhatsApp(from, cityResponse);
-                        } else {
-                            const invalidCityResponse = await getOpenAIResponse("The user made an invalid city selection. Ask them to choose from the provided options.");
-                            await sendToWhatsApp(from, invalidCityResponse);
-                            await sendCitySelection(from);
-                        }
+            case STATES.CITY_SELECTION:
+                if (message.interactive && message.interactive.button_reply) {
+                    const citySelection = message.interactive.button_reply.id;
+                    const cityMap = {
+                        "abu_dhabi": "Abu Dhabi",
+                        "dubai": "Dubai",
+                        "sharjah": "Sharjah"
+                    };
+
+                    if (cityMap[citySelection]) {
+                        session.data.city = cityMap[citySelection];
+                        session.step = STATES.STREET;
+                        const cityResponse = await getOpenAIResponse(`The user selected the city ${cityMap[citySelection]}. Now, ask them for the street name.`);
+                        await sendToWhatsApp(from, cityResponse);
                     } else {
-                        const noCityResponse = await getOpenAIResponse("The user didn't select a city. Ask them to choose from the provided options.");
-                        await sendToWhatsApp(from, noCityResponse);
+                        const invalidCityResponse = await getOpenAIResponse("The user made an invalid city selection. Ask them to choose from the provided options.");
+                        await sendToWhatsApp(from, invalidCityResponse);
                         await sendCitySelection(from);
                     }
-                    break;
-                
+                } else {
+                    const noCityResponse = await getOpenAIResponse("The user didn't select a city. Ask them to choose from the provided options.");
+                    await sendToWhatsApp(from, noCityResponse);
+                    await sendCitySelection(from);
+                }
+                break;
 
             case STATES.STREET:
                 const streetValidationResponse = await analyzeInput(textRaw, "street name");
