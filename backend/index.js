@@ -534,7 +534,6 @@ function getMissingFields(sessionData) {
                 missingFields.push(field);
             }
         }
-        // For non-string values (like numbers), assume they are valid if they are not null or undefined.
     });
 
     return missingFields;
@@ -690,7 +689,19 @@ const analyzeInput = async (input, expectedField) => {
     console.log(`Analyze Input Response: ${response}`); // Debugging
     return response;
 };
+const detectRequestIntent = async (text) => {
+    const prompt = `
+        Analyze the following text and determine if the user wants to start a request or place an order.
+        Respond with:
+        - "true" if the user wants to start a request (e.g., "I need to request", "I want to order", "I have 50 liters").
+        - "false" if the user does not want to start a request.
 
+        Text: "${text}"
+    `;
+
+    const aiResponse = await getOpenAIResponse(prompt);
+    return aiResponse.trim().toLowerCase() === "true";
+};
 
 
 
@@ -718,9 +729,9 @@ app.post('/webhook', async (req, res) => {
         // Initialize user session if it doesn't exist
         if (!userSessions[from]) {
             userSessions[from] = { step: STATES.WELCOME, data: { phone: formatPhoneNumber(from) } };
-        
+
             const welcomeMessage = await generateWelcomeMessage();
-        
+
             // Send welcome message with options
             await sendInteractiveButtons(from, welcomeMessage, [
                 { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
@@ -728,7 +739,6 @@ app.post('/webhook', async (req, res) => {
             ]);
             return res.sendStatus(200);
         }
-        
 
         const session = userSessions[from];
 
@@ -759,6 +769,20 @@ app.post('/webhook', async (req, res) => {
                 }
             }
 
+            return res.sendStatus(200);
+        }
+
+        // Check if the user wants to start a request
+        const isUserStartingRequest = await detectRequestIntent(textRaw);
+
+        if (isUserStartingRequest) {
+            // Reset session data for a new request
+            session.data = { phone: formatPhoneNumber(from) };
+            session.step = STATES.NAME;
+
+            // Ask for the user's name
+            const namePrompt = await generateMissingFieldPrompt("name");
+            await sendToWhatsApp(from, namePrompt);
             return res.sendStatus(200);
         }
 
