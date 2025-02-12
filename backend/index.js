@@ -789,21 +789,30 @@ app.post('/webhook', async (req, res) => {
 
 
             //----------------------------------------------------------------------
-            case STATES.NAME:
-                const nameValidationResponse = await analyzeInput(textRaw, "name");
+            // case STATES.NAME:
+            //     const nameValidationResponse = await analyzeInput(textRaw, "name");
 
-                if (nameValidationResponse.toLowerCase().includes("valid")) {
+            //     if (nameValidationResponse.toLowerCase().includes("valid")) {
+            //         session.data.name = textRaw;
+            //         session.step = STATES.PHONE_INPUT;
+            //         const nextPrompt = await getOpenAIResponse("Great! Now, please provide your phone number.");
+            //         await sendToWhatsApp(from, nextPrompt);
+            //     } else if (nameValidationResponse.startsWith("alternative:")) {
+            //         const altField = nameValidationResponse.split(":")[1];
+            //         session.data[altField] = textRaw; // Store the alternative data
+            //         const missingFields = getMissingFields(session.data);
+            //         await askForNextMissingField(session, from, missingFields);
+            //     } else {
+            //         await sendToWhatsApp(from, nameValidationResponse.replace("invalid:", ""));
+            //     }
+            //     break;
+            case STATES.NAME:
+                if (/\d/.test(textRaw)) {
+                    await sendToWhatsApp(from, "That doesn't look like a name. Please enter your full name.");
+                } else {
                     session.data.name = textRaw;
                     session.step = STATES.PHONE_INPUT;
-                    const nextPrompt = await getOpenAIResponse("Great! Now, please provide your phone number.");
-                    await sendToWhatsApp(from, nextPrompt);
-                } else if (nameValidationResponse.startsWith("alternative:")) {
-                    const altField = nameValidationResponse.split(":")[1];
-                    session.data[altField] = textRaw; // Store the alternative data
-                    const missingFields = getMissingFields(session.data);
-                    await askForNextMissingField(session, from, missingFields);
-                } else {
-                    await sendToWhatsApp(from, nameValidationResponse.replace("invalid:", ""));
+                    await sendToWhatsApp(from, "Great! Now, please provide your phone number. 📱");
                 }
                 break;
 
