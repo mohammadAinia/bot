@@ -223,6 +223,7 @@ const getOpenAIResponse = async (userMessage, context = "") => {
             Your goal is to assist users in completing their orders and answering their questions in a professional yet warm tone.
             Always respond concisely, use emojis sparingly, and maintain a helpful attitude.
             Do not start your responses with greetings like "Hello" or "Hi" unless explicitly asked to.
+            Your task is to analyze user input and provide responses based on the context provided.
         `;
 
         const messages = [
@@ -253,7 +254,9 @@ const getOpenAIResponse = async (userMessage, context = "") => {
             throw new Error("Invalid response structure from OpenAI API");
         }
 
-        return response.data.choices[0].message.content.trim();
+        const aiResponse = response.data.choices[0].message.content.trim();
+        console.log(`OpenAI Response: ${aiResponse}`); // Debugging
+        return aiResponse;
     } catch (error) {
         console.error('❌ Error with OpenAI:', error.response?.data || error.message);
         return "❌ Oops! Something went wrong. Please try again later.";
@@ -656,32 +659,29 @@ const generateMissingFieldPrompt = async (field) => {
     return await getOpenAIResponse(prompt);
 };
 const analyzeInput = async (input, expectedField) => {
-    // const prompt = `
-    //     The user was asked to provide their "${expectedField}".
-    //     They responded with: "${input}". 
-
-    //     - Determine if this response matches the expected field.
-    //     - If valid, return "valid".
-    //     - If invalid, identify if it matches another expected field (e.g., phone number, email, address, quantity, etc.).
-    //     - If it matches another field, return "alternative:<field_name>".
-    //     - If it is completely invalid, return "invalid:<correction_message>".
-
-    //     Example corrections:
-    //     - "That looks like a phone number. Could you please provide your full name instead? 😊"
-    //     - "This seems to be an email. Please share your phone number instead."
-    // `;
     const prompt = `
-    The user is filling out a form. They were asked for their "${expectedField}".
-    Their response: "${input}"
+        You are a helpful assistant for Lootah Biofuels. Your task is to analyze the user's input and determine if it matches the expected field.
 
-    - If it is a valid "${expectedField}", reply with **ONLY** "valid".
-    - If it is incorrect but belongs to another field, reply with **ONLY** "alternative:<field_name>".
-    - If it is completely invalid, reply with **ONLY** "invalid:<correction_message>".
-    
-    Do **not** include any unrelated messages, AI disclaimers, or apologies.
-`;
+        - The user was asked to provide their "${expectedField}".
+        - They responded with: "${input}".
 
-    return await getOpenAIResponse(prompt);
+        Rules:
+        1. If the input matches the expected field, return "valid".
+        2. If the input does not match the expected field but matches another valid field (e.g., phone number, email, address, etc.), return "alternative:<field_name>".
+        3. If the input is completely invalid, return "invalid:<correction_message>".
+
+        Examples:
+        - If the expected field is "name" and the user provides "John Doe", return "valid".
+        - If the expected field is "phone number" and the user provides "john@example.com", return "alternative:email".
+        - If the expected field is "email" and the user provides "123", return "invalid:Please provide a valid email address. 😊".
+
+        Important:
+        - Do not respond as if you are the user. Your task is to analyze the input and provide a response based on the rules above.
+    `;
+
+    const response = await getOpenAIResponse(prompt);
+    console.log(`Analyze Input Response: ${response}`); // Debugging
+    return response;
 };
 
 
@@ -789,30 +789,18 @@ app.post('/webhook', async (req, res) => {
 
 
             //----------------------------------------------------------------------
-            // case STATES.NAME:
-            //     const nameValidationResponse = await analyzeInput(textRaw, "name");
-
-            //     if (nameValidationResponse.toLowerCase().includes("valid")) {
-            //         session.data.name = textRaw;
-            //         session.step = STATES.PHONE_INPUT;
-            //         const nextPrompt = await getOpenAIResponse("Great! Now, please provide your phone number.");
-            //         await sendToWhatsApp(from, nextPrompt);
-            //     } else if (nameValidationResponse.startsWith("alternative:")) {
-            //         const altField = nameValidationResponse.split(":")[1];
-            //         session.data[altField] = textRaw; // Store the alternative data
-            //         const missingFields = getMissingFields(session.data);
-            //         await askForNextMissingField(session, from, missingFields);
-            //     } else {
-            //         await sendToWhatsApp(from, nameValidationResponse.replace("invalid:", ""));
-            //     }
-            //     break;
             case STATES.NAME:
-                if (/\d/.test(textRaw)) {
-                    await sendToWhatsApp(from, "That doesn't look like a name. Please enter your full name.");
-                } else {
+                const nameValidationResponse = await analyzeInput(textRaw, "name");
+
+                if (nameValidationResponse.toLowerCase().includes("valid")) {
                     session.data.name = textRaw;
-                    session.step = STATES.PHONE_INPUT;
-                    await sendToWhatsApp(from, "Great! Now, please provide your phone number. 📱");
+                    await askForNextMissingField(session, from);
+                } else if (nameValidationResponse.startsWith("alternative:")) {
+                    const altField = nameValidationResponse.split(":")[1];
+                    session.data[altField] = textRaw; // Store the alternative data
+                    await askForNextMissingField(session, from);
+                } else {
+                    await sendToWhatsApp(from, nameValidationResponse.replace("invalid:", ""));
                 }
                 break;
 
