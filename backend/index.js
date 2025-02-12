@@ -645,27 +645,41 @@ const generateMissingFieldPrompt = async (field) => {
     if (!fieldPromptMap[field]) return null;
 
     const prompt = `
-        ${fieldPromptMap[field]}
-        Do not start the message with a greeting like "Hello" or "Hi".
-    `;
+    The user is filling out a form. They need to provide their "${field}".
+    Ensure your response is **ONLY** a polite request for the missing field, without any unrelated information.
+    Do **not** mention AI, email, or apologies.
+    Do **not** generate anything except the request prompt.
+    
+    ${fieldPromptMap[field]}
+`;
 
     return await getOpenAIResponse(prompt);
 };
 const analyzeInput = async (input, expectedField) => {
-    const prompt = `
-        The user was asked to provide their "${expectedField}".
-        They responded with: "${input}". 
-        
-        - Determine if this response matches the expected field.
-        - If valid, return "valid".
-        - If invalid, identify if it matches another expected field (e.g., phone number, email, address, quantity, etc.).
-        - If it matches another field, return "alternative:<field_name>".
-        - If it is completely invalid, return "invalid:<correction_message>".
+    // const prompt = `
+    //     The user was asked to provide their "${expectedField}".
+    //     They responded with: "${input}". 
 
-        Example corrections:
-        - "That looks like a phone number. Could you please provide your full name instead? 😊"
-        - "This seems to be an email. Please share your phone number instead."
-    `;
+    //     - Determine if this response matches the expected field.
+    //     - If valid, return "valid".
+    //     - If invalid, identify if it matches another expected field (e.g., phone number, email, address, quantity, etc.).
+    //     - If it matches another field, return "alternative:<field_name>".
+    //     - If it is completely invalid, return "invalid:<correction_message>".
+
+    //     Example corrections:
+    //     - "That looks like a phone number. Could you please provide your full name instead? 😊"
+    //     - "This seems to be an email. Please share your phone number instead."
+    // `;
+    const prompt = `
+    The user is filling out a form. They were asked for their "${expectedField}".
+    Their response: "${input}"
+
+    - If it is a valid "${expectedField}", reply with **ONLY** "valid".
+    - If it is incorrect but belongs to another field, reply with **ONLY** "alternative:<field_name>".
+    - If it is completely invalid, reply with **ONLY** "invalid:<correction_message>".
+    
+    Do **not** include any unrelated messages, AI disclaimers, or apologies.
+`;
 
     return await getOpenAIResponse(prompt);
 };
@@ -954,7 +968,6 @@ app.post('/webhook', async (req, res) => {
                     session.step = STATES.QUANTITY;
                 }
                 break;
-
 
             case "ASK_NAME": {
                 session.data.name = textRaw;
@@ -1500,90 +1513,90 @@ app.post('/webhook', async (req, res) => {
 //     const dynamicResponse = await getOpenAIResponse(dynamicPrompt);
 //     await sendToWhatsApp(from, dynamicResponse);
 // }
-            // case STATES.CITY_SELECTION:
-            //     if (message.interactive && message.interactive.button_reply) {
-            //         const citySelection = message.interactive.button_reply.id;
-            //         const cityMap = {
-            //             "abu_dhabi": "Abu Dhabi",
-            //             "dubai": "Dubai",
-            //             "sharjah": "Sharjah"
-            //         };
+// case STATES.CITY_SELECTION:
+//     if (message.interactive && message.interactive.button_reply) {
+//         const citySelection = message.interactive.button_reply.id;
+//         const cityMap = {
+//             "abu_dhabi": "Abu Dhabi",
+//             "dubai": "Dubai",
+//             "sharjah": "Sharjah"
+//         };
 
-            //         if (cityMap[citySelection]) {
-            //             session.data.city = cityMap[citySelection];
-            //             session.step = STATES.STREET;
-            //             const cityResponse = await getOpenAIResponse("The user selected the city " + cityMap[citySelection] + ". Now, ask them for the street name.");
-            //             await sendToWhatsApp(from, cityResponse);
-            //         } else {
-            //             const invalidCityResponse = await getOpenAIResponse("The user made an invalid city selection. Ask them to choose from the provided options.");
-            //             await sendToWhatsApp(from, invalidCityResponse);
-            //             await sendCitySelection(from); // Re-send city selection
-            //         }
-            //     } else {
-            //         const noCityResponse = await getOpenAIResponse("The user didn't select a city. Ask them to choose from the provided options.");
-            //         await sendToWhatsApp(from, noCityResponse);
-            //         await sendCitySelection(from); // Re-send city selection buttons
-            //     }
-            //     break;
+//         if (cityMap[citySelection]) {
+//             session.data.city = cityMap[citySelection];
+//             session.step = STATES.STREET;
+//             const cityResponse = await getOpenAIResponse("The user selected the city " + cityMap[citySelection] + ". Now, ask them for the street name.");
+//             await sendToWhatsApp(from, cityResponse);
+//         } else {
+//             const invalidCityResponse = await getOpenAIResponse("The user made an invalid city selection. Ask them to choose from the provided options.");
+//             await sendToWhatsApp(from, invalidCityResponse);
+//             await sendCitySelection(from); // Re-send city selection
+//         }
+//     } else {
+//         const noCityResponse = await getOpenAIResponse("The user didn't select a city. Ask them to choose from the provided options.");
+//         await sendToWhatsApp(from, noCityResponse);
+//         await sendCitySelection(from); // Re-send city selection buttons
+//     }
+//     break;
 
-            // case STATES.STREET:
-            //     session.data.street = textRaw;
-            //     session.step = STATES.BUILDING_NAME;
-            //     const streetResponse = await getOpenAIResponse("User provided the street " + textRaw + ". Ask them for the building name.");
-            //     await sendToWhatsApp(from, streetResponse);
-            //     break;
+// case STATES.STREET:
+//     session.data.street = textRaw;
+//     session.step = STATES.BUILDING_NAME;
+//     const streetResponse = await getOpenAIResponse("User provided the street " + textRaw + ". Ask them for the building name.");
+//     await sendToWhatsApp(from, streetResponse);
+//     break;
 
-            // case STATES.BUILDING_NAME:
-            //     session.data.building_name = textRaw;
-            //     session.step = STATES.FLAT_NO;
-            //     const buildingResponse = await getOpenAIResponse("User provided the building name " + textRaw + ". Ask them for the flat number.");
-            //     await sendToWhatsApp(from, buildingResponse);
-            //     break;
+// case STATES.BUILDING_NAME:
+//     session.data.building_name = textRaw;
+//     session.step = STATES.FLAT_NO;
+//     const buildingResponse = await getOpenAIResponse("User provided the building name " + textRaw + ". Ask them for the flat number.");
+//     await sendToWhatsApp(from, buildingResponse);
+//     break;
 
-            // case STATES.FLAT_NO:
-            //     session.data.flat_no = textRaw;
-            //     session.step = STATES.LONGITUDE;
-            //     const flatResponse = await getOpenAIResponse("User provided the flat number " + textRaw + ". Ask them to share their location.");
-            //     if (!session.locationPromptSent) {
-            //         await sendToWhatsApp(from, flatResponse);
-            //         session.locationPromptSent = true;
-            //     }
-            //     break;
+// case STATES.FLAT_NO:
+//     session.data.flat_no = textRaw;
+//     session.step = STATES.LONGITUDE;
+//     const flatResponse = await getOpenAIResponse("User provided the flat number " + textRaw + ". Ask them to share their location.");
+//     if (!session.locationPromptSent) {
+//         await sendToWhatsApp(from, flatResponse);
+//         session.locationPromptSent = true;
+//     }
+//     break;
 
-            // case STATES.LONGITUDE:
-            //     if (message.location) {
-            //         const { latitude, longitude } = message.location;
-            //         const UAE_BOUNDS = {
-            //             minLat: 22.5,
-            //             maxLat: 26.5,
-            //             minLng: 51.6,
-            //             maxLng: 56.5
-            //         };
+// case STATES.LONGITUDE:
+//     if (message.location) {
+//         const { latitude, longitude } = message.location;
+//         const UAE_BOUNDS = {
+//             minLat: 22.5,
+//             maxLat: 26.5,
+//             minLng: 51.6,
+//             maxLng: 56.5
+//         };
 
-            //         if (
-            //             latitude >= UAE_BOUNDS.minLat &&
-            //             latitude <= UAE_BOUNDS.maxLat &&
-            //             longitude >= UAE_BOUNDS.minLng &&
-            //             longitude <= UAE_BOUNDS.maxLng
-            //         ) {
-            //             session.data.latitude = latitude;
-            //             session.data.longitude = longitude;
-            //             session.step = STATES.QUANTITY;
-            //             session.awaitingQuantityInput = true;
-            //             const locationResponse = await getOpenAIResponse("User shared a valid location within the UAE. Now, ask them for the quantity.");
-            //             await sendToWhatsApp(from, locationResponse);
-            //         } else {
-            //             const invalidLocationResponse = await getOpenAIResponse("User shared an invalid location outside the UAE. Ask them to provide a valid location within the UAE.");
-            //             await sendToWhatsApp(from, invalidLocationResponse);
-            //         }
-            //     } else {
-            //         if (!session.locationPromptSent) {
-            //             const missingPrompt = await generateMissingFieldPrompt("longitude");
-            //             await sendToWhatsApp(from, missingPrompt);
-            //             session.locationPromptSent = true;
-            //         }
-            //     }
-            //     break;
+//         if (
+//             latitude >= UAE_BOUNDS.minLat &&
+//             latitude <= UAE_BOUNDS.maxLat &&
+//             longitude >= UAE_BOUNDS.minLng &&
+//             longitude <= UAE_BOUNDS.maxLng
+//         ) {
+//             session.data.latitude = latitude;
+//             session.data.longitude = longitude;
+//             session.step = STATES.QUANTITY;
+//             session.awaitingQuantityInput = true;
+//             const locationResponse = await getOpenAIResponse("User shared a valid location within the UAE. Now, ask them for the quantity.");
+//             await sendToWhatsApp(from, locationResponse);
+//         } else {
+//             const invalidLocationResponse = await getOpenAIResponse("User shared an invalid location outside the UAE. Ask them to provide a valid location within the UAE.");
+//             await sendToWhatsApp(from, invalidLocationResponse);
+//         }
+//     } else {
+//         if (!session.locationPromptSent) {
+//             const missingPrompt = await generateMissingFieldPrompt("longitude");
+//             await sendToWhatsApp(from, missingPrompt);
+//             session.locationPromptSent = true;
+//         }
+//     }
+//     break;
 
 
 app.listen(PORT, () => console.log(`🚀 Server is running on http://localhost:${PORT}`));
