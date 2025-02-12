@@ -712,9 +712,7 @@ app.post('/webhook', async (req, res) => {
         if (!userSessions[from]) {
             userSessions[from] = { step: STATES.WELCOME, data: { phone: formatPhoneNumber(from) } };
 
-
             const welcomeMessage = await generateWelcomeMessage();
-
 
             // Send welcome message with options
             await sendInteractiveButtons(from, welcomeMessage, [
@@ -727,7 +725,7 @@ app.post('/webhook', async (req, res) => {
         const session = userSessions[from];
 
         if (!session.data.phone) {
-            session.data.phone = formatPhoneNumber(from)
+            session.data.phone = formatPhoneNumber(from);
         }
 
         // Check if the user is asking a question
@@ -736,23 +734,23 @@ app.post('/webhook', async (req, res) => {
         if (isUserAskingQuestion) {
             // Answer the question using ChatGPT
             const aiResponse = await getOpenAIResponse(textRaw);
-        
+
             // Send the answer to the user
             await sendToWhatsApp(from, aiResponse);
-        
-            // Check if the user was already in the middle of a request
+
+            // If the user was in the middle of a request, remind them to continue
             if (session.step !== STATES.WELCOME) {
                 const missingFields = getMissingFields(session.data);
                 if (missingFields.length > 0) {
                     const nextMissingField = missingFields[0];
                     const missingPrompt = await generateMissingFieldPrompt(nextMissingField);
-        
+
                     if (missingPrompt) {
                         await sendToWhatsApp(from, `Let’s go back to complete the request. ${missingPrompt}`);
                     }
                 }
             }
-        
+
             return res.sendStatus(200);
         }
         
@@ -791,8 +789,6 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-
-            //----------------------------------------------------------------------
             case STATES.NAME:
                 const nameValidationResponse = await analyzeInput(textRaw, "name");
 
