@@ -563,8 +563,7 @@ function getMissingFields(sessionData) {
 // }
 const askForNextMissingField = async (session, from, missingFields) => {
     if (!session.greetingSent) {
-        const greetingMessage = `Hey ${session.data.name || 'there'}! 👋 Ready to complete your order? Let's get started! 😊`;
-        await sendToWhatsApp(from, greetingMessage);
+        await sendToWhatsApp(from, `Hey ${session.data.name || 'there'}! 👋 Ready to complete your order? Let's get started! 😊`);
         session.greetingSent = true;
     }
 
@@ -579,13 +578,16 @@ const askForNextMissingField = async (session, from, missingFields) => {
     const context = `
         The user is submitting an order to Lootah Biofuels. 
         The missing field is: "${nextMissingField}". 
-        Ask for it in a friendly and concise way, using emojis if appropriate.
-        Do not start the message with a greeting like "Hello" or "Hi".
+        - Ask the user for this field in a friendly way.
+        - Ensure you understand the type of response expected.
+        - If the user has already provided a valid response, do not ask again.
+        - Do not treat responses like "50 liters" as a title or unrelated text.
     `;
 
-    const dynamicResponse = await getOpenAIResponse("Ask for the missing field.", context);
+    const dynamicResponse = await getOpenAIResponse(`Ask for "${nextMissingField}" from the user.`, context);
     await sendToWhatsApp(from, dynamicResponse);
 };
+
 
 
 
@@ -692,17 +694,21 @@ const analyzeInput = async (input, expectedField) => {
     const prompt = `
         The user was asked to provide their "${expectedField}". 
         They responded with: "${input}". 
-        
-        Determine if this response matches the expected field. If it does, respond with "valid". 
-        If it does not match, identify the actual type of input they provided (e.g., phone number, email, address) 
-        and generate a polite correction message.
 
-        Example correction: "That looks like a phone number. Could you please provide your full address instead? 🏠"
+        Determine if this response correctly matches the expected field. 
+        - If it matches, respond with "valid". 
+        - If it does not match, identify the actual type of input they provided (e.g., number, email, address, product name). 
+        - If the response is ambiguous, ask for clarification.
+
+        Example correction: 
+        - If expected: "quantity", but input is "50 liters", respond with "valid". 
+        - If expected: "email", but input is "50 liters", respond with "That looks like a quantity. Could you please provide your email address instead? 📧"
     `;
 
     const response = await getOpenAIResponse(prompt);
     return response;
 };
+
 
 
 app.post('/webhook', async (req, res) => {
