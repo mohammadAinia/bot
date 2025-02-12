@@ -736,23 +736,27 @@ app.post('/webhook', async (req, res) => {
         if (isUserAskingQuestion) {
             // Answer the question using ChatGPT
             const aiResponse = await getOpenAIResponse(textRaw);
-
+        
             // Send the answer to the user
             await sendToWhatsApp(from, aiResponse);
-
-            // Remind the user to continue with the request
-            const missingFields = getMissingFields(session.data);
-            if (missingFields.length > 0) {
-                const nextMissingField = missingFields[0];
-                const missingPrompt = await generateMissingFieldPrompt(nextMissingField);
-
-                if (missingPrompt) {
-                    await sendToWhatsApp(from, `Let’s go back to complete the request. ${missingPrompt}`);
+        
+            // Check if the user was already in the middle of a request
+            if (session.step !== STATES.WELCOME) {
+                const missingFields = getMissingFields(session.data);
+                if (missingFields.length > 0) {
+                    const nextMissingField = missingFields[0];
+                    const missingPrompt = await generateMissingFieldPrompt(nextMissingField);
+        
+                    if (missingPrompt) {
+                        await sendToWhatsApp(from, `Let’s go back to complete the request. ${missingPrompt}`);
+                    }
                 }
             }
-
+        
             return res.sendStatus(200);
         }
+        
+        
 
         // Handle messages based on the current state
         switch (session.step) {
