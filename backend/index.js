@@ -557,14 +557,31 @@ const askForNextMissingField = async (session, from) => {
 };
 async function isQuestionOrRequest(text) {
     const prompt = `
-        Determine the type of input based on the following rules:
-        - If the text is a request to submit an order (e.g., "I want to make a request", "I need to submit a request", "New order request"), return "request".
-        - If the text is a general question, return "question".
-        - If the text is a casual greeting like "hi", "hello", return "greeting".
-        - If it doesn’t fit into any of these categories, return "other".
+    Classify the user's input into one of the following categories:
+    
+    1️⃣ **"request"** → ONLY if the user is clearly making a service request. Examples:
+       - "I want to submit a request"
+       - "I need a pickup for used oil"
+       - "New order request"
+       - "Please collect oil from my location"
+    
+    2️⃣ **"question"** → If the user is **asking for information** about the company, services, or anything general. Examples:
+       - "What services do you provide?"
+       - "How does your oil collection work?"
+       - "Where are you located?"
+       - "What is the cost of biodiesel?"
+    
+    3️⃣ **"greeting"** → If the user is just saying hello. Examples:
+       - "Hi"
+       - "Hello"
+       - "Good morning"
+    
+    4️⃣ **"other"** → If the input does not fit the above categories.
+    
+    Respond ONLY with one of these words: "request", "question", "greeting", or "other".
 
-        Text: "${text}"
-    `;
+    **User Input:** "${text}"
+`;
 
     const aiResponse = await getOpenAIResponse(prompt);
     const response = aiResponse.trim().toLowerCase();
@@ -755,15 +772,14 @@ app.post('/webhook', async (req, res) => {
         const inputType = await isQuestionOrRequest(textRaw);
 
         if (inputType === "request") {
-            // Reset session data and start the request process
-            session.data = { phone: formatPhoneNumber(from) };
-            session.step = STATES.NAME;
+            // ✅ Double-check if the user is REALLY making an order
+            if (!textRaw.includes("collect") && !textRaw.includes("order") && !textRaw.includes("submit")) {
+                console.log("⚠️ Potential misclassification, treating as inquiry instead.");
+                inputType = "question"; // Revert to question
+            }
+        }
 
-            const namePrompt = await generateMissingFieldPrompt("name");
-            await sendToWhatsApp(from, namePrompt);
-            return res.sendStatus(200);
-        } else if (inputType === "question") {
-            // Handle questions as usual
+        if (inputType === "question") {
             const aiResponse = await getOpenAIResponse(textRaw);
             await sendToWhatsApp(from, aiResponse);
             return res.sendStatus(200);
