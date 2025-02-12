@@ -555,16 +555,23 @@ const askForNextMissingField = async (session, from) => {
     const dynamicResponse = await getOpenAIResponse(context);
     await sendToWhatsApp(from, dynamicResponse);
 };
-
 async function isQuestion(text) {
     const prompt = `
-        Determine if the following text is a question. Respond with "true" if it is a question, otherwise respond with "false".
-        Text: ${text}
+        Determine if the following text is a question or a greeting.
+        Respond with:
+        - "question" if the text is a genuine question.
+        - "greeting" if the text is a casual greeting like "hi", "hello", "who are you".
+        - "other" if the text is neither a question nor a greeting.
+
+        Text: "${text}"
     `;
 
     const aiResponse = await getOpenAIResponse(prompt);
-    return aiResponse.trim().toLowerCase() === "true";
+    const response = aiResponse.trim().toLowerCase();
+
+    return response === "question" ? true : response === "greeting" ? false : "other";
 }
+
 // const generateWelcomeMessage = async () => {
 //     try {
 //         const systemPrompt = `
@@ -711,9 +718,9 @@ app.post('/webhook', async (req, res) => {
         // Initialize user session if it doesn't exist
         if (!userSessions[from]) {
             userSessions[from] = { step: STATES.WELCOME, data: { phone: formatPhoneNumber(from) } };
-
+        
             const welcomeMessage = await generateWelcomeMessage();
-
+        
             // Send welcome message with options
             await sendInteractiveButtons(from, welcomeMessage, [
                 { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
@@ -721,6 +728,7 @@ app.post('/webhook', async (req, res) => {
             ]);
             return res.sendStatus(200);
         }
+        
 
         const session = userSessions[from];
 
@@ -753,8 +761,6 @@ app.post('/webhook', async (req, res) => {
 
             return res.sendStatus(200);
         }
-        
-        
 
         // Handle messages based on the current state
         switch (session.step) {
