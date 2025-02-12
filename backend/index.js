@@ -253,7 +253,9 @@ const getOpenAIResponse = async (userMessage, context = "") => {
             throw new Error("Invalid response structure from OpenAI API");
         }
 
-        return response.data.choices[0].message.content.trim();
+        const aiResponse = response.data.choices[0].message.content.trim();
+        console.log(`OpenAI Response: ${aiResponse}`); // Debugging
+        return aiResponse;
     } catch (error) {
         console.error('❌ Error with OpenAI:', error.response?.data || error.message);
         return "❌ Oops! Something went wrong. Please try again later.";
@@ -653,22 +655,25 @@ const generateMissingFieldPrompt = async (field) => {
 };
 const analyzeInput = async (input, expectedField) => {
     const prompt = `
-        The user was asked to provide their "${expectedField}".
-        They responded with: "${input}". 
-        
-        - Determine if this response matches the expected field.
-        - If valid, return "valid".
-        - If invalid, identify if it matches another expected field (e.g., phone number, email, address, quantity, etc.).
-        - If it matches another field, return "alternative:<field_name>".
-        - If it is completely invalid, return "invalid:<correction_message>".
-        
-        Example corrections:
-        - "That looks like a phone number. Could you please provide your full name instead? 😊"
-        - "This seems to be an email. Please share your phone number instead."
-        - "This looks like a name, but the format isn't quite right. Could you please share your full name?"
+        You are a helpful assistant for Lootah Biofuels. Your task is to analyze the user's input and determine if it matches the expected field.
+
+        - The user was asked to provide their "${expectedField}".
+        - They responded with: "${input}".
+
+        Rules:
+        1. If the input matches the expected field, return "valid".
+        2. If the input does not match the expected field but matches another valid field (e.g., phone number, email, address, etc.), return "alternative:<field_name>".
+        3. If the input is completely invalid, return "invalid:<correction_message>".
+
+        Examples:
+        - If the expected field is "name" and the user provides "John Doe", return "valid".
+        - If the expected field is "phone number" and the user provides "john@example.com", return "alternative:email".
+        - If the expected field is "email" and the user provides "123", return "invalid:Please provide a valid email address. 😊".
     `;
 
-    return await getOpenAIResponse(prompt);
+    const response = await getOpenAIResponse(prompt);
+    console.log(`Analyze Input Response: ${response}`); // Debugging
+    return response;
 };
 
 
@@ -779,20 +784,16 @@ app.post('/webhook', async (req, res) => {
             //----------------------------------------------------------------------
             case STATES.NAME:
                 const nameValidationResponse = await analyzeInput(textRaw, "name");
-
+            
                 if (nameValidationResponse.toLowerCase().includes("valid")) {
                     session.data.name = textRaw;
-                    session.step = STATES.PHONE_INPUT;
-                    const nextPrompt = await getOpenAIResponse("Great! Now, please provide your phone number.");
-                    await sendToWhatsApp(from, nextPrompt);
+                    await askForNextMissingField(session, from);
                 } else if (nameValidationResponse.startsWith("alternative:")) {
                     const altField = nameValidationResponse.split(":")[1];
                     session.data[altField] = textRaw; // Store the alternative data
-                    const missingFields = getMissingFields(session.data);
-                    await askForNextMissingField(session, from, missingFields);
+                    await askForNextMissingField(session, from);
                 } else {
-                    const errorMessage = nameValidationResponse.replace("invalid:", "").trim();
-                    await sendToWhatsApp(from, errorMessage);  // Show the correction message
+                    await sendToWhatsApp(from, nameValidationResponse.replace("invalid:", ""));
                 }
                 break;
 
