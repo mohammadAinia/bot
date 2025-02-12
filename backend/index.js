@@ -561,12 +561,8 @@ function getMissingFields(sessionData) {
 //     const dynamicResponse = await getOpenAIResponse(dynamicPrompt);
 //     await sendToWhatsApp(from, dynamicResponse);
 // }
-const askForNextMissingField = async (session, from, missingFields) => {
-    if (!session.greetingSent) {
-        const greetingMessage = `Hey ${session.data.name || 'there'}! 👋 Ready to complete your order? Let's get started! 😊`;
-        await sendToWhatsApp(from, greetingMessage);
-        session.greetingSent = true;
-    }
+const askForNextMissingField = async (session, from) => {
+    const missingFields = getMissingFields(session.data);
 
     if (missingFields.length === 0) {
         session.step = STATES.CONFIRMATION;
@@ -576,16 +572,12 @@ const askForNextMissingField = async (session, from, missingFields) => {
     const nextMissingField = missingFields[0];
     session.step = `ASK_${nextMissingField.toUpperCase()}`;
 
-    const context = `
-        The user is submitting an order to Lootah Biofuels. 
-        The missing field is: "${nextMissingField}". 
-        Ask for it in a friendly and concise way, using emojis if appropriate.
-        Do not start the message with a greeting like "Hello" or "Hi".
-    `;
-
-    const dynamicResponse = await getOpenAIResponse("Ask for the missing field.", context);
+    const context = `The user is submitting an order. Ask them for their "${nextMissingField}" in a friendly way. 😊`;
+    const dynamicResponse = await getOpenAIResponse(context);
     await sendToWhatsApp(from, dynamicResponse);
 };
+
+
 
 
 
@@ -690,19 +682,24 @@ const generateMissingFieldPrompt = async (field) => {
 };
 const analyzeInput = async (input, expectedField) => {
     const prompt = `
-        The user was asked to provide their "${expectedField}". 
+        The user was asked to provide their "${expectedField}".
         They responded with: "${input}". 
         
-        Determine if this response matches the expected field. If it does, respond with "valid". 
-        If it does not match, identify the actual type of input they provided (e.g., phone number, email, address) 
-        and generate a polite correction message.
+        - Determine if this response matches the expected field.
+        - If valid, return "valid".
+        - If invalid, identify if it matches another expected field (e.g., phone number, email, address, quantity, etc.).
+        - If it matches another field, return "alternative:<field_name>".
+        - If it is completely invalid, return "invalid:<correction_message>".
 
-        Example correction: "That looks like a phone number. Could you please provide your full address instead? 🏠"
+        Example corrections:
+        - "That looks like a phone number. Could you please provide your full name instead? 😊"
+        - "This seems to be an email. Please share your phone number instead."
     `;
 
-    const response = await getOpenAIResponse(prompt);
-    return response;
+    return await getOpenAIResponse(prompt);
 };
+
+
 
 
 app.post('/webhook', async (req, res) => {
@@ -808,65 +805,64 @@ app.post('/webhook', async (req, res) => {
 
             //----------------------------------------------------------------------
             case STATES.NAME:
-                // Send the name to ChatGPT for validation
-                const nameValidationPrompt = `
-                The user provided the following input: "${textRaw}". 
-                Determine if it is a valid name. If not, respond with a friendly suggestion to provide a proper name.
-                Example: "It looks like the name you provided might not be valid. Could you please provide your full name? 😊"
-                Do not start the message with a greeting like "Hello" or "Hi".
-            `;
+                const nameValidationResponse = await analyzeInput(textRaw, "name");
 
-                const nameValidationResponse = await getOpenAIResponse(nameValidationPrompt);
-
-                if (nameValidationResponse.toLowerCase().includes('not a valid name') || nameValidationResponse.toLowerCase().includes('incorrect name')) {
-                    // If the response indicates that the input is not a valid name
-                    const invalidNameResponse = "❌ It looks like the name you provided might not be valid. Could you please provide your full name? 😊";
-                    await sendToWhatsApp(from, invalidNameResponse);
-                    session.step = STATES.NAME;  // Keep the user in the NAME state
-                } else {
-                    // If the response indicates that it seems like a valid name
+                if (nameValidationResponse.toLowerCase().includes("valid")) {
                     session.data.name = textRaw;
-                    session.step = STATES.EMAIL;
-                    const nameResponse = await getOpenAIResponse("The user just provided their name as " + textRaw + ". Now, ask them for their email address.");
-                    await sendToWhatsApp(from, nameResponse);
+                    session.step = STATES.PHONE_INPUT;
+                    const nextPrompt = await getOpenAIResponse("Great! Now, please provide your phone number.");
+                    await sendToWhatsApp(from, nextPrompt);
+                } else if (nameValidationResponse.startsWith("alternative:")) {
+                    const altField = nameValidationResponse.split(":")[1];
+                    session.data[altField] = textRaw; // Store the alternative data
+                    const missingFields = getMissingFields(session.data);
+                    await askForNextMissingField(session, from, missingFields);
+                } else {
+                    await sendToWhatsApp(from, nameValidationResponse.replace("invalid:", ""));
                 }
                 break;
 
-
             case STATES.PHONE_INPUT:
-                if (!isValidPhone(textRaw)) {
-                    const phoneResponse = await getOpenAIResponse("User entered an invalid phone number " + textRaw + ". Ask them to enter a valid Emirati phone number.");
-                    await sendToWhatsApp(from, phoneResponse);
-                    return res.sendStatus(200);
+                const phoneValidationResponse = await analyzeInput(textRaw, "phone number");
+
+                if (phoneValidationResponse.toLowerCase().includes("valid")) {
+                    session.data.phone = formatPhoneNumber(textRaw);
+                    session.step = STATES.EMAIL;
+                    const nextPrompt = await getOpenAIResponse("Thanks! Now, please provide your email.");
+                    await sendToWhatsApp(from, nextPrompt);
+                } else if (phoneValidationResponse.startsWith("alternative:")) {
+                    const altField = phoneValidationResponse.split(":")[1];
+                    session.data[altField] = textRaw; // Store the alternative data
+                    const missingFields = getMissingFields(session.data);
+                    await askForNextMissingField(session, from, missingFields);
+                } else {
+                    await sendToWhatsApp(from, phoneValidationResponse.replace("invalid:", ""));
                 }
-                session.data.phone = formatPhoneNumber(textRaw);
-                session.step = STATES.EMAIL;
-                const phoneValidResponse = await getOpenAIResponse("The user entered a valid phone number " + textRaw + ". Now, ask them for their email address.");
-                await sendToWhatsApp(from, phoneValidResponse);
                 break;
 
             case STATES.EMAIL:
-                if (!isValidEmail(textRaw)) {
-                    const emailResponse = await getOpenAIResponse("User entered an invalid email address " + textRaw + ". Ask them to enter a valid email address.");
-                    await sendToWhatsApp(from, emailResponse);
-                    return res.sendStatus(200);
+                const emailValidationResponse = await analyzeInput(textRaw, "email");
+
+                if (emailValidationResponse.toLowerCase().includes("valid")) {
+                    session.data.email = textRaw;
+                    session.step = STATES.ADDRESS;
+                    const nextPrompt = await getOpenAIResponse("User provided a valid email. Now, ask them for their address.");
+                    await sendToWhatsApp(from, nextPrompt);
+                } else {
+                    await sendToWhatsApp(from, emailValidationResponse);
+                    session.step = STATES.EMAIL;
                 }
-                session.data.email = textRaw;
-                session.step = STATES.ADDRESS;
-                const emailValidResponse = await getOpenAIResponse("The user entered a valid email address " + textRaw + ". Now, ask them for their full address.");
-                await sendToWhatsApp(from, emailValidResponse);
                 break;
-
             case STATES.ADDRESS:
-                const validationResponse = await analyzeInput(textRaw, "address");
+                const addressValidationResponse = await analyzeInput(textRaw, "address");
 
-                if (validationResponse.toLowerCase().includes("valid")) {
+                if (addressValidationResponse.toLowerCase().includes("valid")) {
                     session.data.address = textRaw;
                     session.step = STATES.CITY_SELECTION;
-                    await sendCitySelection(from); // Ask for city selection
+                    await sendCitySelection(from);
                 } else {
-                    await sendToWhatsApp(from, validationResponse); // Send correction message
-                    session.step = STATES.ADDRESS; // Keep user in the same state
+                    await sendToWhatsApp(from, addressValidationResponse);
+                    session.step = STATES.ADDRESS;
                 }
                 break;
 
@@ -883,41 +879,59 @@ app.post('/webhook', async (req, res) => {
                     if (cityMap[citySelection]) {
                         session.data.city = cityMap[citySelection];
                         session.step = STATES.STREET;
-                        const cityResponse = await getOpenAIResponse("The user selected the city " + cityMap[citySelection] + ". Now, ask them for the street name.");
+                        const cityResponse = await getOpenAIResponse(`The user selected the city ${cityMap[citySelection]}. Now, ask them for the street name.`);
                         await sendToWhatsApp(from, cityResponse);
                     } else {
                         const invalidCityResponse = await getOpenAIResponse("The user made an invalid city selection. Ask them to choose from the provided options.");
                         await sendToWhatsApp(from, invalidCityResponse);
-                        await sendCitySelection(from); // Re-send city selection
+                        await sendCitySelection(from);
                     }
                 } else {
                     const noCityResponse = await getOpenAIResponse("The user didn't select a city. Ask them to choose from the provided options.");
                     await sendToWhatsApp(from, noCityResponse);
-                    await sendCitySelection(from); // Re-send city selection buttons
+                    await sendCitySelection(from);
                 }
                 break;
 
             case STATES.STREET:
-                session.data.street = textRaw;
-                session.step = STATES.BUILDING_NAME;
-                const streetResponse = await getOpenAIResponse("User provided the street " + textRaw + ". Ask them for the building name.");
-                await sendToWhatsApp(from, streetResponse);
+                const streetValidationResponse = await analyzeInput(textRaw, "street name");
+                if (streetValidationResponse.toLowerCase().includes("valid")) {
+                    session.data.street = textRaw;
+                    session.step = STATES.BUILDING_NAME;
+                    const streetResponse = await getOpenAIResponse(`User provided the street ${textRaw}. Ask them for the building name.`);
+                    await sendToWhatsApp(from, streetResponse);
+                } else {
+                    await sendToWhatsApp(from, streetValidationResponse);
+                    session.step = STATES.STREET;
+                }
                 break;
 
             case STATES.BUILDING_NAME:
-                session.data.building_name = textRaw;
-                session.step = STATES.FLAT_NO;
-                const buildingResponse = await getOpenAIResponse("User provided the building name " + textRaw + ". Ask them for the flat number.");
-                await sendToWhatsApp(from, buildingResponse);
+                const buildingValidationResponse = await analyzeInput(textRaw, "building name");
+                if (buildingValidationResponse.toLowerCase().includes("valid")) {
+                    session.data.building_name = textRaw;
+                    session.step = STATES.FLAT_NO;
+                    const buildingResponse = await getOpenAIResponse(`User provided the building name ${textRaw}. Ask them for the flat number.`);
+                    await sendToWhatsApp(from, buildingResponse);
+                } else {
+                    await sendToWhatsApp(from, buildingValidationResponse);
+                    session.step = STATES.BUILDING_NAME;
+                }
                 break;
 
             case STATES.FLAT_NO:
-                session.data.flat_no = textRaw;
-                session.step = STATES.LONGITUDE;
-                const flatResponse = await getOpenAIResponse("User provided the flat number " + textRaw + ". Ask them to share their location.");
-                if (!session.locationPromptSent) {
-                    await sendToWhatsApp(from, flatResponse);
-                    session.locationPromptSent = true;
+                const flatValidationResponse = await analyzeInput(textRaw, "flat number");
+                if (flatValidationResponse.toLowerCase().includes("valid")) {
+                    session.data.flat_no = textRaw;
+                    session.step = STATES.LONGITUDE;
+                    const flatResponse = await getOpenAIResponse(`User provided the flat number ${textRaw}. Ask them to share their location.`);
+                    if (!session.locationPromptSent) {
+                        await sendToWhatsApp(from, flatResponse);
+                        session.locationPromptSent = true;
+                    }
+                } else {
+                    await sendToWhatsApp(from, flatValidationResponse);
+                    session.step = STATES.FLAT_NO;
                 }
                 break;
 
@@ -949,32 +963,112 @@ app.post('/webhook', async (req, res) => {
                     }
                 } else {
                     if (!session.locationPromptSent) {
-                        const missingPrompt = await generateMissingFieldPrompt("longitude");
+                        const missingPrompt = await getOpenAIResponse("The user hasn't shared their location yet. Kindly ask them again to share their live location.");
                         await sendToWhatsApp(from, missingPrompt);
                         session.locationPromptSent = true;
                     }
                 }
                 break;
 
+            // case STATES.CITY_SELECTION:
+            //     if (message.interactive && message.interactive.button_reply) {
+            //         const citySelection = message.interactive.button_reply.id;
+            //         const cityMap = {
+            //             "abu_dhabi": "Abu Dhabi",
+            //             "dubai": "Dubai",
+            //             "sharjah": "Sharjah"
+            //         };
+
+            //         if (cityMap[citySelection]) {
+            //             session.data.city = cityMap[citySelection];
+            //             session.step = STATES.STREET;
+            //             const cityResponse = await getOpenAIResponse("The user selected the city " + cityMap[citySelection] + ". Now, ask them for the street name.");
+            //             await sendToWhatsApp(from, cityResponse);
+            //         } else {
+            //             const invalidCityResponse = await getOpenAIResponse("The user made an invalid city selection. Ask them to choose from the provided options.");
+            //             await sendToWhatsApp(from, invalidCityResponse);
+            //             await sendCitySelection(from); // Re-send city selection
+            //         }
+            //     } else {
+            //         const noCityResponse = await getOpenAIResponse("The user didn't select a city. Ask them to choose from the provided options.");
+            //         await sendToWhatsApp(from, noCityResponse);
+            //         await sendCitySelection(from); // Re-send city selection buttons
+            //     }
+            //     break;
+
+            // case STATES.STREET:
+            //     session.data.street = textRaw;
+            //     session.step = STATES.BUILDING_NAME;
+            //     const streetResponse = await getOpenAIResponse("User provided the street " + textRaw + ". Ask them for the building name.");
+            //     await sendToWhatsApp(from, streetResponse);
+            //     break;
+
+            // case STATES.BUILDING_NAME:
+            //     session.data.building_name = textRaw;
+            //     session.step = STATES.FLAT_NO;
+            //     const buildingResponse = await getOpenAIResponse("User provided the building name " + textRaw + ". Ask them for the flat number.");
+            //     await sendToWhatsApp(from, buildingResponse);
+            //     break;
+
+            // case STATES.FLAT_NO:
+            //     session.data.flat_no = textRaw;
+            //     session.step = STATES.LONGITUDE;
+            //     const flatResponse = await getOpenAIResponse("User provided the flat number " + textRaw + ". Ask them to share their location.");
+            //     if (!session.locationPromptSent) {
+            //         await sendToWhatsApp(from, flatResponse);
+            //         session.locationPromptSent = true;
+            //     }
+            //     break;
+
+            // case STATES.LONGITUDE:
+            //     if (message.location) {
+            //         const { latitude, longitude } = message.location;
+            //         const UAE_BOUNDS = {
+            //             minLat: 22.5,
+            //             maxLat: 26.5,
+            //             minLng: 51.6,
+            //             maxLng: 56.5
+            //         };
+
+            //         if (
+            //             latitude >= UAE_BOUNDS.minLat &&
+            //             latitude <= UAE_BOUNDS.maxLat &&
+            //             longitude >= UAE_BOUNDS.minLng &&
+            //             longitude <= UAE_BOUNDS.maxLng
+            //         ) {
+            //             session.data.latitude = latitude;
+            //             session.data.longitude = longitude;
+            //             session.step = STATES.QUANTITY;
+            //             session.awaitingQuantityInput = true;
+            //             const locationResponse = await getOpenAIResponse("User shared a valid location within the UAE. Now, ask them for the quantity.");
+            //             await sendToWhatsApp(from, locationResponse);
+            //         } else {
+            //             const invalidLocationResponse = await getOpenAIResponse("User shared an invalid location outside the UAE. Ask them to provide a valid location within the UAE.");
+            //             await sendToWhatsApp(from, invalidLocationResponse);
+            //         }
+            //     } else {
+            //         if (!session.locationPromptSent) {
+            //             const missingPrompt = await generateMissingFieldPrompt("longitude");
+            //             await sendToWhatsApp(from, missingPrompt);
+            //             session.locationPromptSent = true;
+            //         }
+            //     }
+            //     break;
+
             case STATES.QUANTITY:
-                if (session.awaitingQuantityInput) {
-                    const quantity = extractQuantity(textRaw);
-                    if (!quantity) {
-                        const quantityErrorResponse = await getOpenAIResponse("User entered an invalid quantity " + textRaw + ". Ask them to enter a valid quantity.");
-                        await sendToWhatsApp(from, quantityErrorResponse);
-                        return res.sendStatus(200);
-                    }
-                    session.data.quantity = quantity;
-                    session.awaitingQuantityInput = false;
+                const quantityValidationResponse = await analyzeInput(textRaw, "quantity");
+
+                if (quantityValidationResponse.toLowerCase().includes("valid")) {
+                    session.data.quantity = extractQuantity(textRaw);
                     session.step = STATES.CONFIRMATION;
-                    const orderSummaryResponse = await getOpenAIResponse("User entered a valid quantity " + quantity + ". Provide a summary and confirmation.");
-                    sendOrderSummary(from, session, orderSummaryResponse);
+                    const summary = await getOpenAIResponse("User provided a valid quantity. Now, provide the order summary.");
+                    sendOrderSummary(from, session, summary);
                 } else {
-                    session.awaitingQuantityInput = true;
-                    const quantityRequestResponse = await getOpenAIResponse("Ask the user to provide the quantity of the product in liters.");
-                    await sendToWhatsApp(from, quantityRequestResponse);
+                    await sendToWhatsApp(from, quantityValidationResponse);
+                    session.step = STATES.QUANTITY;
                 }
                 break;
+
 
             case "ASK_NAME": {
                 session.data.name = textRaw;
