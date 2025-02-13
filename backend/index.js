@@ -920,15 +920,14 @@ app.post('/webhook', async (req, res) => {
                                 `The user selected the city ${cityMap[citySelection]}. Now, ask them for the street name.`,
                                 `Respond in ${detectedLanguage}.`
                             );
-                            await sendToWhatsApp(from, cityResponse);
+                            return await sendToWhatsApp(from, cityResponse);
                         } else {
-                            await sendCitySelection(from, detectedLanguage); // Re-send buttons only if an invalid selection is made
+                            return await sendCitySelection(from, detectedLanguage); // Re-send buttons only for invalid selections
                         }
                     }
                     break;
                 
-
-
+                
             case STATES.STREET:
                 const streetValidationResponse = await analyzeInput(textRaw, "street name", detectedLanguage); // Pass language here
 
@@ -1064,9 +1063,9 @@ app.post('/webhook', async (req, res) => {
 
             case "ASK_CITY": {
                 session.step = STATES.CITY_SELECTION; // Set session state properly before sending buttons
-                await sendCitySelection(from, detectedLanguage); // Send only one message with buttons
-                break;
+                return await sendCitySelection(from, detectedLanguage); // Ensure only one message is sent
             }
+            
             
 
 
