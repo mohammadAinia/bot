@@ -706,113 +706,112 @@ const analyzeInput = async (input, expectedField, detectedLanguage) => {
 //
 //
 app.post('/webhook', async (req, res) => {
-    app.post('/webhook', async (req, res) => {
-        try {
-            console.log('Incoming Webhook Data:', req.body);
-    
-            const entry = req.body.entry?.[0];
-            const changes = entry?.changes?.[0];
-            const value = changes?.value;
-            const messages = value?.messages;
-    
-            if (!messages || messages.length === 0) {
-                console.log('No messages received, returning early.');
-                return res.sendStatus(200);
+    try {
+        console.log('Incoming Webhook Data:', req.body);
+
+        const entry = req.body.entry?.[0];
+        const changes = entry?.changes?.[0];
+        const value = changes?.value;
+        const messages = value?.messages;
+
+        if (!messages || messages.length === 0) {
+            console.log('No messages received, returning early.');
+            return res.sendStatus(200);
+        }
+
+        const message = messages[0];
+        const from = message.from;
+        const textRaw = message.text?.body || "";
+        const text = textRaw.toLowerCase().trim();
+
+        // Detect the user's language
+        const detectedLanguage = detectLanguage(textRaw);
+        console.log(`Detected Language: ${detectedLanguage}`);
+
+        // Initialize user session if it doesn't exist
+        if (!userSessions[from]) {
+            userSessions[from] = {
+                step: STATES.WELCOME,
+                data: { phone: formatPhoneNumber(from) },
+                language: detectedLanguage // Store detected language
+            };
+
+            const welcomeMessage = await generateWelcomeMessage(detectedLanguage); // Pass detected language
+
+            // Send welcome message with options
+            await sendInteractiveButtons(from, welcomeMessage, [
+                { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
+                { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
+            ]);
+            return res.sendStatus(200);
+        }
+
+        const session = userSessions[from];
+
+        if (session.language !== detectedLanguage) {
+            session.language = detectedLanguage;
+        }
+
+        if (!session.data.phone) {
+            session.data.phone = formatPhoneNumber(from);
+        }
+
+        let inputType = await isQuestionOrRequest(textRaw, detectedLanguage); // Pass language here
+
+        if (inputType === "request") {
+            // Extract data from the user's input
+            const extractedData = await extractInformationFromText(textRaw, detectedLanguage);
+            session.data = { ...session.data, ...extractedData };
+
+            // Check if the user provided enough information to skip steps
+            const missingFields = getMissingFields(session.data);
+            if (missingFields.length === 0) {
+                session.step = STATES.CONFIRMATION;
+                await sendOrderSummary(from, session, detectedLanguage);
+            } else {
+                await askForNextMissingField(session, from, detectedLanguage);
             }
-    
-            const message = messages[0];
-            const from = message.from;
-            const textRaw = message.text?.body || "";
-            const text = textRaw.toLowerCase().trim();
-    
-            // Detect the user's language
-            const detectedLanguage = detectLanguage(textRaw);
-            console.log(`Detected Language: ${detectedLanguage}`);
-    
-            // Initialize user session if it doesn't exist
-            if (!userSessions[from]) {
-                userSessions[from] = {
-                    step: STATES.WELCOME,
-                    data: { phone: formatPhoneNumber(from) },
-                    language: detectedLanguage // Store detected language
-                };
-    
-                const welcomeMessage = await generateWelcomeMessage(detectedLanguage); // Pass detected language
-    
-                // Send welcome message with options
-                await sendInteractiveButtons(from, welcomeMessage, [
-                    { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
-                    { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
-                ]);
-                return res.sendStatus(200);
-            }
-    
-            const session = userSessions[from];
-    
-            if (session.language !== detectedLanguage) {
-                session.language = detectedLanguage;
-            }
-    
-            if (!session.data.phone) {
-                session.data.phone = formatPhoneNumber(from);
-            }
-    
-            let inputType = await isQuestionOrRequest(textRaw, detectedLanguage); // Pass language here
-    
-            if (inputType === "request") {
-                // Extract data from the user's input
-                const extractedData = await extractInformationFromText(textRaw, detectedLanguage);
-                session.data = { ...session.data, ...extractedData };
-    
-                // Check if the user provided enough information to skip steps
-                const missingFields = getMissingFields(session.data);
-                if (missingFields.length === 0) {
-                    session.step = STATES.CONFIRMATION;
-                    await sendOrderSummary(from, session, detectedLanguage);
-                } else {
-                    await askForNextMissingField(session, from, detectedLanguage);
-                }
-                return res.sendStatus(200);
-            }
-    
-            if (inputType === "question") {
-                const aiResponse = await getOpenAIResponse(textRaw, `Respond in ${detectedLanguage}.`); // Pass language here
-                await sendToWhatsApp(from, aiResponse);
-                return res.sendStatus(200);
-            }
-    
-            // Handle messages based on the current state
-            switch (session.step) {
-                case STATES.WELCOME:
-                    if (message.interactive && message.interactive.button_reply) {
-                        const buttonId = message.interactive.button_reply.id;
-    
-                        if (buttonId === "new_request") {
-                            // Reset session data for a new request
-                            session.data = { phone: formatPhoneNumber(from) };
-                            session.step = STATES.NAME;
-    
-                            // Ask for the user's name
-                            const namePrompt = await generateMissingFieldPrompt("name", detectedLanguage); // Pass language here
-                            await sendToWhatsApp(from, namePrompt);
-                        } else if (buttonId === "contact_us") {
-                            // Handle "Contact Us" button
-                            await sendToWhatsApp(from, "You can reach us at support@example.com. 📞");
-                        }
-                    } else if (message.type === "text") {
-                        // Handle text input (if any)
-                        const extractedData = await extractInformationFromText(textRaw, detectedLanguage); // Pass language here
-                        session.data = { ...session.data, ...extractedData };
-    
-                        const missingFields = getMissingFields(session.data);
-                        if (missingFields.length === 0) {
-                            session.step = STATES.CONFIRMATION;
-                            await sendOrderSummary(from, session, detectedLanguage); // Pass language here
-                        } else {
-                            await askForNextMissingField(session, from, detectedLanguage); // Pass language here
-                        }
+            return res.sendStatus(200);
+        }
+
+        if (inputType === "question") {
+            const aiResponse = await getOpenAIResponse(textRaw, `Respond in ${detectedLanguage}.`); // Pass language here
+            await sendToWhatsApp(from, aiResponse);
+            return res.sendStatus(200);
+        }
+
+        // Handle messages based on the current state
+        switch (session.step) {
+            case STATES.WELCOME:
+                if (message.interactive && message.interactive.button_reply) {
+                    const buttonId = message.interactive.button_reply.id;
+
+                    if (buttonId === "new_request") {
+                        // Reset session data for a new request
+                        session.data = { phone: formatPhoneNumber(from) };
+                        session.step = STATES.NAME;
+
+                        // Ask for the user's name
+                        const namePrompt = await generateMissingFieldPrompt("name", detectedLanguage); // Pass language here
+                        await sendToWhatsApp(from, namePrompt);
+                    } else if (buttonId === "contact_us") {
+                        // Handle "Contact Us" button
+                        await sendToWhatsApp(from, "You can reach us at support@example.com. 📞");
                     }
-                    break;
+                } else if (message.type === "text") {
+                    // Handle text input (if any)
+                    const extractedData = await extractInformationFromText(textRaw, detectedLanguage); // Pass language here
+                    session.data = { ...session.data, ...extractedData };
+
+                    const missingFields = getMissingFields(session.data);
+                    if (missingFields.length === 0) {
+                        session.step = STATES.CONFIRMATION;
+                        await sendOrderSummary(from, session, detectedLanguage); // Pass language here
+                    } else {
+                        await askForNextMissingField(session, from, detectedLanguage); // Pass language here
+                    }
+                }
+                break;
 
             case STATES.NAME:
                 const nameValidationResponse = await analyzeInput(textRaw, "name", detectedLanguage); // Pass language here
