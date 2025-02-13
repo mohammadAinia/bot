@@ -701,7 +701,21 @@ const analyzeInput = async (input, expectedField, detectedLanguage) => {
     console.log(`Analyze Input Response: ${response}`); // Debugging
     return response;
 };
+const shouldEndRequest = (text) => {
+    const endPhrases = [
+        "end the request",
+        "cancel the request",
+        "i do not want the request",
+        "close",
+        "end",
+        "stop",
+        "cancel",
+        "i want to end the request",
+        "i want to cancel the request"
+    ];
 
+    return endPhrases.some(phrase => text.includes(phrase));
+};
 
 //
 //
@@ -723,6 +737,17 @@ app.post('/webhook', async (req, res) => {
         const from = message.from;
         const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
+
+        // Check if the user wants to end the request
+        if (shouldEndRequest(text)) {
+            delete userSessions[from]; // Reset the session
+            const welcomeMessage = await generateWelcomeMessage(detectedLanguage);
+            await sendInteractiveButtons(from, welcomeMessage, [
+                { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
+                { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
+            ]);
+            return res.sendStatus(200);
+        }
 
         // Detect the user's language
         const detectedLanguage = detectLanguage(textRaw);
