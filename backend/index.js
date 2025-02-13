@@ -566,6 +566,24 @@ function getMissingFields(sessionData) {
     return missingFields;
 }
 
+// Define the fieldPromptMap globally so it's accessible everywhere
+const fieldPromptMap = {
+    name: "What’s your full name?",
+    phone: "Could you share your phone number? 📱",
+    email: "What’s your email address? ✉️",
+    address: "Can you provide your address? 🏠",
+    city: "Which city are you located in? 🌆",
+    street: "What’s the name of your street? 🛣️",
+    building_name: "What’s the name of your building? 🏢",
+    flat_no: "What’s your flat number? 🏠",
+    latitude: "Can you share your live location via WhatsApp? 📍",
+    longitude: "Can you share your live location via WhatsApp? 📍",
+    quantity: "How many liters of oil would you like to order? ⛽"
+};
+
+// Now both askForNextMissingField and generateMissingFieldPrompt can access this map
+
+
 const askForNextMissingField = async (session, from, detectedLanguage) => {
     const missingFields = getMissingFields(session.data);
 
@@ -586,6 +604,7 @@ const askForNextMissingField = async (session, from, detectedLanguage) => {
     // Send the message with all missing fields
     await sendToWhatsApp(from, missingFieldsMessage);
 };
+
 
 async function isQuestionOrRequest(text) {
     const prompt = `
