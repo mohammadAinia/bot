@@ -847,7 +847,7 @@ app.post('/webhook', async (req, res) => {
                 if (phoneValidationResponse.toLowerCase().includes("valid")) {
                     session.data.phone = formatPhoneNumber(textRaw);
                     session.step = STATES.EMAIL;
-                    const nextPrompt = await getOpenAIResponse("Thanks! Now, please provide your email.");
+                    const nextPrompt = await getOpenAIResponse("Thanks! Now, please provide your email.", `Respond in ${detectedLanguage}.`);
                     await sendToWhatsApp(from, nextPrompt);
                 } else if (phoneValidationResponse.startsWith("alternative:")) {
                     const altField = phoneValidationResponse.split(":")[1];
