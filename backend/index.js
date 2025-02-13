@@ -631,17 +631,19 @@ async function isQuestionOrRequest(text) {
 }
 
 
-const generateWelcomeMessage = async () => {
+const generateWelcomeMessage = async (language) => {
     const systemPrompt = `
         You are a friendly WhatsApp assistant for Lootah Biofuels. 
         Generate a concise and engaging welcome message that:
         - Introduces the company in a warm and professional tone.
         - Encourages users to ask questions or start a new request.
         - Uses emojis sparingly to make the message lively but not overwhelming.
+        - Respond in the language: ${language}.
     `;
 
     return await getOpenAIResponse("Generate a welcome message.", systemPrompt);
 };
+
 
 const generateMissingFieldPrompt = async (field, detectedLanguage) => {
     const fieldPromptMap = {
@@ -720,11 +722,9 @@ app.post('/webhook', async (req, res) => {
         const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
 
-
         // Detect the user's language
         const detectedLanguage = detectLanguage(textRaw);
         console.log(`Detected Language: ${detectedLanguage}`);
-
 
         // Initialize user session if it doesn't exist
         if (!userSessions[from]) {
@@ -734,7 +734,7 @@ app.post('/webhook', async (req, res) => {
                 language: detectedLanguage // Store detected language
             };
 
-            const welcomeMessage = await generateWelcomeMessage(detectedLanguage); // Pass language here
+            const welcomeMessage = await generateWelcomeMessage(detectedLanguage); // Pass detected language
 
             // Send welcome message with options
             await sendInteractiveButtons(from, welcomeMessage, [
@@ -743,12 +743,12 @@ app.post('/webhook', async (req, res) => {
             ]);
             return res.sendStatus(200);
         }
+
         const session = userSessions[from];
 
         if (session.language !== detectedLanguage) {
             session.language = detectedLanguage;
         }
-
 
         if (!session.data.phone) {
             session.data.phone = formatPhoneNumber(from);
@@ -777,7 +777,6 @@ app.post('/webhook', async (req, res) => {
             await sendToWhatsApp(from, aiResponse);
             return res.sendStatus(200);
         }
-
 
         // Handle messages based on the current state
         switch (session.step) {
@@ -845,21 +844,21 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-                case STATES.EMAIL:
-                    const emailValidationResponse = await analyzeInput(textRaw, "email", detectedLanguage); // Pass language here
-                
-                    if (emailValidationResponse.toLowerCase().includes("valid")) {
-                        session.data.email = textRaw;
-                        session.step = STATES.ADDRESS;
-                
-                        // Use generateMissingFieldPrompt to request the address
-                        const addressPrompt = await generateMissingFieldPrompt("address", detectedLanguage);
-                        await sendToWhatsApp(from, addressPrompt);
-                    } else {
-                        await sendToWhatsApp(from, emailValidationResponse);
-                        session.step = STATES.EMAIL;
-                    }
-                    break;
+            case STATES.EMAIL:
+                const emailValidationResponse = await analyzeInput(textRaw, "email", detectedLanguage); // Pass language here
+
+                if (emailValidationResponse.toLowerCase().includes("valid")) {
+                    session.data.email = textRaw;
+                    session.step = STATES.ADDRESS;
+
+                    // Use generateMissingFieldPrompt to request the address
+                    const addressPrompt = await generateMissingFieldPrompt("address", detectedLanguage);
+                    await sendToWhatsApp(from, addressPrompt);
+                } else {
+                    await sendToWhatsApp(from, emailValidationResponse);
+                    session.step = STATES.EMAIL;
+                }
+                break;
             case STATES.ADDRESS:
                 const addressValidationResponse = await analyzeInput(textRaw, "address", detectedLanguage); // Pass language here
 
