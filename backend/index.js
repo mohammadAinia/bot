@@ -532,7 +532,7 @@ async function extractInformationFromText(text, detectedLanguage) {
         Text: ${text}
     `;
 
-    const aiResponse = await getOpenAIResponse(textRaw, detectedLanguage);
+    const aiResponse = await getOpenAIResponse(prompt); // Pass prompt, not textRaw
 
     try {
         const aiExtractedData = JSON.parse(aiResponse);
@@ -542,6 +542,7 @@ async function extractInformationFromText(text, detectedLanguage) {
         return extractedData; // Return at least the manually extracted data
     }
 }
+
 
 
 function getMissingFields(sessionData) {
@@ -721,14 +722,14 @@ app.post('/webhook', async (req, res) => {
 
         // Initialize user session if it doesn't exist
         if (!userSessions[from]) {
-            userSessions[from] = { 
-                step: STATES.WELCOME, 
-                data: { phone: formatPhoneNumber(from) }, 
+            userSessions[from] = {
+                step: STATES.WELCOME,
+                data: { phone: formatPhoneNumber(from) },
                 language: detectedLanguage // Store detected language
             };
-        
+
             const welcomeMessage = await generateWelcomeMessage(detectedLanguage); // Pass language here
-        
+
             // Send welcome message with options
             await sendInteractiveButtons(from, welcomeMessage, [
                 { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
@@ -749,7 +750,7 @@ app.post('/webhook', async (req, res) => {
             // Extract data from the user's input
             const extractedData = await extractInformationFromText(textRaw, detectedLanguage);
             session.data = { ...session.data, ...extractedData };
-        
+
             // Check if the user provided enough information to skip steps
             const missingFields = getMissingFields(session.data);
             if (missingFields.length === 0) {
