@@ -242,6 +242,10 @@ const getOpenAIResponse = async (userMessage, context = "") => {
             { role: "user", content: userMessage },
         ];
 
+        if (context && context.trim() !== "") {
+            messages.push({ role: "system", content: context });
+        }
+
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
             model: "gpt-4",
             messages,
@@ -296,17 +300,19 @@ const isValidPhone = (phone) => {
 };
 
 
-const sendCitySelection = async (to) => {
+const sendCitySelection = async (to, detectedLanguage) => {
     try {
+        const cityPrompt = await getOpenAIResponse("Ask the user to select their city from the available options.", `Respond in ${detectedLanguage}.`);
+
         await axios.post(process.env.WHATSAPP_API_URL, {
             messaging_product: "whatsapp",
             recipient_type: "individual",
             to: to,
             type: "interactive",
             interactive: {
-                type: "button",  // Use "button" for quick replies
+                type: "button",
                 body: {
-                    text: "🌆 Please select your city:"
+                    text: cityPrompt
                 },
                 action: {
                     buttons: [
@@ -327,21 +333,24 @@ const sendCitySelection = async (to) => {
     }
 };
 
-const sendOrderSummary = async (to, session) => {
+
+const sendOrderSummary = async (to, session, detectedLanguage) => {
     try {
-        let summary = `✅ *Order Summary:*\n\n`;
-        summary += `🔹 *Name:* ${session.data.name}\n`;
-        summary += `📞 *Phone Number:* ${session.data.phone}\n`;
-        summary += `📧 *Email:* ${session.data.email}\n`;
-        summary += `📍 *Address:* ${session.data.address}\n`;
-        summary += `🌆 *City:* ${session.data.city}\n`;
-        summary += `🏠 *Street:* ${session.data.street}\n`;
-        summary += `🏢 *Building Name:* ${session.data.building_name}\n`;
-        summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;
-        summary += `📍 *Latitude:* ${session.data.latitude}\n`;
-        summary += `📍 *Longitude:* ${session.data.longitude}\n`;
-        summary += `📦 *Quantity:* ${session.data.quantity}\n\n`;
-        summary += `Is the information correct? Please confirm below:`;
+        const summaryText = await getOpenAIResponse(
+            `Generate an order summary in a user-friendly way, including the following details:
+            Name: ${session.data.name},
+            Phone: ${session.data.phone},
+            Email: ${session.data.email},
+            Address: ${session.data.address},
+            City: ${session.data.city},
+            Street: ${session.data.street},
+            Building Name: ${session.data.building_name},
+            Flat Number: ${session.data.flat_no},
+            Location: (Latitude: ${session.data.latitude}, Longitude: ${session.data.longitude}),
+            Quantity: ${session.data.quantity}.
+            Also, ask the user to confirm if the details are correct.`,
+            `Respond in ${detectedLanguage}.`
+        );
 
         await axios.post(process.env.WHATSAPP_API_URL, {
             messaging_product: "whatsapp",
@@ -351,12 +360,12 @@ const sendOrderSummary = async (to, session) => {
             interactive: {
                 type: "button",
                 body: {
-                    text: summary
+                    text: summaryText
                 },
                 action: {
                     buttons: [
-                        { type: "reply", reply: { id: "yes_confirm", title: "Yes" } },
-                        { type: "reply", reply: { id: "no_correct", title: "No" } }
+                        { type: "reply", reply: { id: "yes_confirm", title: "✅ Yes, Confirm" } },
+                        { type: "reply", reply: { id: "no_correct", title: "❌ No, Edit Details" } }
                     ]
                 }
             }
@@ -370,6 +379,7 @@ const sendOrderSummary = async (to, session) => {
         console.error("❌ Failed to send order summary:", error.response?.data || error.message);
     }
 };
+
 
 let dataStore = [];  // Array to temporarily store data
 
@@ -477,13 +487,13 @@ function extractQuantity(text) {
     return match ? match[0] : null; // Returns the number or null if not found
 }
 
-async function extractInformationFromText(text) {
-    // Extract quantity directly from the text
+async function extractInformationFromText(text, detectedLanguage) {
     const extractedData = {
         quantity: extractQuantity(text) // Use extractQuantity function
     };
 
     const prompt = `
+        Respond in ${detectedLanguage}.
         Extract the following information from the text and return a valid JSON object:
         {
           "name": "The user's full name or null",
@@ -538,18 +548,18 @@ function getMissingFields(sessionData) {
     return missingFields;
 }
 
-const askForNextMissingField = async (session, from) => {
+const askForNextMissingField = async (session, from, detectedLanguage) => {
     const missingFields = getMissingFields(session.data);
 
     if (missingFields.length === 0) {
         session.step = STATES.CONFIRMATION;
-        return await sendOrderSummary(from, session);
+        return await sendOrderSummary(from, session, detectedLanguage); // Pass language here
     }
 
     const nextMissingField = missingFields[0];
     session.step = `ASK_${nextMissingField.toUpperCase()}`;
 
-    const context = `The user is submitting an order. Ask them for their "${nextMissingField}" in a friendly way. 😊`;
+    const context = `Respond in ${detectedLanguage}. The user is submitting an order. Ask them for their "${nextMissingField}" in a friendly way. 😊`;
     const dynamicResponse = await getOpenAIResponse(context);
     await sendToWhatsApp(from, dynamicResponse);
 };
@@ -600,7 +610,7 @@ const generateWelcomeMessage = async () => {
     return await getOpenAIResponse("Generate a welcome message.", systemPrompt);
 };
 
-const generateMissingFieldPrompt = async (field) => {
+const generateMissingFieldPrompt = async (field, detectedLanguage) => {
     const fieldPromptMap = {
         name: "Ask the user to provide their full name in a friendly and casual tone. Example: 'May I have your full name, please? 😊'",
         phone: "Ask the user for their phone number in a casual and friendly way. Example: 'Could you share your phone number with us? 📱'",
@@ -618,6 +628,7 @@ const generateMissingFieldPrompt = async (field) => {
     if (!fieldPromptMap[field]) return null;
 
     const prompt = `
+    Respond in ${detectedLanguage}.
     The user is filling out a form. They need to provide their "${field}".
     Ensure your response is **ONLY** a polite request for the missing field, without any unrelated information.
     Do **not** mention AI, email, or apologies.
@@ -676,13 +687,15 @@ app.post('/webhook', async (req, res) => {
         const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
 
-        console.log(`📩 New message from ${from}: ${text}`);
+        // Detect the user's language
+        const detectedLanguage = detectLanguage(textRaw);
+        console.log(`Detected Language: ${detectedLanguage}`);
 
         // Initialize user session if it doesn't exist
         if (!userSessions[from]) {
             userSessions[from] = { step: STATES.WELCOME, data: { phone: formatPhoneNumber(from) } };
 
-            const welcomeMessage = await generateWelcomeMessage();
+            const welcomeMessage = await generateWelcomeMessage(detectedLanguage); // Pass language here
 
             // Send welcome message with options
             await sendInteractiveButtons(from, welcomeMessage, [
@@ -692,24 +705,23 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(200);
         }
 
-
         const session = userSessions[from];
 
         if (!session.data.phone) {
             session.data.phone = formatPhoneNumber(from);
         }
-        let inputType = await isQuestionOrRequest(textRaw); // Changed to let
+
+        let inputType = await isQuestionOrRequest(textRaw, detectedLanguage); // Pass language here
 
         if (inputType === "request") {
             if (!textRaw.includes("collect") && !textRaw.includes("order") && !textRaw.includes("submit")) {
                 console.log("⚠️ Potential misclassification, treating as inquiry instead.");
-                inputType = "question"; // ✅ Now it works!
+                inputType = "question"; // Revert to question
             }
         }
 
-
         if (inputType === "question") {
-            const aiResponse = await getOpenAIResponse(textRaw);
+            const aiResponse = await getOpenAIResponse(textRaw, `Respond in ${detectedLanguage}.`); // Pass language here
             await sendToWhatsApp(from, aiResponse);
             return res.sendStatus(200);
         }
@@ -727,7 +739,7 @@ app.post('/webhook', async (req, res) => {
                         session.step = STATES.NAME;
 
                         // Ask for the user's name
-                        const namePrompt = await generateMissingFieldPrompt("name");
+                        const namePrompt = await generateMissingFieldPrompt("name", detectedLanguage); // Pass language here
                         await sendToWhatsApp(from, namePrompt);
                     } else if (buttonId === "contact_us") {
                         // Handle "Contact Us" button
@@ -735,29 +747,29 @@ app.post('/webhook', async (req, res) => {
                     }
                 } else if (message.type === "text") {
                     // Handle text input (if any)
-                    const extractedData = await extractInformationFromText(textRaw);
+                    const extractedData = await extractInformationFromText(textRaw, detectedLanguage); // Pass language here
                     session.data = { ...session.data, ...extractedData };
 
                     const missingFields = getMissingFields(session.data);
                     if (missingFields.length === 0) {
                         session.step = STATES.CONFIRMATION;
-                        await sendOrderSummary(from, session);
+                        await sendOrderSummary(from, session, detectedLanguage); // Pass language here
                     } else {
-                        await askForNextMissingField(session, from, missingFields);
+                        await askForNextMissingField(session, from, detectedLanguage); // Pass language here
                     }
                 }
                 break;
 
             case STATES.NAME:
-                const nameValidationResponse = await analyzeInput(textRaw, "name");
+                const nameValidationResponse = await analyzeInput(textRaw, "name", detectedLanguage); // Pass language here
 
                 if (nameValidationResponse.toLowerCase().includes("valid")) {
                     session.data.name = textRaw;
-                    await askForNextMissingField(session, from);
+                    await askForNextMissingField(session, from, detectedLanguage); // Pass language here
                 } else if (nameValidationResponse.startsWith("alternative:")) {
                     const altField = nameValidationResponse.split(":")[1];
                     session.data[altField] = textRaw; // Store the alternative data
-                    await askForNextMissingField(session, from);
+                    await askForNextMissingField(session, from, detectedLanguage); // Pass language here
                 } else {
                     await sendToWhatsApp(from, nameValidationResponse.replace("invalid:", ""));
                 }
@@ -782,12 +794,12 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case STATES.EMAIL:
-                const emailValidationResponse = await analyzeInput(textRaw, "email");
+                const emailValidationResponse = await analyzeInput(textRaw, "email", detectedLanguage); // Pass language here
 
                 if (emailValidationResponse.toLowerCase().includes("valid")) {
                     session.data.email = textRaw;
                     session.step = STATES.ADDRESS;
-                    const nextPrompt = await getOpenAIResponse("User provided a valid email. Now, ask them for their address.");
+                    const nextPrompt = await getOpenAIResponse("User provided a valid email. Now, ask them for their address.", `Respond in ${detectedLanguage}.`); // Pass language here
                     await sendToWhatsApp(from, nextPrompt);
                 } else {
                     await sendToWhatsApp(from, emailValidationResponse);
@@ -795,12 +807,12 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
             case STATES.ADDRESS:
-                const addressValidationResponse = await analyzeInput(textRaw, "address");
+                const addressValidationResponse = await analyzeInput(textRaw, "address", detectedLanguage); // Pass language here
 
                 if (addressValidationResponse.toLowerCase().includes("valid")) {
                     session.data.address = textRaw;
                     session.step = STATES.CITY_SELECTION;
-                    await sendCitySelection(from);
+                    await sendCitySelection(from, detectedLanguage); // Pass language here
                 } else {
                     await sendToWhatsApp(from, addressValidationResponse);
                     session.step = STATES.ADDRESS;
@@ -820,26 +832,27 @@ app.post('/webhook', async (req, res) => {
                     if (cityMap[citySelection]) {
                         session.data.city = cityMap[citySelection];
                         session.step = STATES.STREET;
-                        const cityResponse = await getOpenAIResponse(`The user selected the city ${cityMap[citySelection]}. Now, ask them for the street name.`);
+                        const cityResponse = await getOpenAIResponse(`The user selected the city ${cityMap[citySelection]}. Now, ask them for the street name.`, `Respond in ${detectedLanguage}.`); // Pass language here
                         await sendToWhatsApp(from, cityResponse);
                     } else {
-                        const invalidCityResponse = await getOpenAIResponse("The user made an invalid city selection. Ask them to choose from the provided options.");
+                        const invalidCityResponse = await getOpenAIResponse("The user made an invalid city selection. Ask them to choose from the provided options.", `Respond in ${detectedLanguage}.`); // Pass language here
                         await sendToWhatsApp(from, invalidCityResponse);
-                        await sendCitySelection(from);
+                        await sendCitySelection(from, detectedLanguage); // Pass language here
                     }
                 } else {
-                    const noCityResponse = await getOpenAIResponse("The user didn't select a city. Ask them to choose from the provided options.");
+                    const noCityResponse = await getOpenAIResponse("The user didn't select a city. Ask them to choose from the provided options.", `Respond in ${detectedLanguage}.`); // Pass language here
                     await sendToWhatsApp(from, noCityResponse);
-                    await sendCitySelection(from);
+                    await sendCitySelection(from, detectedLanguage); // Pass language here
                 }
                 break;
 
             case STATES.STREET:
-                const streetValidationResponse = await analyzeInput(textRaw, "street name");
+                const streetValidationResponse = await analyzeInput(textRaw, "street name", detectedLanguage); // Pass language here
+
                 if (streetValidationResponse.toLowerCase().includes("valid")) {
                     session.data.street = textRaw;
                     session.step = STATES.BUILDING_NAME;
-                    const streetResponse = await getOpenAIResponse(`User provided the street ${textRaw}. Ask them for the building name.`);
+                    const streetResponse = await getOpenAIResponse(`User provided the street ${textRaw}. Ask them for the building name.`, `Respond in ${detectedLanguage}.`); // Pass language here
                     await sendToWhatsApp(from, streetResponse);
                 } else {
                     await sendToWhatsApp(from, streetValidationResponse);
@@ -848,11 +861,12 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case STATES.BUILDING_NAME:
-                const buildingValidationResponse = await analyzeInput(textRaw, "building name");
+                const buildingValidationResponse = await analyzeInput(textRaw, "building name", detectedLanguage); // Pass language here
+
                 if (buildingValidationResponse.toLowerCase().includes("valid")) {
                     session.data.building_name = textRaw;
                     session.step = STATES.FLAT_NO;
-                    const buildingResponse = await getOpenAIResponse(`User provided the building name ${textRaw}. Ask them for the flat number.`);
+                    const buildingResponse = await getOpenAIResponse(`User provided the building name ${textRaw}. Ask them for the flat number.`, `Respond in ${detectedLanguage}.`); // Pass language here
                     await sendToWhatsApp(from, buildingResponse);
                 } else {
                     await sendToWhatsApp(from, buildingValidationResponse);
@@ -861,11 +875,12 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case STATES.FLAT_NO:
-                const flatValidationResponse = await analyzeInput(textRaw, "flat number");
+                const flatValidationResponse = await analyzeInput(textRaw, "flat number", detectedLanguage); // Pass language here
+
                 if (flatValidationResponse.toLowerCase().includes("valid")) {
                     session.data.flat_no = textRaw;
                     session.step = STATES.LONGITUDE;
-                    const flatResponse = await getOpenAIResponse(`User provided the flat number ${textRaw}. Ask them to share their location.`);
+                    const flatResponse = await getOpenAIResponse(`User provided the flat number ${textRaw}. Ask them to share their location.`, `Respond in ${detectedLanguage}.`); // Pass language here
                     if (!session.locationPromptSent) {
                         await sendToWhatsApp(from, flatResponse);
                         session.locationPromptSent = true;
@@ -896,15 +911,15 @@ app.post('/webhook', async (req, res) => {
                         session.data.longitude = longitude;
                         session.step = STATES.QUANTITY;
                         session.awaitingQuantityInput = true;
-                        const locationResponse = await getOpenAIResponse("User shared a valid location within the UAE. Now, ask them for the quantity.");
+                        const locationResponse = await getOpenAIResponse("User shared a valid location within the UAE. Now, ask them for the quantity.", `Respond in ${detectedLanguage}.`); // Pass language here
                         await sendToWhatsApp(from, locationResponse);
                     } else {
-                        const invalidLocationResponse = await getOpenAIResponse("User shared an invalid location outside the UAE. Ask them to provide a valid location within the UAE.");
+                        const invalidLocationResponse = await getOpenAIResponse("User shared an invalid location outside the UAE. Ask them to provide a valid location within the UAE.", `Respond in ${detectedLanguage}.`); // Pass language here
                         await sendToWhatsApp(from, invalidLocationResponse);
                     }
                 } else {
                     if (!session.locationPromptSent) {
-                        const missingPrompt = await getOpenAIResponse("The user hasn't shared their location yet. Kindly ask them again to share their live location.");
+                        const missingPrompt = await getOpenAIResponse("The user hasn't shared their location yet. Kindly ask them again to share their live location.", `Respond in ${detectedLanguage}.`); // Pass language here
                         await sendToWhatsApp(from, missingPrompt);
                         session.locationPromptSent = true;
                     }
@@ -912,13 +927,13 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case STATES.QUANTITY:
-                const quantityValidationResponse = await analyzeInput(textRaw, "quantity");
+                const quantityValidationResponse = await analyzeInput(textRaw, "quantity", detectedLanguage); // Pass language here
 
                 if (quantityValidationResponse.toLowerCase().includes("valid")) {
                     session.data.quantity = extractQuantity(textRaw);
                     session.step = STATES.CONFIRMATION;
-                    const summary = await getOpenAIResponse("User provided a valid quantity. Now, provide the order summary.");
-                    sendOrderSummary(from, session, summary);
+                    const summary = await getOpenAIResponse("User provided a valid quantity. Now, provide the order summary.", `Respond in ${detectedLanguage}.`); // Pass language here
+                    sendOrderSummary(from, session, summary, detectedLanguage); // Pass language here
                 } else {
                     await sendToWhatsApp(from, quantityValidationResponse);
                     session.step = STATES.QUANTITY;
