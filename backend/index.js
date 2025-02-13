@@ -727,17 +727,9 @@ app.post('/webhook', async (req, res) => {
             userSessions[from] = {
                 step: STATES.WELCOME,
                 data: { phone: formatPhoneNumber(from) },
-                language: detectedLanguage
+                language: detectedLanguage // Store detected language
             };
-        }
-        
-        // Reassign session to ensure it's not undefined
-        const session = userSessions[from];
-        
-        if (session.language !== detectedLanguage) {
-            session.language = detectedLanguage;
-        }
-        
+
             const welcomeMessage = await generateWelcomeMessage(detectedLanguage); // Pass language here
 
             // Send welcome message with options
@@ -746,6 +738,11 @@ app.post('/webhook', async (req, res) => {
                 { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
             ]);
             return res.sendStatus(200);
+        }
+        const session = userSessions[from];
+
+        if (session.language !== detectedLanguage) {
+            session.language = detectedLanguage;
         }
 
 
