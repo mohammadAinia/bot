@@ -230,23 +230,19 @@ app.post('/admin/update-welcome-message', authenticateToken, (req, res) => {
 //         return "❌ Oops! Something went wrong. Please try again later.";
 //     }
 // };
-const getOpenAIResponse = async (userMessage, context = "", detectedLanguage = "English") => {
+const getOpenAIResponse = async (userMessage, detectedLanguage = "English") => {
     try {
         const systemMessage = `
             You are a friendly and intelligent WhatsApp assistant for Lootah Biofuels. 
-            Respond in ${detectedLanguage}.
-            Your goal is to assist users in completing their orders and answering their questions in a professional yet warm tone.
+            Your goal is to assist users in completing their orders and answering their questions.
             Always respond concisely, use emojis sparingly, and maintain a helpful attitude.
+            Make sure to respond in **${detectedLanguage}**.
         `;
 
         const messages = [
             { role: "system", content: systemMessage },
             { role: "user", content: userMessage },
         ];
-
-        if (context && context.trim() !== "") {
-            messages.push({ role: "system", content: context });
-        }
 
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
             model: "gpt-4",
@@ -266,22 +262,27 @@ const getOpenAIResponse = async (userMessage, context = "", detectedLanguage = "
         return "❌ Oops! Something went wrong. Please try again later.";
     }
 };
+
 const detectLanguage = (text) => {
-    // Detect the language using franc
     const languageCode = franc(text);
 
-    // Map the language code to a human-readable language name
     const languageMap = {
-        'ara': 'Arabic', // Arabic
-        'eng': 'English', // English
-        'urd': 'Urdu', // Urdu
-        'hin': 'Hindi', // Hindi
-        // Add more languages as needed
+        'ara': 'Arabic',
+        'eng': 'English',
+        'urd': 'Urdu',
+        'hin': 'Hindi',
     };
 
-    // Default to English if the language is not in the map
-    return languageMap[languageCode] || 'English';
+    if (languageMap[languageCode]) return languageMap[languageCode];
+
+    // Fallback: Check for common words in Arabic, Urdu, etc.
+    if (/[اأإءؤذءخصضطظعغفقلن]/.test(text)) return 'Arabic';
+    if (/[ںےکیج]/.test(text)) return 'Urdu';
+    if (/[अआइईउऊऋएऐओऔ]/.test(text)) return 'Hindi';
+
+    return 'English'; // Default to English
 };
+
 
 const userSessions = {};
 const sendToWhatsApp = async (to, message) => {
@@ -531,7 +532,7 @@ async function extractInformationFromText(text, detectedLanguage) {
         Text: ${text}
     `;
 
-    const aiResponse = await getOpenAIResponse(prompt, ``, detectedLanguage);
+    const aiResponse = await getOpenAIResponse(textRaw, detectedLanguage);
 
     try {
         const aiExtractedData = JSON.parse(aiResponse);
