@@ -598,6 +598,7 @@ async function isQuestionOrRequest(text) {
        - "Please collect oil from my location"
        - "I need a pickup for used oil"
        - "New order request"
+       - "I am Mohammad and I have 50 liters in Sharjah"
     
     2️⃣ **"question"** → If the user is **asking for information** about the company, services, or anything general. Examples:
        - "What services do you provide?"
@@ -743,7 +744,7 @@ app.post('/webhook', async (req, res) => {
             // Extract data from the user's input
             const extractedData = await extractInformationFromText(textRaw, detectedLanguage);
             session.data = { ...session.data, ...extractedData };
-
+        
             // Check if the user provided enough information to skip steps
             const missingFields = getMissingFields(session.data);
             if (missingFields.length === 0) {
