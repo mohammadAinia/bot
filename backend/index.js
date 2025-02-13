@@ -230,19 +230,23 @@ app.post('/admin/update-welcome-message', authenticateToken, (req, res) => {
 //         return "❌ Oops! Something went wrong. Please try again later.";
 //     }
 // };
-const getOpenAIResponse = async (userMessage, detectedLanguage = "English") => {
+const getOpenAIResponse = async (userMessage, context = "", detectedLanguage = "English") => {
     try {
         const systemMessage = `
             You are a friendly and intelligent WhatsApp assistant for Lootah Biofuels. 
+            Respond in ${detectedLanguage}.
             Your goal is to assist users in completing their orders and answering their questions.
             Always respond concisely, use emojis sparingly, and maintain a helpful attitude.
-            Make sure to respond in **${detectedLanguage}**.
         `;
 
         const messages = [
             { role: "system", content: systemMessage },
             { role: "user", content: userMessage },
         ];
+
+        if (context && context.trim() !== "") {
+            messages.push({ role: "system", content: context });
+        }
 
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
             model: "gpt-4",
@@ -668,7 +672,7 @@ const generateMissingFieldPrompt = async (field, detectedLanguage) => {
 
     return await getOpenAIResponse(prompt, ``, detectedLanguage);
 };
-const analyzeInput = async (input, expectedField) => {
+const analyzeInput = async (input, expectedField, detectedLanguage) => {
     const prompt = `
         You are a helpful assistant for Lootah Biofuels. Your task is to analyze the user's input and determine if it matches the expected field.
 
@@ -689,7 +693,7 @@ const analyzeInput = async (input, expectedField) => {
         - Do not respond as if you are the user. Your task is to analyze the input and provide a response based on the rules above.
     `;
 
-    const response = await getOpenAIResponse(prompt);
+    const response = await getOpenAIResponse(prompt, ``, detectedLanguage);
     console.log(`Analyze Input Response: ${response}`); // Debugging
     return response;
 };
@@ -841,21 +845,21 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-            case STATES.EMAIL:
-                const emailValidationResponse = await analyzeInput(textRaw, "email", detectedLanguage); // Pass language here
-
-                if (emailValidationResponse.toLowerCase().includes("valid")) {
-                    session.data.email = textRaw;
-                    session.step = STATES.ADDRESS;
-
-                    // Use generateMissingFieldPrompt to request the address
-                    const addressPrompt = await generateMissingFieldPrompt("address", detectedLanguage);
-                    await sendToWhatsApp(from, addressPrompt);
-                } else {
-                    await sendToWhatsApp(from, emailValidationResponse);
-                    session.step = STATES.EMAIL;
-                }
-                break;
+                case STATES.EMAIL:
+                    const emailValidationResponse = await analyzeInput(textRaw, "email", detectedLanguage); // Pass language here
+                
+                    if (emailValidationResponse.toLowerCase().includes("valid")) {
+                        session.data.email = textRaw;
+                        session.step = STATES.ADDRESS;
+                
+                        // Use generateMissingFieldPrompt to request the address
+                        const addressPrompt = await generateMissingFieldPrompt("address", detectedLanguage);
+                        await sendToWhatsApp(from, addressPrompt);
+                    } else {
+                        await sendToWhatsApp(from, emailValidationResponse);
+                        session.step = STATES.EMAIL;
+                    }
+                    break;
             case STATES.ADDRESS:
                 const addressValidationResponse = await analyzeInput(textRaw, "address", detectedLanguage); // Pass language here
 
