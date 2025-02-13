@@ -5,7 +5,7 @@ import bodyParser from 'body-parser';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import franc from 'franc';
+import { franc } from 'franc';
 
 
 dotenv.config(); // Load environment variables
