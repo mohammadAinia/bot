@@ -715,6 +715,8 @@ app.post('/webhook', async (req, res) => {
         const from = message.from;
         const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
+        const session = userSessions[from];
+
 
         // Detect the user's language
         const detectedLanguage = detectLanguage(textRaw);
@@ -743,7 +745,6 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(200);
         }
 
-        const session = userSessions[from];
 
         if (!session.data.phone) {
             session.data.phone = formatPhoneNumber(from);
