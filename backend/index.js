@@ -566,24 +566,6 @@ function getMissingFields(sessionData) {
     return missingFields;
 }
 
-// Define the fieldPromptMap globally so it's accessible everywhere
-const fieldPromptMap = {
-    name: "What’s your full name?",
-    phone: "Could you share your phone number? 📱",
-    email: "What’s your email address? ✉️",
-    address: "Can you provide your address? 🏠",
-    city: "Which city are you located in? 🌆",
-    street: "What’s the name of your street? 🛣️",
-    building_name: "What’s the name of your building? 🏢",
-    flat_no: "What’s your flat number? 🏠",
-    latitude: "Can you share your live location via WhatsApp? 📍",
-    longitude: "Can you share your live location via WhatsApp? 📍",
-    quantity: "How many liters of oil would you like to order? ⛽"
-};
-
-// Now both askForNextMissingField and generateMissingFieldPrompt can access this map
-
-
 const askForNextMissingField = async (session, from, detectedLanguage) => {
     const missingFields = getMissingFields(session.data);
 
@@ -592,20 +574,13 @@ const askForNextMissingField = async (session, from, detectedLanguage) => {
         return await sendOrderSummary(from, session, detectedLanguage); // Pass language here
     }
 
-    // Create a message that includes all missing fields one by one
-    let missingFieldsMessage = "Sure! Could you please provide the following details? 😊\n\n";
-    
-    missingFields.forEach(field => {
-        missingFieldsMessage += `${fieldPromptMap[field]}\n`;
-    });
+    const nextMissingField = missingFields[0];
+    session.step = `ASK_${nextMissingField.toUpperCase()}`;
 
-    session.step = STATES.MISSING_FIELDS;
-
-    // Send the message with all missing fields
-    await sendToWhatsApp(from, missingFieldsMessage);
+    const context = `Respond in ${detectedLanguage}. The user is submitting an order. Ask them for their "${nextMissingField}" in a friendly way. 😊`;
+    const dynamicResponse = await getOpenAIResponse(context);
+    await sendToWhatsApp(from, dynamicResponse);
 };
-
-
 async function isQuestionOrRequest(text) {
     const prompt = `
     Classify the user's input into one of the following categories:
@@ -787,12 +762,12 @@ app.post('/webhook', async (req, res) => {
             case STATES.WELCOME:
                 if (message.interactive && message.interactive.button_reply) {
                     const buttonId = message.interactive.button_reply.id;
-
+            
                     if (buttonId === "new_request") {
                         // Reset session data for a new request
                         session.data = { phone: formatPhoneNumber(from) };
                         session.step = STATES.NAME;
-
+            
                         // Ask for the user's name
                         const namePrompt = await generateMissingFieldPrompt("name", detectedLanguage); // Pass language here
                         await sendToWhatsApp(from, namePrompt);
@@ -804,7 +779,7 @@ app.post('/webhook', async (req, res) => {
                     // Handle text input (if any)
                     const extractedData = await extractInformationFromText(textRaw, detectedLanguage); // Pass language here
                     session.data = { ...session.data, ...extractedData };
-
+            
                     const missingFields = getMissingFields(session.data);
                     if (missingFields.length === 0) {
                         session.step = STATES.CONFIRMATION;
