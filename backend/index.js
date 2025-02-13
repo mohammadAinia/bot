@@ -108,8 +108,9 @@ app.post('/webhook', async (req, res) => {
 
                 const phoneNumber = message.value.messages[0].from;
                 const userMessage = message.value.messages[0].text?.body;
+                const locationMessage = message.value.messages[0].location; // Location sent by the user
 
-                if (!userMessage) continue;
+                if (!userMessage && !locationMessage) continue;
 
                 // Manage user session
                 if (!userSessions.has(phoneNumber)) {
@@ -139,13 +140,13 @@ app.post('/webhook', async (req, res) => {
                         await sendToWhatsApp(phoneNumber, "Thanks! Please provide your apartment number.");
                     } else if (!sessionData.data.apartmentNumber) {
                         sessionData.data.apartmentNumber = userMessage;
-                        await sendToWhatsApp(phoneNumber, "Great! Lastly, please share your location (latitude, longitude, street).");
-                    } else if (!sessionData.data.location) {
-                        sessionData.data.location = userMessage;
+                        await sendToWhatsApp(phoneNumber, "Great! Lastly, please share your location.");
+                    } else if (!sessionData.data.location && locationMessage) {
+                        sessionData.data.location = locationMessage;
                         await sendToWhatsApp(phoneNumber, "Thank you! You're almost done. Let's confirm everything and submit your request.");
                         // Once all details are gathered, submit the request
                         try {
-                            await axios.post(API_REQUEST_URL, sessionData.data);
+                            await axios.post("https://api.lootahbiofuels.com/api/v1/whatsapp_request", sessionData.data);
                             await sendToWhatsApp(phoneNumber, "Your request has been submitted. Thank you!");
                         } catch (error) {
                             await sendToWhatsApp(phoneNumber, "Sorry, there was an error submitting your request. Please try again later.");
@@ -190,6 +191,9 @@ const sendWelcomeMessage = async (phoneNumber) => {
 
 // Start the server
 app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+
+
+// "https://api.lootahbiofuels.com/api/v1/whatsapp_request"
 
 
 
