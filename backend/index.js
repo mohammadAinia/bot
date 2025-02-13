@@ -1077,16 +1077,11 @@ app.post('/webhook', async (req, res) => {
             }
 
             case "ASK_CITY": {
-                session.data.city = textRaw;
-                const missingAfterCity = getMissingFields(session.data);
-                if (missingAfterCity.length === 0) {
-                    session.step = STATES.CONFIRMATION;
-                    await sendOrderSummary(from, session);
-                } else {
-                    await askForNextMissingField(session, from, missingAfterCity);
-                }
+                await sendCitySelection(from, detectedLanguage);
+                session.step = STATES.CITY_SELECTION; // Set session state properly
                 break;
             }
+            
 
             case "ASK_STREET": {
                 session.data.street = textRaw;
