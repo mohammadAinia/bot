@@ -641,7 +641,7 @@ const generateMissingFieldPrompt = async (field, detectedLanguage) => {
         name: "Ask the user to provide their full name in a friendly and casual tone. Example: 'May I have your full name, please? 😊'",
         phone: "Ask the user for their phone number in a casual and friendly way. Example: 'Could you share your phone number with us? 📱'",
         email: "Ask the user for their email address politely. Example: 'What’s your email address? We’ll use it to keep you updated! ✉️'",
-        address: "Ask the user for their full address in a simple and friendly way. Example: 'Could you provide your complete address? �'",
+        address: "Ask the user for their full address in a simple and friendly way. Example: 'Could you provide your complete address? 🏠'",
         city: "Ask the user to select their city from the options provided. Example: 'Which city are you located in? 🌆'",
         street: "Ask the user for their street name in a cheerful tone. Example: 'What’s the name of your street? 🛣️'",
         building_name: "Ask the user for their building name in a friendly way. Example: 'Could you tell us the name of your building? 🏢'",
