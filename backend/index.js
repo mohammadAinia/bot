@@ -5,6 +5,8 @@ import bodyParser from 'body-parser';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import franc from 'franc';
+
 
 dotenv.config(); // Load environment variables
 
@@ -263,6 +265,22 @@ const getOpenAIResponse = async (userMessage, context = "") => {
         console.error('❌ Error with OpenAI:', error.response?.data || error.message);
         return "❌ Oops! Something went wrong. Please try again later.";
     }
+};
+const detectLanguage = (text) => {
+    // Detect the language using franc
+    const languageCode = franc(text);
+
+    // Map the language code to a human-readable language name
+    const languageMap = {
+        'ara': 'Arabic', // Arabic
+        'eng': 'English', // English
+        'urd': 'Urdu', // Urdu
+        'hin': 'Hindi', // Hindi
+        // Add more languages as needed
+    };
+
+    // Default to English if the language is not in the map
+    return languageMap[languageCode] || 'English';
 };
 
 const userSessions = {};
