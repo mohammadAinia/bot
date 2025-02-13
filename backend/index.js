@@ -313,30 +313,23 @@ const isValidPhone = (phone) => {
 };
 
 
-const sendCitySelection = async (to) => {
+const sendCitySelection = async (to, detectedLanguage) => {
     try {
-        await axios.post(process.env.WHATSAPP_API_URL, {
-            messaging_product: "whatsapp",
-            recipient_type: "individual",
-            to: to,
-            type: "interactive",
-            interactive: {
-                type: "button",
-                body: { text: "Please select your city from the options below:" },
-                action: {
-                    buttons: [
-                        { type: "reply", reply: { id: "abu_dhabi", title: "Abu Dhabi" } },
-                        { type: "reply", reply: { id: "dubai", title: "Dubai" } },
-                        { type: "reply", reply: { id: "sharjah", title: "Sharjah" } }
-                    ]
-                }
-            }
-        }, {
-            headers: {
-                "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-                "Content-Type": "application/json"
-            }
-        });
+        // Generate the city selection prompt in the detected language
+        const cityPrompt = await getOpenAIResponse(
+            "Ask the user to select their city from the available options.",
+            `Respond in ${detectedLanguage}.`
+        );
+
+        // Define the buttons for city selection
+        const cityButtons = [
+            { type: "reply", reply: { id: "abu_dhabi", title: "Abu Dhabi" } },
+            { type: "reply", reply: { id: "dubai", title: "Dubai" } },
+            { type: "reply", reply: { id: "sharjah", title: "Sharjah" } }
+        ];
+
+        // Use the sendInteractiveButtons function to send the city selection message
+        await sendInteractiveButtons(to, cityPrompt, cityButtons);
     } catch (error) {
         console.error("❌ Failed to send city selection:", error.response?.data || error.message);
     }
@@ -889,31 +882,40 @@ app.post('/webhook', async (req, res) => {
                 break;
 
 
-            case STATES.CITY_SELECTION:
-                if (message.interactive && message.interactive.button_reply) {
-                    const citySelection = message.interactive.button_reply.id;
-                    const cityMap = {
-                        "abu_dhabi": "Abu Dhabi",
-                        "dubai": "Dubai",
-                        "sharjah": "Sharjah"
-                    };
-
-                    if (cityMap[citySelection]) {
-                        session.data.city = cityMap[citySelection];
-                        session.step = STATES.STREET;
-                        const cityResponse = await getOpenAIResponse(`The user selected the city ${cityMap[citySelection]}. Now, ask them for the street name.`, `Respond in ${detectedLanguage}.`); // Pass language here
-                        await sendToWhatsApp(from, cityResponse);
+                case STATES.CITY_SELECTION:
+                    if (message.interactive && message.interactive.button_reply) {
+                        const citySelection = message.interactive.button_reply.id;
+                        const cityMap = {
+                            "abu_dhabi": "Abu Dhabi",
+                            "dubai": "Dubai",
+                            "sharjah": "Sharjah"
+                        };
+                
+                        if (cityMap[citySelection]) {
+                            session.data.city = cityMap[citySelection];
+                            session.step = STATES.STREET;
+                            const cityResponse = await getOpenAIResponse(
+                                `The user selected the city ${cityMap[citySelection]}. Now, ask them for the street name.`,
+                                `Respond in ${detectedLanguage}.`
+                            );
+                            await sendToWhatsApp(from, cityResponse);
+                        } else {
+                            const invalidCityResponse = await getOpenAIResponse(
+                                "The user made an invalid city selection. Ask them to choose from the provided options.",
+                                `Respond in ${detectedLanguage}.`
+                            );
+                            await sendToWhatsApp(from, invalidCityResponse);
+                            await sendCitySelection(from, detectedLanguage); // Re-send city selection
+                        }
                     } else {
-                        const invalidCityResponse = await getOpenAIResponse("The user made an invalid city selection. Ask them to choose from the provided options.", `Respond in ${detectedLanguage}.`); // Pass language here
-                        await sendToWhatsApp(from, invalidCityResponse);
-                        await sendCitySelection(from, detectedLanguage); // Pass language here
+                        const noCityResponse = await getOpenAIResponse(
+                            "The user didn't select a city. Ask them to choose from the provided options.",
+                            `Respond in ${detectedLanguage}.`
+                        );
+                        await sendToWhatsApp(from, noCityResponse);
+                        await sendCitySelection(from, detectedLanguage); // Send city selection buttons
                     }
-                } else {
-                    const noCityResponse = await getOpenAIResponse("The user didn't select a city. Ask them to choose from the provided options.", `Respond in ${detectedLanguage}.`); // Pass language here
-                    await sendToWhatsApp(from, noCityResponse);
-                    await sendCitySelection(from, detectedLanguage); // Pass language here
-                }
-                break;
+                    break;
 
             case STATES.STREET:
                 const streetValidationResponse = await analyzeInput(textRaw, "street name", detectedLanguage); // Pass language here
