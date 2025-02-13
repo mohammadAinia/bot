@@ -715,7 +715,6 @@ app.post('/webhook', async (req, res) => {
         const from = message.from;
         const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
-        const session = userSessions[from];
 
 
         // Detect the user's language
@@ -728,13 +727,17 @@ app.post('/webhook', async (req, res) => {
             userSessions[from] = {
                 step: STATES.WELCOME,
                 data: { phone: formatPhoneNumber(from) },
-                language: detectedLanguage // Store detected language
+                language: detectedLanguage
             };
-
-            // Update the session language if it differs from the previous one
-            if (session.language !== detectedLanguage) {
-                session.language = detectedLanguage;
-            }
+        }
+        
+        // Reassign session to ensure it's not undefined
+        const session = userSessions[from];
+        
+        if (session.language !== detectedLanguage) {
+            session.language = detectedLanguage;
+        }
+        
             const welcomeMessage = await generateWelcomeMessage(detectedLanguage); // Pass language here
 
             // Send welcome message with options
