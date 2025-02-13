@@ -888,20 +888,20 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-            case STATES.ADDRESS:
-                const addressValidationResponse = await analyzeInput(textRaw, "address", detectedLanguage);
-
-                if (addressValidationResponse.toLowerCase().includes("valid")) {
-                    session.data.address = textRaw;
-                    session.step = STATES.CITY_SELECTION;
-
-                    // Send city selection buttons immediately
-                    await sendCitySelection(from, detectedLanguage);
-                } else {
-                    await sendToWhatsApp(from, addressValidationResponse);
-                    session.step = STATES.ADDRESS;
-                }
-                break;
+                case STATES.ADDRESS:
+                    const addressValidationResponse = await analyzeInput(textRaw, "address", detectedLanguage);
+                
+                    if (addressValidationResponse.toLowerCase().includes("valid")) {
+                        session.data.address = textRaw;
+                        session.step = STATES.CITY_SELECTION;
+                
+                        // Send city selection buttons immediately
+                        await sendCitySelection(from, detectedLanguage);
+                    } else {
+                        await sendToWhatsApp(from, addressValidationResponse);
+                        session.step = STATES.ADDRESS;
+                    }
+                    break;
 
                 case STATES.CITY_SELECTION:
                     if (message.interactive && message.interactive.button_reply) {
@@ -916,14 +916,16 @@ app.post('/webhook', async (req, res) => {
                             session.data.city = cityMap[citySelection];
                             session.step = STATES.STREET;
                 
-                            const cityResponse = await getOpenAIResponse(
-                                `The user selected the city ${cityMap[citySelection]}. Now, ask them for the street name.`,
-                                `Respond in ${detectedLanguage}.`
-                            );
-                            return await sendToWhatsApp(from, cityResponse);
+                            // Ask for the street name after city selection
+                            const streetPrompt = await generateMissingFieldPrompt("street", detectedLanguage);
+                            await sendToWhatsApp(from, streetPrompt);
                         } else {
-                            return await sendCitySelection(from, detectedLanguage); // Re-send buttons only for invalid selections
+                            // Re-send city selection buttons for invalid selections
+                            await sendCitySelection(from, detectedLanguage);
                         }
+                    } else {
+                        // Send city selection buttons if the message is not interactive
+                        await sendCitySelection(from, detectedLanguage);
                     }
                     break;
                 
