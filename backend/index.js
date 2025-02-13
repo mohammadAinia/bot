@@ -577,9 +577,14 @@ const askForNextMissingField = async (session, from, detectedLanguage) => {
     const nextMissingField = missingFields[0];
     session.step = `ASK_${nextMissingField.toUpperCase()}`;
 
-    const context = `Respond in ${detectedLanguage}. The user is submitting an order. Ask them for their "${nextMissingField}" in a friendly way. 😊`;
-    const dynamicResponse = await getOpenAIResponse(context);
-    await sendToWhatsApp(from, dynamicResponse);
+    // Use generateMissingFieldPrompt to get a specific prompt for the next missing field
+    const fieldPrompt = await generateMissingFieldPrompt(nextMissingField, detectedLanguage);
+    if (fieldPrompt) {
+        await sendToWhatsApp(from, fieldPrompt);
+    } else {
+        console.error(`No prompt found for field: ${nextMissingField}`);
+        await sendToWhatsApp(from, `Please provide your ${nextMissingField}. 😊`);
+    }
 };
 async function isQuestionOrRequest(text) {
     const prompt = `
@@ -762,12 +767,12 @@ app.post('/webhook', async (req, res) => {
             case STATES.WELCOME:
                 if (message.interactive && message.interactive.button_reply) {
                     const buttonId = message.interactive.button_reply.id;
-            
+
                     if (buttonId === "new_request") {
                         // Reset session data for a new request
                         session.data = { phone: formatPhoneNumber(from) };
                         session.step = STATES.NAME;
-            
+
                         // Ask for the user's name
                         const namePrompt = await generateMissingFieldPrompt("name", detectedLanguage); // Pass language here
                         await sendToWhatsApp(from, namePrompt);
@@ -779,7 +784,7 @@ app.post('/webhook', async (req, res) => {
                     // Handle text input (if any)
                     const extractedData = await extractInformationFromText(textRaw, detectedLanguage); // Pass language here
                     session.data = { ...session.data, ...extractedData };
-            
+
                     const missingFields = getMissingFields(session.data);
                     if (missingFields.length === 0) {
                         session.step = STATES.CONFIRMATION;
@@ -829,8 +834,10 @@ app.post('/webhook', async (req, res) => {
                 if (emailValidationResponse.toLowerCase().includes("valid")) {
                     session.data.email = textRaw;
                     session.step = STATES.ADDRESS;
-                    const nextPrompt = await getOpenAIResponse("User provided a valid email. Now, ask them for their address.", `Respond in ${detectedLanguage}.`); // Pass language here
-                    await sendToWhatsApp(from, nextPrompt);
+
+                    // Use generateMissingFieldPrompt to request the address
+                    const addressPrompt = await generateMissingFieldPrompt("address", detectedLanguage);
+                    await sendToWhatsApp(from, addressPrompt);
                 } else {
                     await sendToWhatsApp(from, emailValidationResponse);
                     session.step = STATES.EMAIL;
@@ -842,7 +849,10 @@ app.post('/webhook', async (req, res) => {
                 if (addressValidationResponse.toLowerCase().includes("valid")) {
                     session.data.address = textRaw;
                     session.step = STATES.CITY_SELECTION;
-                    await sendCitySelection(from, detectedLanguage); // Pass language here
+
+                    // Use generateMissingFieldPrompt to request the city
+                    const cityPrompt = await generateMissingFieldPrompt("city", detectedLanguage);
+                    await sendToWhatsApp(from, cityPrompt);
                 } else {
                     await sendToWhatsApp(from, addressValidationResponse);
                     session.step = STATES.ADDRESS;
