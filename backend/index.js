@@ -313,10 +313,8 @@ const isValidPhone = (phone) => {
 };
 
 
-const sendCitySelection = async (to, detectedLanguage) => {
+const sendCitySelection = async (to) => {
     try {
-        const cityPrompt = await getOpenAIResponse("Ask the user to select their city from the available options.", `Respond in ${detectedLanguage}.`);
-
         await axios.post(process.env.WHATSAPP_API_URL, {
             messaging_product: "whatsapp",
             recipient_type: "individual",
@@ -324,9 +322,7 @@ const sendCitySelection = async (to, detectedLanguage) => {
             type: "interactive",
             interactive: {
                 type: "button",
-                body: {
-                    text: cityPrompt
-                },
+                body: { text: "Please select your city from the options below:" },
                 action: {
                     buttons: [
                         { type: "reply", reply: { id: "abu_dhabi", title: "Abu Dhabi" } },
@@ -345,6 +341,7 @@ const sendCitySelection = async (to, detectedLanguage) => {
         console.error("❌ Failed to send city selection:", error.response?.data || error.message);
     }
 };
+
 
 
 const sendOrderSummary = async (to, session, detectedLanguage) => {
