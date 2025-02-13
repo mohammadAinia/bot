@@ -31,6 +31,7 @@ app.get("/webhook", (req, res) => {
     }
 });
 
+// Send message to WhatsApp with optional buttons
 const sendToWhatsApp = async (to, message, buttons = []) => {
     let payload = {
         messaging_product: 'whatsapp',
@@ -61,6 +62,7 @@ const sendToWhatsApp = async (to, message, buttons = []) => {
     }
 };
 
+// Get OpenAI response with context based on user query
 const getOpenAIResponse = async (userMessage, sessionData) => {
     const context = `You are a WhatsApp bot for Lootah Biofuels.
     Lootah Biofuels was founded in 2010 in Dubai to address the growing demand for alternative fuels. The company focuses on sustainable energy solutions, including biodiesel production from Used Cooking Oil (UCO). 
@@ -89,16 +91,16 @@ const getOpenAIResponse = async (userMessage, sessionData) => {
         return response.data.choices[0].message.content;
     } catch (error) {
         console.error('❌ OpenAI API error:', error.response?.data || error.message);
-        return "Sorry, I couldn't process your request.";
+        return "Sorry, I couldn't process your request. Please try again later.";
     }
 };
 
+// Handle incoming webhook messages and manage sessions
 app.post('/webhook', async (req, res) => {
     const body = req.body;
     if (body.object === 'whatsapp_business_account') {
         for (const entry of body.entry) {
             for (const message of entry.changes) {
-                // Check if messages is present and has the expected structure
                 if (!message.value.messages || !Array.isArray(message.value.messages) || message.value.messages.length === 0) {
                     console.error('❌ No messages found in the incoming webhook data.');
                     continue;
@@ -116,6 +118,7 @@ app.post('/webhook', async (req, res) => {
 
                 const sessionData = userSessions.get(phoneNumber);
 
+                // Check if user wants to submit a disposal request
                 if (userMessage.toLowerCase().includes("dispose oil")) {
                     sessionData.isSubmittingRequest = true;
                     sessionData.data = {};
@@ -123,12 +126,36 @@ app.post('/webhook', async (req, res) => {
                     continue;
                 }
 
+                // Handle request submission process
                 if (sessionData.isSubmittingRequest) {
-                    sessionData.data.name = userMessage;
-                    await sendToWhatsApp(phoneNumber, "Thanks! Now, please share your email.");
+                    if (!sessionData.data.name) {
+                        sessionData.data.name = userMessage;
+                        await sendToWhatsApp(phoneNumber, "Thanks! Now, please share your email.");
+                    } else if (!sessionData.data.email) {
+                        sessionData.data.email = userMessage;
+                        await sendToWhatsApp(phoneNumber, "Got it! Now, please share your building name.");
+                    } else if (!sessionData.data.buildingName) {
+                        sessionData.data.buildingName = userMessage;
+                        await sendToWhatsApp(phoneNumber, "Thanks! Please provide your apartment number.");
+                    } else if (!sessionData.data.apartmentNumber) {
+                        sessionData.data.apartmentNumber = userMessage;
+                        await sendToWhatsApp(phoneNumber, "Great! Lastly, please share your location (latitude, longitude, street).");
+                    } else if (!sessionData.data.location) {
+                        sessionData.data.location = userMessage;
+                        await sendToWhatsApp(phoneNumber, "Thank you! You're almost done. Let's confirm everything and submit your request.");
+                        // Once all details are gathered, submit the request
+                        try {
+                            await axios.post(API_REQUEST_URL, sessionData.data);
+                            await sendToWhatsApp(phoneNumber, "Your request has been submitted. Thank you!");
+                        } catch (error) {
+                            await sendToWhatsApp(phoneNumber, "Sorry, there was an error submitting your request. Please try again later.");
+                        }
+                        sessionData.isSubmittingRequest = false; // End the request flow
+                    }
                     continue;
                 }
 
+                // Handle general inquiries (OpenAI Response)
                 const botResponse = await getOpenAIResponse(userMessage, sessionData);
                 await sendToWhatsApp(phoneNumber, botResponse);
             }
@@ -139,8 +166,31 @@ app.post('/webhook', async (req, res) => {
     }
 });
 
+// Send a welcome message with buttons for first interaction
+const sendWelcomeMessage = async (phoneNumber) => {
+    const buttons = [
+        {
+            "type": "reply",
+            "reply": {
+                "id": "1",
+                "title": "Submit Disposal Request"
+            }
+        },
+        {
+            "type": "reply",
+            "reply": {
+                "id": "2",
+                "title": "Inquire About Services"
+            }
+        }
+    ];
 
+    await sendToWhatsApp(phoneNumber, "Welcome to Lootah Biofuels! How can we assist you today?", buttons);
+};
+
+// Start the server
 app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+
 
 
 
