@@ -717,8 +717,6 @@ const shouldEndRequest = (text) => {
     return endPhrases.some(phrase => text.includes(phrase));
 };
 
-//
-//
 app.post('/webhook', async (req, res) => {
     try {
         console.log('Incoming Webhook Data:', req.body);
@@ -738,20 +736,20 @@ app.post('/webhook', async (req, res) => {
         const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
 
+        // Detect the user's language
+        const detectedLanguage = detectLanguage(textRaw); // Initialize detectedLanguage here
+        console.log(`Detected Language: ${detectedLanguage}`);
+
         // Check if the user wants to end the request
         if (shouldEndRequest(text)) {
             delete userSessions[from]; // Reset the session
-            const welcomeMessage = await generateWelcomeMessage(detectedLanguage);
+            const welcomeMessage = await generateWelcomeMessage(detectedLanguage); // Now detectedLanguage is defined
             await sendInteractiveButtons(from, welcomeMessage, [
                 { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
                 { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
             ]);
             return res.sendStatus(200);
         }
-
-        // Detect the user's language
-        const detectedLanguage = detectLanguage(textRaw);
-        console.log(`Detected Language: ${detectedLanguage}`);
 
         // Initialize user session if it doesn't exist
         if (!userSessions[from]) {
