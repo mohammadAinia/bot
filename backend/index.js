@@ -114,12 +114,12 @@ app.post('/webhook', async (req, res) => {
 
                 // Manage user session
                 if (!userSessions.has(phoneNumber)) {
-                    userSessions.set(phoneNumber, {});
+                    userSessions.set(phoneNumber, { isSubmittingRequest: false, data: {} });
                 }
-
+                
                 const sessionData = userSessions.get(phoneNumber);
 
-                // Check if user wants to submit a disposal request
+                // Start disposal request
                 if (userMessage.toLowerCase().includes("dispose oil")) {
                     sessionData.isSubmittingRequest = true;
                     sessionData.data = {};
@@ -127,27 +127,39 @@ app.post('/webhook', async (req, res) => {
                     continue;
                 }
 
-                // Handle request submission process
+                // Handle request submission process dynamically
                 if (sessionData.isSubmittingRequest) {
+                    const requiredFields = [
+                        { key: "name", prompt: "Thanks! Now, please share your email." },
+                        { key: "email", prompt: "Got it! Now, please share your building name." },
+                        { key: "buildingName", prompt: "Thanks! Please provide your apartment number." },
+                        { key: "apartmentNumber", prompt: "Great! Lastly, please share your location (latitude and longitude)." },
+                        { key: "location", prompt: "Thank you! You're almost done. Let's confirm everything and submit your request." }
+                    ];
+
+                    // Store user input
                     if (!sessionData.data.name) {
                         sessionData.data.name = userMessage;
-                        await sendToWhatsApp(phoneNumber, "Thanks! Now, please share your email.");
                     } else if (!sessionData.data.email) {
                         sessionData.data.email = userMessage;
-                        await sendToWhatsApp(phoneNumber, "Got it! Now, please share your building name.");
                     } else if (!sessionData.data.buildingName) {
                         sessionData.data.buildingName = userMessage;
-                        await sendToWhatsApp(phoneNumber, "Thanks! Please provide your apartment number.");
                     } else if (!sessionData.data.apartmentNumber) {
                         sessionData.data.apartmentNumber = userMessage;
-                        await sendToWhatsApp(phoneNumber, "Great! Lastly, please share your location.");
                     } else if (!sessionData.data.location && locationMessage) {
                         sessionData.data.location = locationMessage;
-                        await sendToWhatsApp(phoneNumber, "Thank you! You're almost done. Let's confirm everything and submit your request.");
-                        // Once all details are gathered, submit the request
+                    }
+
+                    // Find the next missing field
+                    const nextField = requiredFields.find(field => !sessionData.data[field.key]);
+
+                    if (nextField) {
+                        await sendToWhatsApp(phoneNumber, nextField.prompt);
+                    } else {
+                        // All details collected, submit request
                         try {
                             await axios.post("https://api.lootahbiofuels.com/api/v1/whatsapp_request", sessionData.data);
-                            await sendToWhatsApp(phoneNumber, "Your request has been submitted. Thank you!");
+                            await sendToWhatsApp(phoneNumber, "Your request has been submitted successfully. Thank you!");
                         } catch (error) {
                             await sendToWhatsApp(phoneNumber, "Sorry, there was an error submitting your request. Please try again later.");
                         }
@@ -166,6 +178,7 @@ app.post('/webhook', async (req, res) => {
         res.sendStatus(404);
     }
 });
+
 
 // Send a welcome message with buttons for first interaction
 const sendWelcomeMessage = async (phoneNumber) => {
