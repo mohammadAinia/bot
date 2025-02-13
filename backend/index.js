@@ -859,21 +859,22 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-            case STATES.EMAIL:
-                const emailValidationResponse = await analyzeInput(textRaw, "email", detectedLanguage); // Pass language here
-
-                if (emailValidationResponse.toLowerCase().includes("valid")) {
-                    session.data.email = textRaw;
-                    session.step = STATES.ADDRESS;
-
-                    // Use generateMissingFieldPrompt to request the address
-                    const addressPrompt = await generateMissingFieldPrompt("address", detectedLanguage);
-                    await sendToWhatsApp(from, addressPrompt);
-                } else {
-                    await sendToWhatsApp(from, emailValidationResponse);
-                    session.step = STATES.EMAIL;
-                }
-                break;
+                case STATES.EMAIL:
+                    const emailValidationResponse = await analyzeInput(textRaw, "email", detectedLanguage); // Pass language here
+                
+                    if (emailValidationResponse.toLowerCase().includes("valid")) {
+                        session.data.email = textRaw;
+                        session.step = STATES.ADDRESS;
+                
+                        // Use generateMissingFieldPrompt to request the address
+                        const addressPrompt = await generateMissingFieldPrompt("address", detectedLanguage);
+                        await sendToWhatsApp(from, addressPrompt);
+                    } else {
+                        await sendToWhatsApp(from, emailValidationResponse);
+                        session.step = STATES.EMAIL;
+                    }
+                    break;
+                
             case STATES.ADDRESS:
                 const addressValidationResponse = await analyzeInput(textRaw, "address", detectedLanguage); // Pass language here
 
