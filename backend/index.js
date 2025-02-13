@@ -574,13 +574,19 @@ const askForNextMissingField = async (session, from, detectedLanguage) => {
         return await sendOrderSummary(from, session, detectedLanguage); // Pass language here
     }
 
-    const nextMissingField = missingFields[0];
-    session.step = `ASK_${nextMissingField.toUpperCase()}`;
+    // Create a message that includes all missing fields one by one
+    let missingFieldsMessage = "Sure! Could you please provide the following details? 😊\n\n";
+    
+    missingFields.forEach(field => {
+        missingFieldsMessage += `${fieldPromptMap[field]}\n`;
+    });
 
-    const context = `Respond in ${detectedLanguage}. The user is submitting an order. Ask them for their "${nextMissingField}" in a friendly way. 😊`;
-    const dynamicResponse = await getOpenAIResponse(context);
-    await sendToWhatsApp(from, dynamicResponse);
+    session.step = STATES.MISSING_FIELDS;
+
+    // Send the message with all missing fields
+    await sendToWhatsApp(from, missingFieldsMessage);
 };
+
 async function isQuestionOrRequest(text) {
     const prompt = `
     Classify the user's input into one of the following categories:
