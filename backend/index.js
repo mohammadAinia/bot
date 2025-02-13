@@ -269,23 +269,12 @@ const getOpenAIResponse = async (userMessage, context = "", detectedLanguage = "
 
 // Language Detection
 const detectLanguage = (text) => {
-    const languageCode = franc(text);
-
-    const languageMap = {
-        'ara': 'Arabic',
-        'eng': 'English',
-        'urd': 'Urdu',
-        'hin': 'Hindi',
-    };
-
-    if (languageMap[languageCode]) return languageMap[languageCode];
-
-    // Fallback: Check for common words in Arabic, Urdu, etc.
-    if (/[اأإءؤذءخصضطظعغفقلن]/.test(text)) return 'Arabic';
-    if (/[ںےکیج]/.test(text)) return 'Urdu';
-    if (/[अआइईउऊऋएऐओऔ]/.test(text)) return 'Hindi';
-
-    return 'English'; // Default to English
+    // Check for Arabic characters
+    if (/[اأإءؤذءخصضطظعغفقلن]/.test(text)) {
+        return 'Arabic';
+    }
+    // Default to English
+    return 'English';
 };
 
 
@@ -639,7 +628,7 @@ const generateWelcomeMessage = async (language) => {
         - Introduces the company in a warm and professional tone.
         - Encourages users to ask questions or start a new request.
         - Uses emojis sparingly to make the message lively but not overwhelming.
-        - Respond in ${language === 'ar' ? 'Arabic' : 'English'}.
+        - Respond in ${language === 'Arabic' ? 'Arabic' : 'English'}.
     `;
 
     return await getOpenAIResponse("Generate a welcome message.", systemPrompt);
@@ -652,7 +641,7 @@ const generateMissingFieldPrompt = async (field, detectedLanguage) => {
         name: "Ask the user to provide their full name in a friendly and casual tone. Example: 'May I have your full name, please? 😊'",
         phone: "Ask the user for their phone number in a casual and friendly way. Example: 'Could you share your phone number with us? 📱'",
         email: "Ask the user for their email address politely. Example: 'What’s your email address? We’ll use it to keep you updated! ✉️'",
-        address: "Ask the user for their full address in a simple and friendly way. Example: 'Could you provide your complete address? 🏠'",
+        address: "Ask the user for their full address in a simple and friendly way. Example: 'Could you provide your complete address? �'",
         city: "Ask the user to select their city from the options provided. Example: 'Which city are you located in? 🌆'",
         street: "Ask the user for their street name in a cheerful tone. Example: 'What’s the name of your street? 🛣️'",
         building_name: "Ask the user for their building name in a friendly way. Example: 'Could you tell us the name of your building? 🏢'",
@@ -665,14 +654,14 @@ const generateMissingFieldPrompt = async (field, detectedLanguage) => {
     if (!fieldPromptMap[field]) return null;
 
     const prompt = `
-    Respond in ${detectedLanguage}.
-    The user is filling out a form. They need to provide their "${field}".
-    Ensure your response is **ONLY** a polite request for the missing field, without any unrelated information.
-    Do **not** mention AI, email, or apologies.
-    Do **not** generate anything except the request prompt.
-    
-    ${fieldPromptMap[field]}
-`;
+        Respond in ${detectedLanguage}.
+        The user is filling out a form. They need to provide their "${field}".
+        Ensure your response is **ONLY** a polite request for the missing field, without any unrelated information.
+        Do **not** mention AI, email, or apologies.
+        Do **not** generate anything except the request prompt.
+        
+        ${fieldPromptMap[field]}
+    `;
 
     return await getOpenAIResponse(prompt, ``, detectedLanguage);
 };
@@ -695,6 +684,7 @@ const analyzeInput = async (input, expectedField, detectedLanguage) => {
 
         Important:
         - Do not respond as if you are the user. Your task is to analyze the input and provide a response based on the rules above.
+        - Respond in ${detectedLanguage}.
     `;
 
     const response = await getOpenAIResponse(prompt, ``, detectedLanguage);
