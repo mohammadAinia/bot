@@ -903,37 +903,30 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-
-            case STATES.CITY_SELECTION:
-                if (message.interactive && message.interactive.button_reply) {
-                    const citySelection = message.interactive.button_reply.id;
-                    const cityMap = {
-                        "abu_dhabi": "Abu Dhabi",
-                        "dubai": "Dubai",
-                        "sharjah": "Sharjah"
-                    };
-
-                    if (cityMap[citySelection]) {
-                        session.data.city = cityMap[citySelection];
-                        session.step = STATES.STREET;
-
-                        const cityResponse = await getOpenAIResponse(
-                            `The user selected the city ${cityMap[citySelection]}. Now, ask them for the street name.`,
-                            `Respond in ${detectedLanguage}.`
-                        );
-                        await sendToWhatsApp(from, cityResponse);
-                    } else {
-                        const invalidCityResponse = await getOpenAIResponse(
-                            "The user made an invalid city selection. Ask them to choose from the provided options.",
-                            `Respond in ${detectedLanguage}.`
-                        );
-                        await sendToWhatsApp(from, invalidCityResponse);
-                        await sendCitySelection(from, detectedLanguage); // Re-send city selection buttons
+                case STATES.CITY_SELECTION:
+                    if (message.interactive && message.interactive.button_reply) {
+                        const citySelection = message.interactive.button_reply.id;
+                        const cityMap = {
+                            "abu_dhabi": "Abu Dhabi",
+                            "dubai": "Dubai",
+                            "sharjah": "Sharjah"
+                        };
+                
+                        if (cityMap[citySelection]) {
+                            session.data.city = cityMap[citySelection];
+                            session.step = STATES.STREET;
+                
+                            const cityResponse = await getOpenAIResponse(
+                                `The user selected the city ${cityMap[citySelection]}. Now, ask them for the street name.`,
+                                `Respond in ${detectedLanguage}.`
+                            );
+                            await sendToWhatsApp(from, cityResponse);
+                        } else {
+                            await sendCitySelection(from, detectedLanguage); // Re-send buttons only if an invalid selection is made
+                        }
                     }
-                } else {
-                    await sendCitySelection(from, detectedLanguage); // Send city selection buttons
-                }
-                break;
+                    break;
+                
 
 
             case STATES.STREET:
@@ -1070,10 +1063,11 @@ app.post('/webhook', async (req, res) => {
             }
 
             case "ASK_CITY": {
-                await sendCitySelection(from, detectedLanguage);
-                session.step = STATES.CITY_SELECTION; // Set session state properly
+                session.step = STATES.CITY_SELECTION; // Set session state properly before sending buttons
+                await sendCitySelection(from, detectedLanguage); // Send only one message with buttons
                 break;
             }
+            
 
 
             case "ASK_STREET": {
