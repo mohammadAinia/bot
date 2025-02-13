@@ -188,14 +188,14 @@ const sendWelcomeMessage = async (phoneNumber) => {
             "type": "reply",
             "reply": {
                 "id": "1",
-                "title": "Submit Disposal Request"
+                "title": "Disposal Request" // Shortened to 17 characters
             }
         },
         {
             "type": "reply",
             "reply": {
                 "id": "2",
-                "title": "Inquire About Services"
+                "title": "Service Inquiry" // Shortened to 16 characters
             }
         }
     ];
