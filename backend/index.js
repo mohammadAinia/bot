@@ -698,15 +698,15 @@ app.post('/webhook', async (req, res) => {
         if (!session.data.phone) {
             session.data.phone = formatPhoneNumber(from);
         }
-        const inputType = await isQuestionOrRequest(textRaw);
+        let inputType = await isQuestionOrRequest(textRaw); // Changed to let
 
         if (inputType === "request") {
-            // ✅ Double-check if the user is REALLY making an order
             if (!textRaw.includes("collect") && !textRaw.includes("order") && !textRaw.includes("submit")) {
                 console.log("⚠️ Potential misclassification, treating as inquiry instead.");
-                inputType = "question"; // Revert to question
+                inputType = "question"; // ✅ Now it works!
             }
         }
+
 
         if (inputType === "question") {
             const aiResponse = await getOpenAIResponse(textRaw);
@@ -1587,32 +1587,32 @@ app.post('/webhook', async (req, res) => {
 //         }
 //     }
 //     break;
-        // Check if the user is asking a question
-        // const isUserAskingQuestion = await isQuestion(textRaw);
+// Check if the user is asking a question
+// const isUserAskingQuestion = await isQuestion(textRaw);
 
-        // if (isUserAskingQuestion) {
-        //     // Answer the question using ChatGPT
-        //     const aiResponse = await getOpenAIResponse(textRaw);
+// if (isUserAskingQuestion) {
+//     // Answer the question using ChatGPT
+//     const aiResponse = await getOpenAIResponse(textRaw);
 
-        //     // Send the answer to the user
-        //     await sendToWhatsApp(from, aiResponse);
+//     // Send the answer to the user
+//     await sendToWhatsApp(from, aiResponse);
 
-        //     // If the user was in the middle of a request, remind them to continue
-        //     if (session.step !== STATES.WELCOME) {
-        //         const missingFields = getMissingFields(session.data);
-        //         if (missingFields.length > 0) {
-        //             const nextMissingField = missingFields[0];
-        //             const missingPrompt = await generateMissingFieldPrompt(nextMissingField);
+//     // If the user was in the middle of a request, remind them to continue
+//     if (session.step !== STATES.WELCOME) {
+//         const missingFields = getMissingFields(session.data);
+//         if (missingFields.length > 0) {
+//             const nextMissingField = missingFields[0];
+//             const missingPrompt = await generateMissingFieldPrompt(nextMissingField);
 
-        //             if (missingPrompt) {
-        //                 await sendToWhatsApp(from, `Let’s go back to complete the request. ${missingPrompt}`);
-        //             }
-        //         }
-        //     }
+//             if (missingPrompt) {
+//                 await sendToWhatsApp(from, `Let’s go back to complete the request. ${missingPrompt}`);
+//             }
+//         }
+//     }
 
-        //     return res.sendStatus(200);
-        // }
-        // const generateMissingFieldPrompt = async (field) => {
+//     return res.sendStatus(200);
+// }
+// const generateMissingFieldPrompt = async (field) => {
 //     try {
 //         const fieldPromptMap = {
 //             name: "Ask the user to provide their full name. Keep it short, lively, and friendly with an emoji if possible.",
