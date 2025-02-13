@@ -585,11 +585,14 @@ async function isQuestionOrRequest(text) {
     const prompt = `
     Classify the user's input into one of the following categories:
     
-    1️⃣ **"request"** → ONLY if the user is clearly making a service request. Examples:
-       - "I want to submit a request"
+    1️⃣ **"request"** → If the user is making a service request or wants to start a new request. Examples:
+       - "I want to create a request"
+       - "I want to create a new request"
+       - "I have oil I want to get rid of"
+       - "Hello, I have 50 liters of oil in Dubai"
+       - "Please collect oil from my location"
        - "I need a pickup for used oil"
        - "New order request"
-       - "Please collect oil from my location"
     
     2️⃣ **"question"** → If the user is **asking for information** about the company, services, or anything general. Examples:
        - "What services do you provide?"
@@ -732,10 +735,19 @@ app.post('/webhook', async (req, res) => {
         let inputType = await isQuestionOrRequest(textRaw, detectedLanguage); // Pass language here
 
         if (inputType === "request") {
-            if (!textRaw.includes("collect") && !textRaw.includes("order") && !textRaw.includes("submit")) {
-                console.log("⚠️ Potential misclassification, treating as inquiry instead.");
-                inputType = "question"; // Revert to question
+            // Extract data from the user's input
+            const extractedData = await extractInformationFromText(textRaw, detectedLanguage);
+            session.data = { ...session.data, ...extractedData };
+
+            // Check if the user provided enough information to skip steps
+            const missingFields = getMissingFields(session.data);
+            if (missingFields.length === 0) {
+                session.step = STATES.CONFIRMATION;
+                await sendOrderSummary(from, session, detectedLanguage);
+            } else {
+                await askForNextMissingField(session, from, detectedLanguage);
             }
+            return res.sendStatus(200);
         }
 
         if (inputType === "question") {
