@@ -245,7 +245,7 @@ const getOpenAIResponse = async (userMessage, context = "") => {
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
             model: "gpt-4",
             messages,
-            max_tokens: 90,
+            max_tokens: 300,
             temperature: 0.7
         }, {
             headers: {
