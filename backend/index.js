@@ -720,6 +720,11 @@ app.post('/webhook', async (req, res) => {
         const detectedLanguage = detectLanguage(textRaw);
         console.log(`Detected Language: ${detectedLanguage}`);
 
+        // Update the session language if it differs from the previous one
+        if (session.language !== detectedLanguage) {
+            session.language = detectedLanguage;
+        }
+
         // Initialize user session if it doesn't exist
         if (!userSessions[from]) {
             userSessions[from] = {
