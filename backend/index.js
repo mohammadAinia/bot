@@ -107,9 +107,10 @@ app.post('/webhook', async (req, res) => {
                 }
 
                 const phoneNumber = message.value.messages[0].from;
-                const userMessage = message.value.messages[0].text?.body;
-                const locationMessage = message.value.messages[0].location; // Location sent by the user
+                const userMessage = message.value.messages[0].text?.body; // Text message (optional)
+                const locationMessage = message.value.messages[0].location; // Location message (optional)
 
+                // Skip if neither text nor location is provided
                 if (!userMessage && !locationMessage) continue;
 
                 // Manage user session
@@ -118,46 +119,71 @@ app.post('/webhook', async (req, res) => {
                     await sendWelcomeMessage(phoneNumber); // Send welcome message for new users
                     continue;
                 }
-                
+
                 const sessionData = userSessions.get(phoneNumber);
 
-                // Start disposal request
-                if (userMessage.toLowerCase().includes("submit disposal request") || userMessage.toLowerCase().includes("dispose oil")) {
-                    sessionData.isSubmittingRequest = true;
-                    sessionData.data = {};
-                    await sendToWhatsApp(phoneNumber, "Great! Let's start your oil disposal request. What's your name?");
-                    continue;
-                }
-
-                // Handle request submission process dynamically
-                if (sessionData.isSubmittingRequest) {
-                    const requiredFields = [
-                        { key: "name", prompt: "Thanks! Now, please share your email." },
-                        { key: "email", prompt: "Got it! Now, please share your building name." },
-                        { key: "buildingName", prompt: "Thanks! Please provide your apartment number." },
-                        { key: "apartmentNumber", prompt: "Great! Lastly, please share your location (latitude and longitude)." },
-                        { key: "location", prompt: "Thank you! You're almost done. Let's confirm everything and submit your request." }
-                    ];
-
-                    // Store user input
-                    if (!sessionData.data.name) {
-                        sessionData.data.name = userMessage;
-                    } else if (!sessionData.data.email) {
-                        sessionData.data.email = userMessage;
-                    } else if (!sessionData.data.buildingName) {
-                        sessionData.data.buildingName = userMessage;
-                    } else if (!sessionData.data.apartmentNumber) {
-                        sessionData.data.apartmentNumber = userMessage;
-                    } else if (!sessionData.data.location && locationMessage) {
-                        sessionData.data.location = locationMessage;
+                // Handle text messages
+                if (userMessage) {
+                    // Start disposal request
+                    if (userMessage.toLowerCase().includes("submit disposal request") || userMessage.toLowerCase().includes("dispose oil")) {
+                        sessionData.isSubmittingRequest = true;
+                        sessionData.data = {};
+                        await sendToWhatsApp(phoneNumber, "Great! Let's start your oil disposal request. What's your name?");
+                        continue;
                     }
 
-                    // Find the next missing field
-                    const nextField = requiredFields.find(field => !sessionData.data[field.key]);
+                    // Handle request submission process dynamically
+                    if (sessionData.isSubmittingRequest) {
+                        const requiredFields = [
+                            { key: "name", prompt: "Thanks! Now, please share your email." },
+                            { key: "email", prompt: "Got it! Now, please share your building name." },
+                            { key: "buildingName", prompt: "Thanks! Please provide your apartment number." },
+                            { key: "apartmentNumber", prompt: "Great! Lastly, please share your location (latitude and longitude)." },
+                            { key: "location", prompt: "Thank you! You're almost done. Let's confirm everything and submit your request." }
+                        ];
 
-                    if (nextField) {
-                        await sendToWhatsApp(phoneNumber, nextField.prompt);
-                    } else {
+                        // Store user input
+                        if (!sessionData.data.name) {
+                            sessionData.data.name = userMessage;
+                        } else if (!sessionData.data.email) {
+                            sessionData.data.email = userMessage;
+                        } else if (!sessionData.data.buildingName) {
+                            sessionData.data.buildingName = userMessage;
+                        } else if (!sessionData.data.apartmentNumber) {
+                            sessionData.data.apartmentNumber = userMessage;
+                        }
+
+                        // Find the next missing field
+                        const nextField = requiredFields.find(field => !sessionData.data[field.key]);
+
+                        if (nextField) {
+                            await sendToWhatsApp(phoneNumber, nextField.prompt);
+                        } else {
+                            // All details collected except location
+                            await sendToWhatsApp(phoneNumber, "Please share your location (latitude and longitude) to complete the request.");
+                        }
+                        continue;
+                    }
+
+                    // Handle general inquiries (OpenAI Response)
+                    const botResponse = await getOpenAIResponse(userMessage, sessionData);
+                    await sendToWhatsApp(phoneNumber, botResponse);
+                }
+
+                // Handle location messages
+                if (locationMessage && sessionData.isSubmittingRequest) {
+                    // Store location data
+                    sessionData.data.location = {
+                        latitude: locationMessage.latitude,
+                        longitude: locationMessage.longitude,
+                        address: locationMessage.address || "Unknown address"
+                    };
+
+                    // Check if all details are collected
+                    const requiredFields = ["name", "email", "buildingName", "apartmentNumber", "location"];
+                    const isComplete = requiredFields.every(field => sessionData.data[field]);
+
+                    if (isComplete) {
                         // All details collected, submit request
                         try {
                             await axios.post(API_REQUEST_URL, sessionData.data);
@@ -166,13 +192,10 @@ app.post('/webhook', async (req, res) => {
                             await sendToWhatsApp(phoneNumber, "Sorry, there was an error submitting your request. Please try again later.");
                         }
                         sessionData.isSubmittingRequest = false; // End the request flow
+                    } else {
+                        await sendToWhatsApp(phoneNumber, "Thank you for sharing your location. Please provide the remaining details.");
                     }
-                    continue;
                 }
-
-                // Handle general inquiries (OpenAI Response)
-                const botResponse = await getOpenAIResponse(userMessage, sessionData);
-                await sendToWhatsApp(phoneNumber, botResponse);
             }
         }
         res.sendStatus(200);
