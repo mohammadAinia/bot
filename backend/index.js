@@ -98,6 +98,12 @@ app.post('/webhook', async (req, res) => {
     if (body.object === 'whatsapp_business_account') {
         for (const entry of body.entry) {
             for (const message of entry.changes) {
+                // Check if messages is present and has the expected structure
+                if (!message.value.messages || !Array.isArray(message.value.messages) || message.value.messages.length === 0) {
+                    console.error('❌ No messages found in the incoming webhook data.');
+                    continue;
+                }
+
                 const phoneNumber = message.value.messages[0].from;
                 const userMessage = message.value.messages[0].text?.body;
 
@@ -107,7 +113,7 @@ app.post('/webhook', async (req, res) => {
                 if (!userSessions.has(phoneNumber)) {
                     userSessions.set(phoneNumber, {});
                 }
-                
+
                 const sessionData = userSessions.get(phoneNumber);
 
                 if (userMessage.toLowerCase().includes("dispose oil")) {
@@ -132,6 +138,7 @@ app.post('/webhook', async (req, res) => {
         res.sendStatus(404);
     }
 });
+
 
 app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
 
