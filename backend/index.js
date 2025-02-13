@@ -317,20 +317,44 @@ const sendCitySelection = async (to, detectedLanguage) => {
     try {
         console.log(`Sending city selection buttons to ${to} in language: ${detectedLanguage}`);
 
+        // Generate the city selection prompt in the detected language
         const cityPrompt = await getOpenAIResponse(
             "Ask the user to select their city from the available options.",
             `Respond in ${detectedLanguage}.`
         );
 
+        // Define the buttons for city selection
         const cityButtons = [
             { type: "reply", reply: { id: "abu_dhabi", title: "Abu Dhabi" } },
             { type: "reply", reply: { id: "dubai", title: "Dubai" } },
             { type: "reply", reply: { id: "sharjah", title: "Sharjah" } }
         ];
 
-        await sendInteractiveButtons(to, cityPrompt, cityButtons);
+        // Log the payload being sent
+        const payload = {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: to,
+            type: "interactive",
+            interactive: {
+                type: "button",
+                body: { text: cityPrompt },
+                action: { buttons: cityButtons }
+            }
+        };
+        console.log("City Selection Payload:", JSON.stringify(payload, null, 2));
+
+        // Send the interactive message
+        const response = await axios.post(process.env.WHATSAPP_API_URL, payload, {
+            headers: {
+                Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                "Content-Type": "application/json"
+            }
+        });
+
+        console.log("City Selection Response:", response.data); // Log the response
     } catch (error) {
-        console.error("Error sending city selection:", error);
+        console.error("Error sending city selection:", error.response?.data || error.message);
     }
 };
 
@@ -849,67 +873,75 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-                case STATES.EMAIL:
-                    const emailValidationResponse = await analyzeInput(textRaw, "email", detectedLanguage); // Pass language here
+            case STATES.EMAIL:
+                const emailValidationResponse = await analyzeInput(textRaw, "email", detectedLanguage); // Pass language here
+
+                if (emailValidationResponse.toLowerCase().includes("valid")) {
+                    session.data.email = textRaw;
+                    session.step = STATES.ADDRESS;
+
+                    // Use generateMissingFieldPrompt to request the address
+                    const addressPrompt = await generateMissingFieldPrompt("address", detectedLanguage);
+                    await sendToWhatsApp(from, addressPrompt);
+                } else {
+                    await sendToWhatsApp(from, emailValidationResponse);
+                    session.step = STATES.EMAIL;
+                }
+                break;
+
+            case STATES.ADDRESS:
+                const addressValidationResponse = await analyzeInput(textRaw, "address", detectedLanguage);
+
+                if (addressValidationResponse.toLowerCase().includes("valid")) {
+                    session.data.address = textRaw;
+                    session.step = STATES.CITY_SELECTION;
+
+                    // Send city selection buttons immediately
+                    await sendCitySelection(from, detectedLanguage);
+                } else {
+                    await sendToWhatsApp(from, addressValidationResponse);
+                    session.step = STATES.ADDRESS;
+                }
+                break;
+
+
+
+                case STATES.CITY_SELECTION:
+                    if (message.interactive && message.interactive.button_reply) {
+                        const citySelection = message.interactive.button_reply.id;
+                        const cityMap = {
+                            "abu_dhabi": "Abu Dhabi",
+                            "dubai": "Dubai",
+                            "sharjah": "Sharjah"
+                        };
                 
-                    if (emailValidationResponse.toLowerCase().includes("valid")) {
-                        session.data.email = textRaw;
-                        session.step = STATES.ADDRESS;
+                        if (cityMap[citySelection]) {
+                            session.data.city = cityMap[citySelection];
+                            session.step = STATES.STREET;
                 
-                        // Use generateMissingFieldPrompt to request the address
-                        const addressPrompt = await generateMissingFieldPrompt("address", detectedLanguage);
-                        await sendToWhatsApp(from, addressPrompt);
+                            const cityResponse = await getOpenAIResponse(
+                                `The user selected the city ${cityMap[citySelection]}. Now, ask them for the street name.`,
+                                `Respond in ${detectedLanguage}.`
+                            );
+                            await sendToWhatsApp(from, cityResponse);
+                        } else {
+                            const invalidCityResponse = await getOpenAIResponse(
+                                "The user made an invalid city selection. Ask them to choose from the provided options.",
+                                `Respond in ${detectedLanguage}.`
+                            );
+                            await sendToWhatsApp(from, invalidCityResponse);
+                            await sendCitySelection(from, detectedLanguage); // Re-send city selection buttons
+                        }
                     } else {
-                        await sendToWhatsApp(from, emailValidationResponse);
-                        session.step = STATES.EMAIL;
+                        const noCityResponse = await getOpenAIResponse(
+                            "Please select your city from the options below.",
+                            `Respond in ${detectedLanguage}.`
+                        );
+                        await sendToWhatsApp(from, noCityResponse);
+                        await sendCitySelection(from, detectedLanguage); // Send city selection buttons
                     }
                     break;
-                
-                    case STATES.ADDRESS:
-                        const addressValidationResponse = await analyzeInput(textRaw, "address", detectedLanguage);
-                    
-                        if (addressValidationResponse.toLowerCase().includes("valid")) {
-                            session.data.address = textRaw;
-                            session.step = STATES.CITY_SELECTION;
-                    
-                            // Send city selection buttons immediately
-                            await sendCitySelection(from, detectedLanguage);
-                        } else {
-                            await sendToWhatsApp(from, addressValidationResponse);
-                            session.step = STATES.ADDRESS;
-                        }
-                        break;
-                    
 
-
-                        case STATES.CITY_SELECTION:
-                            if (message.interactive && message.interactive.button_reply) {
-                                const citySelection = message.interactive.button_reply.id;
-                                const cityMap = {
-                                    "abu_dhabi": "Abu Dhabi",
-                                    "dubai": "Dubai",
-                                    "sharjah": "Sharjah"
-                                };
-                        
-                                if (cityMap[citySelection]) {
-                                    session.data.city = cityMap[citySelection];
-                                    session.step = STATES.STREET;
-                        
-                                    const cityResponse = await getOpenAIResponse(
-                                        `The user selected the city ${cityMap[citySelection]}. Now, ask them for the street name.`,
-                                        `Respond in ${detectedLanguage}.`
-                                    );
-                                    await sendToWhatsApp(from, cityResponse);
-                                } else {
-                                    await sendToWhatsApp(from, "Invalid city selection. Please choose from the options below.");
-                                    await sendCitySelection(from, detectedLanguage);
-                                }
-                            } else {
-                                await sendToWhatsApp(from, "Please select your city from the options below.");
-                                await sendCitySelection(from, detectedLanguage);
-                            }
-                            break;
-                        
 
             case STATES.STREET:
                 const streetValidationResponse = await analyzeInput(textRaw, "street name", detectedLanguage); // Pass language here
