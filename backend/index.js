@@ -230,11 +230,11 @@ app.post('/admin/update-welcome-message', authenticateToken, (req, res) => {
 //         return "❌ Oops! Something went wrong. Please try again later.";
 //     }
 // };
-const getOpenAIResponse = async (userMessage, context = "") => {
+const getOpenAIResponse = async (userMessage, context = "", detectedLanguage = "English") => {
     try {
         const systemMessage = `
             You are a friendly and intelligent WhatsApp assistant for Lootah Biofuels. 
-            Respond in the same language as the user's input.
+            Respond in ${detectedLanguage}.
             Your goal is to assist users in completing their orders and answering their questions in a professional yet warm tone.
             Always respond concisely, use emojis sparingly, and maintain a helpful attitude.
         `;
@@ -531,7 +531,7 @@ async function extractInformationFromText(text, detectedLanguage) {
         Text: ${text}
     `;
 
-    const aiResponse = await getOpenAIResponse(prompt);
+    const aiResponse = await getOpenAIResponse(prompt, ``, detectedLanguage);
 
     try {
         const aiExtractedData = JSON.parse(aiResponse);
@@ -664,7 +664,7 @@ const generateMissingFieldPrompt = async (field, detectedLanguage) => {
     ${fieldPromptMap[field]}
 `;
 
-    return await getOpenAIResponse(prompt);
+    return await getOpenAIResponse(prompt, ``, detectedLanguage);
 };
 const analyzeInput = async (input, expectedField) => {
     const prompt = `
@@ -720,10 +720,14 @@ app.post('/webhook', async (req, res) => {
 
         // Initialize user session if it doesn't exist
         if (!userSessions[from]) {
-            userSessions[from] = { step: STATES.WELCOME, data: { phone: formatPhoneNumber(from) } };
-
+            userSessions[from] = { 
+                step: STATES.WELCOME, 
+                data: { phone: formatPhoneNumber(from) }, 
+                language: detectedLanguage // Store detected language
+            };
+        
             const welcomeMessage = await generateWelcomeMessage(detectedLanguage); // Pass language here
-
+        
             // Send welcome message with options
             await sendInteractiveButtons(from, welcomeMessage, [
                 { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
