@@ -656,7 +656,6 @@ const generateMissingFieldPrompt = async (field, detectedLanguage) => {
         phone: "Ask the user for their phone number in a casual and friendly way. Example: 'Could you share your phone number with us? 📱'",
         email: "Ask the user for their email address politely. Example: 'What’s your email address? We’ll use it to keep you updated! ✉️'",
         address: "Ask the user for their full address in a simple and friendly way. Example: 'Could you provide your complete address? 🏠'",
-        city: "Ask the user to select their city from the options provided. Example: 'Which city are you located in? 🌆'",
         street: "Ask the user for their street name in a cheerful tone. Example: 'What’s the name of your street? 🛣️'",
         building_name: "Ask the user for their building name in a friendly way. Example: 'Could you tell us the name of your building? 🏢'",
         flat_no: "Ask the user for their flat number politely. Example: 'What’s your flat number? 🏠'",
@@ -905,42 +904,36 @@ app.post('/webhook', async (req, res) => {
                 break;
 
 
+            case STATES.CITY_SELECTION:
+                if (message.interactive && message.interactive.button_reply) {
+                    const citySelection = message.interactive.button_reply.id;
+                    const cityMap = {
+                        "abu_dhabi": "Abu Dhabi",
+                        "dubai": "Dubai",
+                        "sharjah": "Sharjah"
+                    };
 
-                case STATES.CITY_SELECTION:
-                    if (message.interactive && message.interactive.button_reply) {
-                        const citySelection = message.interactive.button_reply.id;
-                        const cityMap = {
-                            "abu_dhabi": "Abu Dhabi",
-                            "dubai": "Dubai",
-                            "sharjah": "Sharjah"
-                        };
-                
-                        if (cityMap[citySelection]) {
-                            session.data.city = cityMap[citySelection];
-                            session.step = STATES.STREET;
-                
-                            const cityResponse = await getOpenAIResponse(
-                                `The user selected the city ${cityMap[citySelection]}. Now, ask them for the street name.`,
-                                `Respond in ${detectedLanguage}.`
-                            );
-                            await sendToWhatsApp(from, cityResponse);
-                        } else {
-                            const invalidCityResponse = await getOpenAIResponse(
-                                "The user made an invalid city selection. Ask them to choose from the provided options.",
-                                `Respond in ${detectedLanguage}.`
-                            );
-                            await sendToWhatsApp(from, invalidCityResponse);
-                            await sendCitySelection(from, detectedLanguage); // Re-send city selection buttons
-                        }
-                    } else {
-                        const noCityResponse = await getOpenAIResponse(
-                            "Please select your city from the options below.",
+                    if (cityMap[citySelection]) {
+                        session.data.city = cityMap[citySelection];
+                        session.step = STATES.STREET;
+
+                        const cityResponse = await getOpenAIResponse(
+                            `The user selected the city ${cityMap[citySelection]}. Now, ask them for the street name.`,
                             `Respond in ${detectedLanguage}.`
                         );
-                        await sendToWhatsApp(from, noCityResponse);
-                        await sendCitySelection(from, detectedLanguage); // Send city selection buttons
+                        await sendToWhatsApp(from, cityResponse);
+                    } else {
+                        const invalidCityResponse = await getOpenAIResponse(
+                            "The user made an invalid city selection. Ask them to choose from the provided options.",
+                            `Respond in ${detectedLanguage}.`
+                        );
+                        await sendToWhatsApp(from, invalidCityResponse);
+                        await sendCitySelection(from, detectedLanguage); // Re-send city selection buttons
                     }
-                    break;
+                } else {
+                    await sendCitySelection(from, detectedLanguage); // Send city selection buttons
+                }
+                break;
 
 
             case STATES.STREET:
@@ -1081,7 +1074,7 @@ app.post('/webhook', async (req, res) => {
                 session.step = STATES.CITY_SELECTION; // Set session state properly
                 break;
             }
-            
+
 
             case "ASK_STREET": {
                 session.data.street = textRaw;
