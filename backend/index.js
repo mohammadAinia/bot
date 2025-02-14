@@ -62,24 +62,29 @@ const sendToWhatsApp = async (to, message, buttons = []) => {
     }
 };
 
-// Use OpenAI only for general inquiries (not disposal requests)
+// Use OpenAI to generate responses
 const getOpenAIResponse = async (userMessage, sessionData) => {
-    // Bypass OpenAI if the user is in the middle of a disposal request
-    if (sessionData.flowState === 'FORM_FILLING') {
-        return "Please complete the current disposal request. Type 'cancel' to abort.";
-    }
+    let context = `You are a customer service bot for Lootah Biofuels.`;
 
-    const context = `You are a customer service bot for Lootah Biofuels.
-Keep responses under 2 sentences.
-If a disposal request is in progress, say: "Let's finish your disposal request first!".
-Current session state: ${JSON.stringify(sessionData)}`;
+    if (sessionData.flowState === 'FORM_FILLING') {
+        const missingFields = formFlow.filter(field => !(field in sessionData.formData));
+        const nextField = missingFields[0];
+
+        if (nextField) {
+            context += ` You are currently collecting information for a disposal request. The next field to collect is: ${nextField}.`;
+        } else {
+            context += ` All required information has been collected. Please confirm the submission.`;
+        }
+    } else {
+        context += ` Keep responses under 2 sentences. If a disposal request is in progress, say: "Let's finish your disposal request first!".`;
+    }
 
     try {
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
             model: 'gpt-4',
             messages: [
                 { role: 'system', content: context },
-                { role: 'user', content: userMessage }
+                { role: 'user', content: userMessage || "What should I ask next?" }
             ],
             temperature: 0.3
         }, {
@@ -95,18 +100,9 @@ Current session state: ${JSON.stringify(sessionData)}`;
     }
 };
 
-// Define form flow fields, prompts, and validations
+// Define form flow fields and validations
 const formFlow = ['name', 'email', 'buildingName', 'apartmentNumber', 'location'];
-const prompts = {
-    name: "Please enter your full name 🖊️",
-    email: "Thanks! Now, please share your email 📧",
-    buildingName: "Got it! What's your building name? 🏢",
-    apartmentNumber: "Please provide your apartment number 🏠",
-    location: "Great! Lastly, please share your location using WhatsApp's location-sharing feature 📍"
-};
-
 const validations = {
-    // Exclude email patterns for the name field to avoid recording an email as a name.
     name: (input) => input && input.length >= 2 && !/\S+@\S+\.\S+/.test(input),
     email: (input) => /\S+@\S+\.\S+/.test(input),
     buildingName: (input) => input && input.length >= 3,
@@ -183,7 +179,7 @@ app.post('/webhook', async (req, res) => {
                         continue;
                     }
                     
-                    // Handle confirmation state (bilingual: English & Arabic)
+                    // Handle confirmation state
                     if (session.flowState === 'AWAITING_CONFIRMATION') {
                         if (userMessage && (userMessage.toLowerCase().includes('confirm') || userMessage.includes('أكد'))) {
                             try {
@@ -197,8 +193,8 @@ app.post('/webhook', async (req, res) => {
                             session.flowState = 'FORM_FILLING';
                             session.formData = {};
                             session.retryCount = 0;
-                            const firstMissing = formFlow.find(field => !(field in session.formData));
-                            await sendToWhatsApp(phoneNumber, prompts[firstMissing]);
+                            const firstQuestion = await getOpenAIResponse(null, session);
+                            await sendToWhatsApp(phoneNumber, firstQuestion);
                         } else {
                             await sendToWhatsApp(phoneNumber, "Please type 'confirm' (أكد) to submit your request or 'restart' (ابدأ من جديد) to start over.");
                         }
@@ -211,14 +207,13 @@ app.post('/webhook', async (req, res) => {
                         session.flowState = 'FORM_FILLING';
                         session.formData = {};
                         session.retryCount = 0;
-                        const firstMissing = formFlow.find(field => !(field in session.formData));
-                        await sendToWhatsApp(phoneNumber, prompts[firstMissing]);
+                        const firstQuestion = await getOpenAIResponse(null, session);
+                        await sendToWhatsApp(phoneNumber, firstQuestion);
                         continue;
                     }
                     
                     // FORM FILLING STATE MACHINE with flexible input parsing
                     if (session.flowState === 'FORM_FILLING') {
-                        // Determine missing fields
                         const missingFields = formFlow.filter(field => !(field in session.formData));
                         let matchedField = null;
                         
@@ -258,7 +253,8 @@ app.post('/webhook', async (req, res) => {
                         // Determine the next missing field (in order)
                         const nextMissing = formFlow.find(field => !(field in session.formData));
                         if (nextMissing) {
-                            await sendToWhatsApp(phoneNumber, prompts[nextMissing]);
+                            const nextQuestion = await getOpenAIResponse(null, session);
+                            await sendToWhatsApp(phoneNumber, nextQuestion);
                         } else {
                             // All fields collected; send summary and ask for confirmation
                             const summary = generateSubmissionSummary(session.formData);
@@ -284,7 +280,6 @@ app.post('/webhook', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
-
 
 
 
