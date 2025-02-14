@@ -37,17 +37,32 @@ const sendToWhatsApp = async (to, message, buttons = []) => {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
         to: to,
-        type: buttons.length ? 'interactive' : 'text',
     };
 
     if (buttons.length) {
+        // Interactive message with buttons
+        payload.type = 'interactive';
         payload.interactive = {
             type: "button",
-            body: { text: message },
-            action: { buttons: buttons }
+            body: {
+                text: message // Correct structure for the body
+            },
+            action: {
+                buttons: buttons.map((button, index) => ({
+                    type: "reply",
+                    reply: {
+                        id: `btn_${index + 1}`,
+                        title: button.reply.title
+                    }
+                }))
+            }
         };
     } else {
-        payload.text = { body: message };
+        // Plain text message
+        payload.type = 'text';
+        payload.text = {
+            body: message
+        };
     }
 
     try {
@@ -72,18 +87,25 @@ const getOpenAIResponse = async (userMessage, sessionData) => {
             : prompts_en[nextMissing];
 
         // Get OpenAI's dynamic response for the next question
-        const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-            model: 'gpt-4',
-            messages: [
-                { role: 'system', content: `You are a customer service bot for Lootah Biofuels. Ask questions based on the user's missing information: ${nextMissing}` },
-                { role: 'user', content: questionPrompt }
-            ],
-            temperature: 0.3
-        }, {
-            headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` }
-        });
+        try {
+            const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+                model: 'gpt-4',
+                messages: [
+                    { role: 'system', content: `You are a customer service bot for Lootah Biofuels. Ask questions based on the user's missing information: ${nextMissing}` },
+                    { role: 'user', content: questionPrompt }
+                ],
+                temperature: 0.3
+            }, {
+                headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` }
+            });
 
-        return response.data.choices[0].message.content;
+            return response.data.choices[0].message.content;
+        } catch (error) {
+            console.error('❌ OpenAI API error:', error.response?.data || error.message);
+            return sessionData.language === 'ar'
+                ? "عذرًا، حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى."
+                : "Sorry, an error occurred while processing your request. Please try again.";
+        }
     }
 };
 
