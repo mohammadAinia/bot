@@ -97,7 +97,6 @@ You help users by:
     }
 };
 
-// Handle incoming webhook messages and manage sessions
 app.post('/webhook', async (req, res) => {
     const body = req.body;
     if (body.object === 'whatsapp_business_account') {
@@ -109,33 +108,28 @@ app.post('/webhook', async (req, res) => {
                 }
 
                 const phoneNumber = message.value.messages[0].from;
-                const userMessage = message.value.messages[0].text?.body; // Text message (optional)
-                const locationMessage = message.value.messages[0].location; // Location message (optional)
+                const userMessage = message.value.messages[0].text?.body;
+                const locationMessage = message.value.messages[0].location;
 
-                // Skip if neither text nor location is provided
                 if (!userMessage && !locationMessage) continue;
 
-                // Manage user session
                 if (!userSessions.has(phoneNumber)) {
                     userSessions.set(phoneNumber, { isSubmittingRequest: false, data: {}, currentField: null });
-                    await sendWelcomeMessage(phoneNumber); // Send welcome message for new users
+                    await sendWelcomeMessage(phoneNumber);
                     continue;
                 }
 
                 const sessionData = userSessions.get(phoneNumber);
 
-                // Handle text messages
                 if (userMessage) {
-                    // Start disposal request
                     if (userMessage.toLowerCase().includes("submit disposal request") || userMessage.toLowerCase().includes("dispose oil")) {
                         sessionData.isSubmittingRequest = true;
                         sessionData.data = {};
-                        sessionData.currentField = "name"; // Start with the first field
+                        sessionData.currentField = "name";
                         await sendToWhatsApp(phoneNumber, "Great! Let's start your oil disposal request. What's your name?");
                         continue;
                     }
 
-                    // Handle request submission process dynamically
                     if (sessionData.isSubmittingRequest) {
                         const requiredFields = [
                             { key: "name", prompt: "Thanks! Now, please share your email." },
@@ -144,13 +138,10 @@ app.post('/webhook', async (req, res) => {
                             { key: "apartmentNumber", prompt: "Great! Lastly, please share your location (latitude and longitude)." },
                             { key: "location", prompt: "Thank you! You're almost done. Let's confirm everything and submit your request." }
                         ];
-                    
-                        // Store user input
+
                         sessionData.data[sessionData.currentField] = userMessage;
-                    
-                        // Find the next required field
                         const nextField = requiredFields.find(f => !sessionData.data[f.key]);
-                    
+
                         if (nextField) {
                             sessionData.currentField = nextField.key;
                             await sendToWhatsApp(phoneNumber, nextField.prompt);
@@ -165,37 +156,34 @@ app.post('/webhook', async (req, res) => {
                             sessionData.isSubmittingRequest = false;
                             sessionData.currentField = null;
                         }
+                        continue;
                     }
                     
-
-                    // Handle general inquiries (OpenAI Response)
-                    const botResponse = await getOpenAIResponse(userMessage, sessionData);
-                    await sendToWhatsApp(phoneNumber, botResponse);
+                    if (!sessionData.isSubmittingRequest) {
+                        const botResponse = await getOpenAIResponse(userMessage, sessionData);
+                        await sendToWhatsApp(phoneNumber, botResponse);
+                    }
                 }
 
-                // Handle location messages
                 if (locationMessage && sessionData.isSubmittingRequest && sessionData.currentField === "location") {
-                    // Store location data
                     sessionData.data.location = {
                         latitude: locationMessage.latitude,
                         longitude: locationMessage.longitude,
                         address: locationMessage.address || "Unknown address"
                     };
 
-                    // Check if all details are collected
                     const requiredFields = ["name", "email", "buildingName", "apartmentNumber", "location"];
                     const isComplete = requiredFields.every(field => sessionData.data[field]);
 
                     if (isComplete) {
-                        // All details collected, submit request
                         try {
                             await axios.post(API_REQUEST_URL, sessionData.data);
                             await sendToWhatsApp(phoneNumber, "Your request has been submitted successfully. Thank you!");
                         } catch (error) {
                             await sendToWhatsApp(phoneNumber, "Sorry, there was an error submitting your request. Please try again later.");
                         }
-                        sessionData.isSubmittingRequest = false; // End the request flow
-                        sessionData.currentField = null; // Reset the current field
+                        sessionData.isSubmittingRequest = false;
+                        sessionData.currentField = null;
                     } else {
                         await sendToWhatsApp(phoneNumber, "Thank you for sharing your location. Please provide the remaining details.");
                     }
@@ -207,6 +195,7 @@ app.post('/webhook', async (req, res) => {
         res.sendStatus(404);
     }
 });
+
 
 // Send a welcome message with buttons for first interaction
 const sendWelcomeMessage = async (phoneNumber) => {
