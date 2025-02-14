@@ -61,7 +61,6 @@ const sendToWhatsApp = async (to, message, buttons = []) => {
         console.error('❌ Failed to send message:', error.response?.data || error.message);
     }
 };
-
 const getOpenAIResponse = async (userMessage, sessionData) => {
     const context = `You are a WhatsApp bot for Lootah Biofuels.
     Lootah Biofuels was founded in 2010 in Dubai to address the growing demand for alternative fuels. The company focuses on sustainable energy solutions, including biodiesel production from Used Cooking Oil (UCO). 
@@ -86,7 +85,7 @@ You help users by:
                 { role: 'user', content: userMessage }
             ]
         }, {
-            headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` }
+            headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}` }
         });
 
         return response.data.choices[0].message.content;
@@ -98,18 +97,16 @@ You help users by:
 
 app.post('/webhook', async (req, res) => {
     const body = req.body;
-    console.log('Incoming webhook payload:', JSON.stringify(body, null, 2)); // Log the full payload for debugging
+    console.log('Incoming webhook payload:', JSON.stringify(body, null, 2));
 
     if (body.object === 'whatsapp_business_account') {
         for (const entry of body.entry) {
             for (const change of entry.changes) {
-                // Check if the change contains valid messages
                 if (!change.value.messages || !Array.isArray(change.value.messages)) {
-                    console.error('❌ No messages found in the incoming webhook data. This could be a status update or other event.');
-                    continue; // Skip this change and proceed to the next one
+                    console.error('❌ No messages found in the incoming webhook data.');
+                    continue;
                 }
 
-                // Process each message in the messages array
                 for (const message of change.value.messages) {
                     const phoneNumber = message.from;
                     const userMessage = message.text?.body;
@@ -117,10 +114,9 @@ app.post('/webhook', async (req, res) => {
 
                     if (!userMessage && !locationMessage) {
                         console.error('❌ No valid message content found (text or location).');
-                        continue; // Skip this message and proceed to the next one
+                        continue;
                     }
 
-                    // Initialize session if it doesn't exist
                     if (!userSessions.has(phoneNumber)) {
                         userSessions.set(phoneNumber, { isSubmittingRequest: false, data: {}, currentField: null });
                         await sendWelcomeMessage(phoneNumber);
@@ -129,7 +125,6 @@ app.post('/webhook', async (req, res) => {
 
                     const sessionData = userSessions.get(phoneNumber);
 
-                    // Handle the oil disposal request process
                     if (userMessage && (userMessage.toLowerCase().includes("submit disposal request") || userMessage.toLowerCase().includes("dispose oil"))) {
                         sessionData.isSubmittingRequest = true;
                         sessionData.data = {};
@@ -138,7 +133,6 @@ app.post('/webhook', async (req, res) => {
                         continue;
                     }
 
-                    // Handle the oil disposal request process
                     if (sessionData.isSubmittingRequest) {
                         const requiredFields = [
                             { key: "name", prompt: "Thanks! Now, please share your email." },
@@ -148,20 +142,26 @@ app.post('/webhook', async (req, res) => {
                             { key: "location", prompt: "Thank you! You're almost done. Let's confirm everything and submit your request." }
                         ];
 
-                        // Save the user's response to the current field
                         if (sessionData.currentField) {
                             sessionData.data[sessionData.currentField] = userMessage || "Unknown";
                         }
 
-                        // Find the next field that hasn't been filled yet
-                        const nextField = requiredFields.find(f => !sessionData.data[f.key]);
+                        let nextField = requiredFields.find(f => !sessionData.data[f.key]);
+
+                        if (!nextField && locationMessage && sessionData.currentField === "location") {
+                            sessionData.data.location = {
+                                latitude: locationMessage.latitude,
+                                longitude: locationMessage.longitude,
+                                address: locationMessage.address || "Unknown address"
+                            };
+                            nextField = requiredFields.find(f => !sessionData.data[f.key]); // Check again after location
+                        }
 
                         if (nextField) {
-                            // Move to the next field and prompt the user
                             sessionData.currentField = nextField.key;
                             await sendToWhatsApp(phoneNumber, nextField.prompt);
+                            continue; // Prevent further processing in this block
                         } else {
-                            // All fields are filled, submit the request
                             await sendToWhatsApp(phoneNumber, "Your request is complete! Submitting now...");
                             try {
                                 await axios.post(API_REQUEST_URL, sessionData.data);
@@ -169,46 +169,18 @@ app.post('/webhook', async (req, res) => {
                             } catch (error) {
                                 await sendToWhatsApp(phoneNumber, "Sorry, there was an error submitting your request. Please try again later.");
                             }
-                            // Reset the session
                             sessionData.isSubmittingRequest = false;
                             sessionData.currentField = null;
                             sessionData.data = {};
+                            continue;
                         }
-                        continue;
                     }
 
-                    // Handle non-request-related messages
                     if (!sessionData.isSubmittingRequest) {
                         const botResponse = await getOpenAIResponse(userMessage, sessionData);
                         await sendToWhatsApp(phoneNumber, botResponse);
                     }
 
-                    // Handle location sharing
-                    if (locationMessage && sessionData.isSubmittingRequest && sessionData.currentField === "location") {
-                        sessionData.data.location = {
-                            latitude: locationMessage.latitude,
-                            longitude: locationMessage.longitude,
-                            address: locationMessage.address || "Unknown address"
-                        };
-
-                        const requiredFields = ["name", "email", "buildingName", "apartmentNumber", "location"];
-                        const isComplete = requiredFields.every(field => sessionData.data[field]);
-
-                        if (isComplete) {
-                            try {
-                                await axios.post(API_REQUEST_URL, sessionData.data);
-                                await sendToWhatsApp(phoneNumber, "Your request has been submitted successfully. Thank you!");
-                            } catch (error) {
-                                await sendToWhatsApp(phoneNumber, "Sorry, there was an error submitting your request. Please try again later.");
-                            }
-                            // Reset the session
-                            sessionData.isSubmittingRequest = false;
-                            sessionData.currentField = null;
-                            sessionData.data = {};
-                        } else {
-                            await sendToWhatsApp(phoneNumber, "Thank you for sharing your location. Please provide the remaining details.");
-                        }
-                    }
                 }
             }
         }
