@@ -32,38 +32,22 @@ app.get("/webhook", (req, res) => {
 });
 
 // Send message to WhatsApp with optional buttons
-// Send message to WhatsApp with optional buttons
 const sendToWhatsApp = async (to, message, buttons = []) => {
     const payload = {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
         to: to,
+        type: buttons.length ? 'interactive' : 'text',
     };
 
     if (buttons.length) {
-        // Interactive message with buttons
-        payload.type = 'interactive';
         payload.interactive = {
             type: "button",
-            body: {
-                text: message // Correct structure for the body
-            },
-            action: {
-                buttons: buttons.map((button, index) => ({
-                    type: "reply",
-                    reply: {
-                        id: `btn_${index + 1}`,
-                        title: button.reply.title
-                    }
-                }))
-            }
+            body: { text: message },
+            action: { buttons: buttons }
         };
     } else {
-        // Plain text message
-        payload.type = 'text';
-        payload.text = {  // Ensure 'body' is part of the payload
-            body: message // Add body here for plain text messages
-        };
+        payload.text = { body: message };
     }
 
     try {
@@ -78,96 +62,71 @@ const sendToWhatsApp = async (to, message, buttons = []) => {
     }
 };
 
-
 // Use OpenAI only for general inquiries (not disposal requests)
 const getOpenAIResponse = async (userMessage, sessionData) => {
+    // Bypass OpenAI if the user is in the middle of a disposal request
     if (sessionData.flowState === 'FORM_FILLING') {
-        const missingFields = formFlow.filter(field => !(field in sessionData.formData));
-        const nextMissing = missingFields[0]; // Get the next field to ask for
-        const questionPrompt = sessionData.language === 'ar'
-            ? prompts_ar[nextMissing]
-            : prompts_en[nextMissing];
+        return "Please complete the current disposal request. Type 'cancel' to abort.";
+    }
 
-        // Get OpenAI's dynamic response for the next question
-        try {
-            const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-                model: 'gpt-4',
-                messages: [
-                    { role: 'system', content: `You are a customer service bot for Lootah Biofuels. Ask questions based on the user's missing information: ${nextMissing}` },
-                    { role: 'user', content: questionPrompt }
-                ],
-                temperature: 0.3
-            }, {
-                headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` }
-            });
+    const context = `You are a customer service bot for Lootah Biofuels.
+Keep responses under 2 sentences.
+If a disposal request is in progress, say: "Let's finish your disposal request first!".
+Current session state: ${JSON.stringify(sessionData)}`;
 
-            return response.data.choices[0].message.content;
-        } catch (error) {
-            console.error('❌ OpenAI API error:', error.response?.data || error.message);
-            return sessionData.language === 'ar'
-                ? "عذرًا، حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى."
-                : "Sorry, an error occurred while processing your request. Please try again.";
-        }
+    try {
+        const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+            model: 'gpt-4',
+            messages: [
+                { role: 'system', content: context },
+                { role: 'user', content: userMessage }
+            ],
+            temperature: 0.3
+        }, {
+            headers: { 
+                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        return response.data.choices[0].message.content;
+    } catch (error) {
+        console.error('❌ OpenAI API error:', error.response?.data || error.message);
+        return "I'm having trouble answering that. Please contact our support team directly.";
     }
 };
 
-
-// Define form flow fields and bilingual prompts
-const formFlow = ['name', 'email', 'buildingName', 'apartmentNumber', 'location', 'oilQuantity'];
-
-const prompts_en = {
+// Define form flow fields, prompts, and validations
+const formFlow = ['name', 'email', 'buildingName', 'apartmentNumber', 'location'];
+const prompts = {
     name: "Please enter your full name 🖊️",
     email: "Thanks! Now, please share your email 📧",
     buildingName: "Got it! What's your building name? 🏢",
     apartmentNumber: "Please provide your apartment number 🏠",
-    location: "Great! Lastly, please share your location using WhatsApp's location-sharing feature 📍",
-    oilQuantity: "How much oil are you looking to dispose of (in liters)? 🛢️"
+    location: "Great! Lastly, please share your location using WhatsApp's location-sharing feature 📍"
 };
 
-const prompts_ar = {
-    name: "من فضلك ادخل اسمك الكامل 🖊️",
-    email: "شكرًا! الآن، من فضلك شارك بريدك الإلكتروني 📧",
-    buildingName: "حسنًا! ما اسم المبنى الخاص بك؟ 🏢",
-    apartmentNumber: "من فضلك، اذكر رقم الشقة 🏠",
-    location: "رائع! أخيرًا، شارك موقعك باستخدام ميزة مشاركة الموقع على واتساب 📍",
-    oilQuantity: "كمية الزيت التي ترغب في التخلص منها (باللترات)؟ 🛢️"
+const validations = {
+    // Exclude email patterns for the name field to avoid recording an email as a name.
+    name: (input) => input && input.length >= 2 && !/\S+@\S+\.\S+/.test(input),
+    email: (input) => /\S+@\S+\.\S+/.test(input),
+    buildingName: (input) => input && input.length >= 3,
+    apartmentNumber: (input) => !isNaN(input),
+    location: (input) => !!input && input.latitude !== undefined && input.longitude !== undefined
 };
 
-
-// Define bilingual error messages
-const errorMessage_en = "Hmm, that doesn't look right. Please try again 🔄";
-const errorMessage_ar = "همم، يبدو أن المدخل غير صحيح. يرجى المحاولة مرة أخرى 🔄";
-
-const abandonmentMessage_en = "Seems like you want to stop. Type 'restart' to begin again.";
-const abandonmentMessage_ar = "يبدو أنك تريد التوقف. اكتب 'ابدأ من جديد' للبدء مرة أخرى.";
-
-// Generate bilingual submission summary
-const generateSubmissionSummary_en = (formData) => {
+// Generate submission summary
+const generateSubmissionSummary = (formData) => {
     return `📋 Request Summary:
 • Name: ${formData.name}
 • Email: ${formData.email}
 • Building: ${formData.buildingName}
 • Apartment: ${formData.apartmentNumber}
 • Location: ${formData.location.address || 'Shared via GPS'}
-• Oil Quantity: ${formData.oilQuantity} liters
 
 Please type 'confirm' to submit your request or 'restart' to start over.`;
 };
 
-const generateSubmissionSummary_ar = (formData) => {
-    return `📋 ملخص الطلب:
-• الاسم: ${formData.name}
-• البريد الإلكتروني: ${formData.email}
-• اسم المبنى: ${formData.buildingName}
-• رقم الشقة: ${formData.apartmentNumber}
-• الموقع: ${formData.location.address || 'تم المشاركة عبر GPS'}
-• كمية الزيت: ${formData.oilQuantity} لتر
-
-يرجى كتابة "أكد" لتأكيد طلبك أو "ابدأ من جديد" لإعادة البدء.`;
-};
-
-
-// Enhanced welcome message system (bilingual)
+// Enhanced welcome message system
 const sendWelcomeMessage = async (phoneNumber) => {
     try {
         await sendToWhatsApp(phoneNumber, 
@@ -192,16 +151,6 @@ const sendWelcomeMessage = async (phoneNumber) => {
         );
     }
 };
-const validations = {
-    name: (input) => typeof input === 'string' && input.trim().length > 0,
-    email: (input) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input),
-    buildingName: (input) => typeof input === 'string' && input.trim().length > 1,
-    apartmentNumber: (input) => /^\d+$/.test(input),
-    location: (input) => input && typeof input.latitude === 'number' && typeof input.longitude === 'number',
-    oilQuantity: (input) => !isNaN(input) && parseFloat(input) > 0
-};
-
-
 
 app.post('/webhook', async (req, res) => {
     const body = req.body;
@@ -221,8 +170,7 @@ app.post('/webhook', async (req, res) => {
                         userSessions.set(phoneNumber, { 
                             flowState: 'IDLE', // States: IDLE, FORM_FILLING, AWAITING_CONFIRMATION, COMPLETED
                             formData: {},
-                            retryCount: 0,
-                            language: 'en'  // default language
+                            retryCount: 0
                         });
                     }
                     
@@ -230,26 +178,19 @@ app.post('/webhook', async (req, res) => {
                     
                     // Handle form abandonment
                     if (session.flowState === 'FORM_FILLING' && session.retryCount > 2) {
-                        const msg = session.language === 'ar' ? abandonmentMessage_ar : abandonmentMessage_en;
-                        await sendToWhatsApp(phoneNumber, msg);
+                        await sendToWhatsApp(phoneNumber, "Seems like you want to stop. Type 'restart' to begin again.");
                         session.flowState = 'IDLE';
                         continue;
                     }
                     
-                    // Handle confirmation state (bilingual)
+                    // Handle confirmation state (bilingual: English & Arabic)
                     if (session.flowState === 'AWAITING_CONFIRMATION') {
                         if (userMessage && (userMessage.toLowerCase().includes('confirm') || userMessage.includes('أكد'))) {
                             try {
                                 await axios.post(API_REQUEST_URL, session.formData);
-                                const confirmMsg = session.language === 'ar'
-                                    ? "✅ تم تقديم الطلب بنجاح!\nشكرًا لاختيارك لوتة للوقود الحيوي!"
-                                    : "✅ Request submitted successfully!\nThank you for choosing Lootah Biofuels!";
-                                await sendToWhatsApp(phoneNumber, confirmMsg);
+                                await sendToWhatsApp(phoneNumber, "✅ Request submitted successfully!\nThank you for choosing Lootah Biofuels!");
                             } catch (error) {
-                                const failMsg = session.language === 'ar'
-                                    ? "⚠️ فشل في تقديم الطلب. يرجى المحاولة مرة أخرى."
-                                    : "⚠️ Failed to submit. Please try again later.";
-                                await sendToWhatsApp(phoneNumber, failMsg);
+                                await sendToWhatsApp(phoneNumber, "⚠️ Failed to submit. Please try again later.");
                             }
                             userSessions.delete(phoneNumber);
                         } else if (userMessage && (userMessage.toLowerCase().includes('restart') || userMessage.toLowerCase().includes('ابدأ') || userMessage.toLowerCase().includes('أعد'))) {
@@ -257,106 +198,78 @@ app.post('/webhook', async (req, res) => {
                             session.formData = {};
                             session.retryCount = 0;
                             const firstMissing = formFlow.find(field => !(field in session.formData));
-                            const prompt = session.language === 'ar' ? prompts_ar[firstMissing] : prompts_en[firstMissing];
-                            await sendToWhatsApp(phoneNumber, prompt);
+                            await sendToWhatsApp(phoneNumber, prompts[firstMissing]);
                         } else {
-                            const reconfirmMsg = session.language === 'ar'
-                                ? "يرجى كتابة 'أكد' لتأكيد طلبك أو 'ابدأ من جديد' لإعادة البدء."
-                                : "Please type 'confirm' to submit your request or 'restart' to start over.";
-                            await sendToWhatsApp(phoneNumber, reconfirmMsg);
+                            await sendToWhatsApp(phoneNumber, "Please type 'confirm' (أكد) to submit your request or 'restart' (ابدأ من جديد) to start over.");
                         }
                         continue;
                     }
                     
-                    // Bilingual disposal request trigger – detect language if not already set
+                    // Bilingual disposal request trigger
                     const disposalKeywords = /dispose|submit|request|تخلص|تقديم|طلب/;
                     if (userMessage && disposalKeywords.test(userMessage.toLowerCase())) {
                         session.flowState = 'FORM_FILLING';
                         session.formData = {};
                         session.retryCount = 0;
-                        // If userMessage contains Arabic letters, set language to 'ar'
-                        if (/[؀-\u06FF]/.test(userMessage)) {
-                            session.language = 'ar';
-                        } else {
-                            session.language = 'en';
-                        }
                         const firstMissing = formFlow.find(field => !(field in session.formData));
-                        const prompt = session.language === 'ar' ? prompts_ar[firstMissing] : prompts_en[firstMissing];
-                        await sendToWhatsApp(phoneNumber, prompt);
+                        await sendToWhatsApp(phoneNumber, prompts[firstMissing]);
                         continue;
                     }
                     
                     // FORM FILLING STATE MACHINE with flexible input parsing
-// FORM FILLING STATE MACHINE with flexible input parsing
-if (session.flowState === 'FORM_FILLING') {
-    const missingFields = formFlow.filter(field => !(field in session.formData));
-    let matchedField = null;
-    
-    // For location, only accept a location message
-    if (missingFields.includes('location') && locationMessage) {
-        if (validations.location(locationMessage)) {
-            matchedField = 'location';
-        }
-    } else if (missingFields.includes('oilQuantity') && userMessage) {
-        // Add your logic for validating oilQuantity
-        if (validations.oilQuantity(userMessage)) {
-            session.formData.oilQuantity = userMessage; // Save valid oil quantity
-            session.retryCount = 0;
-            matchedField = 'oilQuantity'; // Mark as matched
-        } else {
-            const errMsg = session.language === 'ar' ? errorMessage_ar : errorMessage_en;
-            session.retryCount++;
-            await sendToWhatsApp(phoneNumber, errMsg);
-            continue;
-        }
-    } else if (userMessage) {
-        // Check if userMessage validates for any missing field (except location and oilQuantity)
-        for (const field of missingFields) {
-            if (field === 'location' || field === 'oilQuantity') continue;
-            if (validations[field](userMessage)) {
-                matchedField = field;
-                break;
-            }
-        }
-    }
-    
-    if (matchedField) {
-        if (matchedField === 'location') {
-            session.formData.location = {
-                latitude: locationMessage.latitude,
-                longitude: locationMessage.longitude,
-                address: locationMessage.address || "Unknown address"
-            };
-        } else {
-            session.formData[matchedField] = userMessage;
-        }
-        session.retryCount = 0;
-    } else {
-        const errMsg = session.language === 'ar' ? errorMessage_ar : errorMessage_en;
-        session.retryCount++;
-        await sendToWhatsApp(phoneNumber, errMsg);
-        continue;
-    }
-    
-    // Determine the next missing field (in order)
-    const nextMissing = formFlow.find(field => !(field in session.formData));
-    if (nextMissing) {
-        const nextPrompt = session.language === 'ar' ? prompts_ar[nextMissing] : prompts_en[nextMissing];
-        await sendToWhatsApp(phoneNumber, nextPrompt);
-    } else {
-        // All fields collected; send summary and ask for confirmation
-        const summary = session.language === 'ar'
-            ? generateSubmissionSummary_ar(session.formData)
-            : generateSubmissionSummary_en(session.formData);
-        await sendToWhatsApp(phoneNumber, summary, [
-            { type: "reply", reply: { id: "confirm_yes", title: session.language === 'ar' ? "✅ أكد" : "✅ Confirm" } },
-            { type: "reply", reply: { id: "confirm_no", title: session.language === 'ar' ? "❌ إلغاء" : "❌ Cancel" } }
-        ]);
-        session.flowState = 'AWAITING_CONFIRMATION';
-    }
-    continue;
-}
-
+                    if (session.flowState === 'FORM_FILLING') {
+                        // Determine missing fields
+                        const missingFields = formFlow.filter(field => !(field in session.formData));
+                        let matchedField = null;
+                        
+                        // For location, only accept a location message
+                        if (missingFields.includes('location') && locationMessage) {
+                            if (validations.location(locationMessage)) {
+                                matchedField = 'location';
+                            }
+                        } else if (userMessage) {
+                            // Check if userMessage validates for any missing field (except location)
+                            for (const field of missingFields) {
+                                if (field === 'location') continue;
+                                if (validations[field](userMessage)) {
+                                    matchedField = field;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if (matchedField) {
+                            if (matchedField === 'location') {
+                                session.formData.location = {
+                                    latitude: locationMessage.latitude,
+                                    longitude: locationMessage.longitude,
+                                    address: locationMessage.address || "Unknown address"
+                                };
+                            } else {
+                                session.formData[matchedField] = userMessage;
+                            }
+                            session.retryCount = 0;
+                        } else {
+                            session.retryCount++;
+                            await sendToWhatsApp(phoneNumber, "Hmm, that doesn't look right. Please try again 🔄");
+                            continue;
+                        }
+                        
+                        // Determine the next missing field (in order)
+                        const nextMissing = formFlow.find(field => !(field in session.formData));
+                        if (nextMissing) {
+                            await sendToWhatsApp(phoneNumber, prompts[nextMissing]);
+                        } else {
+                            // All fields collected; send summary and ask for confirmation
+                            const summary = generateSubmissionSummary(session.formData);
+                            await sendToWhatsApp(phoneNumber, summary, [
+                                { type: "reply", reply: { id: "confirm_yes", title: "✅ Confirm" } },
+                                { type: "reply", reply: { id: "confirm_no", title: "❌ Cancel" } }
+                            ]);
+                            session.flowState = 'AWAITING_CONFIRMATION';
+                        }
+                        continue;
+                    }
                     
                     // GENERAL CONVERSATION (if no disposal request is active)
                     if (userMessage) {
@@ -371,7 +284,6 @@ if (session.flowState === 'FORM_FILLING') {
 });
 
 app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
-
 
 
 
