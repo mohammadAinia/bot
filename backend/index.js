@@ -104,7 +104,7 @@ app.post('/webhook', async (req, res) => {
         for (const entry of body.entry) {
             for (const change of entry.changes) {
                 // Check if the change contains valid messages
-                if (!change.value.messages || !Array.isArray(change.value.messages) {
+                if (!change.value.messages || !Array.isArray(change.value.messages)) {
                     console.error('❌ No messages found in the incoming webhook data. This could be a status update or other event.');
                     continue; // Skip this change and proceed to the next one
                 }
