@@ -987,10 +987,10 @@ app.post('/webhook', async (req, res) => {
                 break;
             }
 
-            case "ASK_CITY": {
-                session.step = STATES.CITY_SELECTION; // Set session state properly before sending buttons
-                return await sendCitySelection(from); // Ensure only one message is sent
-            }
+            // case "ASK_CITY": {
+            //     session.step = STATES.CITY_SELECTION; // Set session state properly before sending buttons
+            //     return await sendCitySelection(from); // Ensure only one message is sent
+            // }
         
             case "ASK_STREET": {
                 session.data.street = textRaw;
