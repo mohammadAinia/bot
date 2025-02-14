@@ -142,7 +142,7 @@ app.post('/webhook', async (req, res) => {
 
                     // Save the user's response to the current field
                     if (sessionData.currentField) {
-                        sessionData.data[sessionData.currentField] = userMessage;
+                        sessionData.data[sessionData.currentField] = userMessage || "Unknown";
                     }
 
                     // Find the next field that hasn't been filled yet
