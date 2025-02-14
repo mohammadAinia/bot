@@ -196,6 +196,7 @@ app.post('/webhook', async (req, res) => {
 });
 
 
+
 // Send a welcome message with buttons for first interaction
 const sendWelcomeMessage = async (phoneNumber) => {
     const welcomeMessage = await getOpenAIResponse("Generate a welcome message for a new user.", {});
