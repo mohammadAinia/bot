@@ -686,6 +686,21 @@ app.post('/webhook', async (req, res) => {
             session.data.phone = formatPhoneNumber(from);
         }
 
+        // Check if the user explicitly requests to start an order
+        const isOrderRequest = text.includes("i want to submit an order") ||
+            text.includes("i have oil that i want to get rid of") ||
+            text.includes("i need to dispose of oil") ||
+            text.includes("i want to request a pickup") ||
+            (message.interactive && message.interactive.button_reply?.id === "new_request");
+
+        if (isOrderRequest) {
+            // Start the order process
+            session.step = STATES.NAME;
+            const namePrompt = await generateMissingFieldPrompt("name");
+            await sendToWhatsApp(from, namePrompt);
+            return res.sendStatus(200);
+        }
+
         let inputType = await isQuestionOrRequest(textRaw); // Pass language here
 
         if (inputType === "request") {
@@ -792,48 +807,47 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-                case STATES.ADDRESS:
-                    const addressValidationResponse = await analyzeInput(textRaw, "address");
-                
-                    if (addressValidationResponse.toLowerCase().includes("valid")) {
-                        session.data.address = textRaw;
-                        session.step = STATES.CITY_SELECTION;
-                
-                        // Send city selection buttons immediately
-                        await sendCitySelection(from);
-                    } else {
-                        await sendToWhatsApp(from, addressValidationResponse);
-                        session.step = STATES.ADDRESS;
-                    }
-                    break;
+            case STATES.ADDRESS:
+                const addressValidationResponse = await analyzeInput(textRaw, "address");
 
-                case STATES.CITY_SELECTION:
-                    if (message.interactive && message.interactive.button_reply) {
-                        const citySelection = message.interactive.button_reply.id;
-                        const cityMap = {
-                            "abu_dhabi": "Abu Dhabi",
-                            "dubai": "Dubai",
-                            "sharjah": "Sharjah"
-                        };
-                
-                        if (cityMap[citySelection]) {
-                            session.data.city = cityMap[citySelection];
-                            session.step = STATES.STREET;
-                
-                            // Ask for the street name after city selection
-                            const streetPrompt = await generateMissingFieldPrompt("street");
-                            await sendToWhatsApp(from, streetPrompt);
-                        } else {
-                            // Re-send city selection buttons for invalid selections
-                            await sendCitySelection(from);
-                        }
+                if (addressValidationResponse.toLowerCase().includes("valid")) {
+                    session.data.address = textRaw;
+                    session.step = STATES.CITY_SELECTION;
+
+                    // Directly send city selection buttons without an additional prompt
+                    await sendCitySelection(from);
+                } else {
+                    await sendToWhatsApp(from, addressValidationResponse);
+                    session.step = STATES.ADDRESS;
+                }
+                break;
+
+            case STATES.CITY_SELECTION:
+                if (message.interactive && message.interactive.button_reply) {
+                    const citySelection = message.interactive.button_reply.id;
+                    const cityMap = {
+                        "abu_dhabi": "Abu Dhabi",
+                        "dubai": "Dubai",
+                        "sharjah": "Sharjah"
+                    };
+
+                    if (cityMap[citySelection]) {
+                        session.data.city = cityMap[citySelection];
+                        session.step = STATES.STREET;
+
+                        // Ask for the street name after city selection
+                        const streetPrompt = await generateMissingFieldPrompt("street");
+                        await sendToWhatsApp(from, streetPrompt);
                     } else {
-                        // Send city selection buttons if the message is not interactive
+                        // Re-send city selection buttons for invalid selections
                         await sendCitySelection(from);
                     }
-                    break;
-                
-                
+                } else {
+                    // Send city selection buttons if the message is not interactive
+                    await sendCitySelection(from);
+                }
+                break;
+
             case STATES.STREET:
                 const streetValidationResponse = await analyzeInput(textRaw, "street name"); // Pass language here
 
