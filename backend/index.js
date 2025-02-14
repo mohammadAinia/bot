@@ -10,7 +10,7 @@ if (!process.env.OPENAI_API_KEY || !process.env.WHATSAPP_API_URL || !process.env
     console.error('❌ Missing required environment variables');
     process.exit(1);
 }
-
+//
 const app = express();
 const PORT = process.env.PORT || 5000;
 const VERIFY_TOKEN = "Mohammad";
