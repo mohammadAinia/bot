@@ -106,7 +106,8 @@ const prompts = {
 };
 
 const validations = {
-    name: (input) => input && input.length >= 2 && !/\S+@\S+\.\S+/.test(input), // Exclude email patterns for name
+    // Exclude email patterns for the name field to avoid recording an email as a name.
+    name: (input) => input && input.length >= 2 && !/\S+@\S+\.\S+/.test(input),
     email: (input) => /\S+@\S+\.\S+/.test(input),
     buildingName: (input) => input && input.length >= 3,
     apartmentNumber: (input) => !isNaN(input),
@@ -167,7 +168,7 @@ app.post('/webhook', async (req, res) => {
                     // Initialize or retrieve session
                     if (!userSessions.has(phoneNumber)) {
                         userSessions.set(phoneNumber, { 
-                            flowState: 'IDLE', // Possible states: IDLE, FORM_FILLING, AWAITING_CONFIRMATION, COMPLETED
+                            flowState: 'IDLE', // States: IDLE, FORM_FILLING, AWAITING_CONFIRMATION, COMPLETED
                             formData: {},
                             retryCount: 0
                         });
@@ -182,9 +183,9 @@ app.post('/webhook', async (req, res) => {
                         continue;
                     }
                     
-                    // Handle confirmation state
+                    // Handle confirmation state (bilingual: English & Arabic)
                     if (session.flowState === 'AWAITING_CONFIRMATION') {
-                        if (userMessage && userMessage.toLowerCase().includes('confirm')) {
+                        if (userMessage && (userMessage.toLowerCase().includes('confirm') || userMessage.includes('أكد'))) {
                             try {
                                 await axios.post(API_REQUEST_URL, session.formData);
                                 await sendToWhatsApp(phoneNumber, "✅ Request submitted successfully!\nThank you for choosing Lootah Biofuels!");
@@ -192,45 +193,44 @@ app.post('/webhook', async (req, res) => {
                                 await sendToWhatsApp(phoneNumber, "⚠️ Failed to submit. Please try again later.");
                             }
                             userSessions.delete(phoneNumber);
-                        } else if (userMessage && userMessage.toLowerCase().includes('restart')) {
+                        } else if (userMessage && (userMessage.toLowerCase().includes('restart') || userMessage.toLowerCase().includes('ابدأ') || userMessage.toLowerCase().includes('أعد'))) {
                             session.flowState = 'FORM_FILLING';
                             session.formData = {};
                             session.retryCount = 0;
-                            // Prompt for the first missing field in order
                             const firstMissing = formFlow.find(field => !(field in session.formData));
                             await sendToWhatsApp(phoneNumber, prompts[firstMissing]);
                         } else {
-                            await sendToWhatsApp(phoneNumber, "Please type 'confirm' to submit your request or 'restart' to start over.");
+                            await sendToWhatsApp(phoneNumber, "Please type 'confirm' (أكد) to submit your request or 'restart' (ابدأ من جديد) to start over.");
                         }
                         continue;
                     }
                     
-                    // Start disposal form flow if disposal request is initiated
-                    if (userMessage?.toLowerCase().match(/dispose|submit|request/)) {
+                    // Bilingual disposal request trigger
+                    const disposalKeywords = /dispose|submit|request|تخلص|تقديم|طلب/;
+                    if (userMessage && disposalKeywords.test(userMessage.toLowerCase())) {
                         session.flowState = 'FORM_FILLING';
                         session.formData = {};
                         session.retryCount = 0;
-                        // Prompt for the first missing field in order
                         const firstMissing = formFlow.find(field => !(field in session.formData));
                         await sendToWhatsApp(phoneNumber, prompts[firstMissing]);
                         continue;
                     }
                     
-                    // FORM FILLING STATE MACHINE
+                    // FORM FILLING STATE MACHINE with flexible input parsing
                     if (session.flowState === 'FORM_FILLING') {
-                        // For the current message, try to see if it matches any missing field
+                        // Determine missing fields
                         const missingFields = formFlow.filter(field => !(field in session.formData));
                         let matchedField = null;
                         
-                        // Special handling for location: only accept locationMessage
+                        // For location, only accept a location message
                         if (missingFields.includes('location') && locationMessage) {
                             if (validations.location(locationMessage)) {
                                 matchedField = 'location';
                             }
                         } else if (userMessage) {
-                            // For each missing field (except location), check if the input matches
+                            // Check if userMessage validates for any missing field (except location)
                             for (const field of missingFields) {
-                                if (field === 'location') continue; // skip text for location
+                                if (field === 'location') continue;
                                 if (validations[field](userMessage)) {
                                     matchedField = field;
                                     break;
@@ -239,7 +239,6 @@ app.post('/webhook', async (req, res) => {
                         }
                         
                         if (matchedField) {
-                            // Record the data for the matched field
                             if (matchedField === 'location') {
                                 session.formData.location = {
                                     latitude: locationMessage.latitude,
@@ -256,7 +255,7 @@ app.post('/webhook', async (req, res) => {
                             continue;
                         }
                         
-                        // Determine the next missing field in the predefined order
+                        // Determine the next missing field (in order)
                         const nextMissing = formFlow.find(field => !(field in session.formData));
                         if (nextMissing) {
                             await sendToWhatsApp(phoneNumber, prompts[nextMissing]);
@@ -285,6 +284,7 @@ app.post('/webhook', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+
 
 
 
