@@ -142,27 +142,29 @@ app.post('/webhook', async (req, res) => {
                             { key: "apartmentNumber", prompt: "Great! Lastly, please share your location (latitude and longitude)." },
                             { key: "location", prompt: "Thank you! You're almost done. Let's confirm everything and submit your request." }
                         ];
-
-                        // Store user input based on the current field
-                        if (sessionData.currentField === "name") {
-                            sessionData.data.name = userMessage;
-                            sessionData.currentField = "email";
-                            await sendToWhatsApp(phoneNumber, "Thanks! Now, please share your email.");
-                        } else if (sessionData.currentField === "email") {
-                            sessionData.data.email = userMessage;
-                            sessionData.currentField = "buildingName";
-                            await sendToWhatsApp(phoneNumber, "Got it! Now, please share your building name.");
-                        } else if (sessionData.currentField === "buildingName") {
-                            sessionData.data.buildingName = userMessage;
-                            sessionData.currentField = "apartmentNumber";
-                            await sendToWhatsApp(phoneNumber, "Thanks! Please provide your apartment number.");
-                        } else if (sessionData.currentField === "apartmentNumber") {
-                            sessionData.data.apartmentNumber = userMessage;
-                            sessionData.currentField = "location";
-                            await sendToWhatsApp(phoneNumber, "Great! Lastly, please share your location (latitude and longitude).");
+                    
+                        // Store user input
+                        sessionData.data[sessionData.currentField] = userMessage;
+                    
+                        // Find the next required field
+                        const nextField = requiredFields.find(f => !sessionData.data[f.key]);
+                    
+                        if (nextField) {
+                            sessionData.currentField = nextField.key;
+                            await sendToWhatsApp(phoneNumber, nextField.prompt);
+                        } else {
+                            await sendToWhatsApp(phoneNumber, "Your request is complete! Submitting now...");
+                            try {
+                                await axios.post(API_REQUEST_URL, sessionData.data);
+                                await sendToWhatsApp(phoneNumber, "Your request has been submitted successfully. Thank you!");
+                            } catch (error) {
+                                await sendToWhatsApp(phoneNumber, "Sorry, there was an error submitting your request. Please try again later.");
+                            }
+                            sessionData.isSubmittingRequest = false;
+                            sessionData.currentField = null;
                         }
-                        continue;
                     }
+                    
 
                     // Handle general inquiries (OpenAI Response)
                     const botResponse = await getOpenAIResponse(userMessage, sessionData);
