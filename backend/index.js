@@ -60,10 +60,11 @@ const sendToWhatsApp = async (to, message, buttons = []) => {
     } else {
         // Plain text message
         payload.type = 'text';
-        payload.text = {
+        payload.text = {  // Ensure 'body' is part of the payload
             body: message
         };
     }
+    
 
     try {
         await axios.post(process.env.WHATSAPP_API_URL, payload, {
