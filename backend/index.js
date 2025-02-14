@@ -62,7 +62,6 @@ const sendToWhatsApp = async (to, message, buttons = []) => {
     }
 };
 
-// Get OpenAI response with context based on user query
 const getOpenAIResponse = async (userMessage, sessionData) => {
     const context = `You are a WhatsApp bot for Lootah Biofuels.
     Lootah Biofuels was founded in 2010 in Dubai to address the growing demand for alternative fuels. The company focuses on sustainable energy solutions, including biodiesel production from Used Cooking Oil (UCO). 
