@@ -63,7 +63,6 @@ const sendToWhatsApp = async (to, message, buttons = []) => {
 };
 
 // Use OpenAI only for general inquiries (not disposal requests)
-// ====== IMPROVED VERSION ======
 const getOpenAIResponse = async (userMessage, sessionData) => {
     const context = `You are a WhatsApp bot for Lootah Biofuels. Strictly follow these rules:
 
@@ -107,7 +106,24 @@ const getOpenAIResponse = async (userMessage, sessionData) => {
     }
 };
 
-// ====== ENHANCED WEBHOOK HANDLER ======
+// Define form flow fields, prompts, and validations
+const formFlow = ['name', 'email', 'buildingName', 'apartmentNumber', 'location'];
+const prompts = {
+    name: "Please enter your full name 🖊️",
+    email: "Thanks! Now, please share your email 📧",
+    buildingName: "Got it! What's your building name? 🏢",
+    apartmentNumber: "Please provide your apartment number 🏠",
+    location: "Great! Lastly, please share your location using WhatsApp's location-sharing feature 📍"
+};
+
+const validations = {
+    name: (input) => input && input.length >= 2,
+    email: (input) => /\S+@\S+\.\S+/.test(input),
+    buildingName: (input) => input && input.length >= 3,
+    apartmentNumber: (input) => !isNaN(input),
+    location: (input) => !!input && input.latitude !== undefined && input.longitude !== undefined
+};
+
 app.post('/webhook', async (req, res) => {
     const body = req.body;
     
@@ -126,7 +142,7 @@ app.post('/webhook', async (req, res) => {
                         userSessions.set(phoneNumber, { 
                             flowState: 'IDLE', // IDLE | FORM_FILLING | COMPLETED
                             formData: {},
-                            currentField: null,
+                            currentFieldIndex: 0,
                             retryCount: 0
                         });
                     }
@@ -140,65 +156,79 @@ app.post('/webhook', async (req, res) => {
                         continue;
                     }
 
-                    // Start form flow
+                    // Start disposal form flow if disposal request is initiated
                     if (userMessage?.toLowerCase().match(/dispose|submit|request/)) {
                         session.flowState = 'FORM_FILLING';
-                        session.currentField = 'name';
-                        await sendToWhatsApp(phoneNumber, "Great! Let's start with your full name 🖊️");
+                        session.currentFieldIndex = 0;
+                        session.formData = {};
+                        session.retryCount = 0;
+                        const currentField = formFlow[session.currentFieldIndex];
+                        await sendToWhatsApp(phoneNumber, prompts[currentField]);
                         continue;
                     }
 
-                    // Form filling state machine
+                    // FORM FILLING STATE MACHINE
                     if (session.flowState === 'FORM_FILLING') {
-                        const validation = {
-                            name: (input) => input.length >= 2,
-                            email: (input) => /\S+@\S+\.\S+/.test(input),
-                            buildingName: (input) => input.length >= 3,
-                            apartmentNumber: (input) => !isNaN(input),
-                            location: (input) => !!input?.latitude
-                        };
-
-                        // Handle current field
-                        if (session.currentField === 'location' && locationMessage) {
-                            session.formData.location = locationMessage;
-                            session.currentField = null;
-                        } else if (session.currentField && validation[session.currentField](userMessage)) {
-                            session.formData[session.currentField] = userMessage;
-                            session.retryCount = 0;
+                        const currentField = formFlow[session.currentFieldIndex];
+                        
+                        // Process the "location" field separately
+                        if (currentField === 'location') {
+                            if (locationMessage) {
+                                if (validations.location(locationMessage)) {
+                                    session.formData.location = {
+                                        latitude: locationMessage.latitude,
+                                        longitude: locationMessage.longitude,
+                                        address: locationMessage.address || "Unknown address"
+                                    };
+                                    session.retryCount = 0;
+                                    session.currentFieldIndex++;
+                                } else {
+                                    session.retryCount++;
+                                    await sendToWhatsApp(phoneNumber, "Invalid location data. Please try again 📍");
+                                    continue;
+                                }
+                            } else {
+                                // If expecting location but received text, prompt the user to share their location
+                                await sendToWhatsApp(phoneNumber, "Please share your location using the location-sharing feature instead of typing it.");
+                                continue;
+                            }
                         } else {
-                            session.retryCount++;
-                            await sendToWhatsApp(phoneNumber, "Hmm, that doesn't look right. Please try again 🔄");
-                            continue;
-                        }
-
-                        // Progress to next field
-                        const formFlow = ['name', 'email', 'buildingName', 'apartmentNumber', 'location'];
-                        const nextField = formFlow[formFlow.indexOf(session.currentField) + 1];
-
-                        if (nextField) {
-                            session.currentField = nextField;
-                            const prompts = {
-                                name: "Please enter your full name 🖊️",
-                                email: "Now your email address 📧",
-                                buildingName: "Building name 🏢",
-                                apartmentNumber: "Apartment number 🏠", 
-                                location: "Share your location via WhatsApp's location feature 📍"
-                            };
-                            await sendToWhatsApp(phoneNumber, prompts[nextField]);
-                        } else {
-                            // Submit final data
-                            await axios.post(API_REQUEST_URL, session.formData);
-                            session.flowState = 'COMPLETED';
-                            await sendToWhatsApp(phoneNumber, "✅ Request submitted! Thank you!");
-                            userSessions.delete(phoneNumber);
+                            // Process text input for other fields
+                            if (userMessage && validations[currentField](userMessage)) {
+                                session.formData[currentField] = userMessage;
+                                session.retryCount = 0;
+                                session.currentFieldIndex++;
+                            } else {
+                                session.retryCount++;
+                                await sendToWhatsApp(phoneNumber, "Hmm, that doesn't look right. Please try again 🔄");
+                                continue;
+                            }
                         }
                         
+                        // Check if there are more fields to fill
+                        if (session.currentFieldIndex < formFlow.length) {
+                            const nextField = formFlow[session.currentFieldIndex];
+                            await sendToWhatsApp(phoneNumber, prompts[nextField]);
+                        } else {
+                            // All fields collected; submit the disposal request
+                            await sendToWhatsApp(phoneNumber, "Your request is complete! Submitting now...");
+                            try {
+                                await axios.post(API_REQUEST_URL, session.formData);
+                                await sendToWhatsApp(phoneNumber, "✅ Request submitted! Thank you!");
+                            } catch (error) {
+                                await sendToWhatsApp(phoneNumber, "Sorry, there was an error submitting your request. Please try again later.");
+                            }
+                            // Clear session data
+                            userSessions.delete(phoneNumber);
+                        }
                         continue;
                     }
 
-                    // General conversation
-                    const botResponse = await getOpenAIResponse(userMessage, session);
-                    await sendToWhatsApp(phoneNumber, botResponse);
+                    // GENERAL CONVERSATION (if no disposal request is active)
+                    if (userMessage) {
+                        const botResponse = await getOpenAIResponse(userMessage, session);
+                        await sendToWhatsApp(phoneNumber, botResponse);
+                    }
                 }
             }
         }
@@ -228,8 +258,8 @@ const sendWelcomeMessage = async (phoneNumber) => {
     await sendToWhatsApp(phoneNumber, welcomeMessage, buttons);
 };
 
-// Start the server
 app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+
 
 
 
