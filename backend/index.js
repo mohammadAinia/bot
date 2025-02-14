@@ -238,13 +238,20 @@ const isValidPhone = (phone) => {
 
 const sendCitySelection = async (to) => {
     try {
-        const cityPrompt = "Please select your city from the options below:";
+
+        // Generate the city selection prompt in the detected language
+        const cityPrompt = await getOpenAIResponse(
+            "Ask the user to select their city from the available options.",
+        );
+
+        // Define the buttons for city selection
         const cityButtons = [
             { type: "reply", reply: { id: "abu_dhabi", title: "Abu Dhabi" } },
             { type: "reply", reply: { id: "dubai", title: "Dubai" } },
             { type: "reply", reply: { id: "sharjah", title: "Sharjah" } }
         ];
 
+        // Log the payload being sent
         const payload = {
             messaging_product: "whatsapp",
             recipient_type: "individual",
@@ -258,6 +265,7 @@ const sendCitySelection = async (to) => {
         };
         console.log("City Selection Payload:", JSON.stringify(payload, null, 2));
 
+        // Send the interactive message
         const response = await axios.post(process.env.WHATSAPP_API_URL, payload, {
             headers: {
                 Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
@@ -265,7 +273,7 @@ const sendCitySelection = async (to) => {
             }
         });
 
-        console.log("City Selection Response:", response.data);
+        console.log("City Selection Response:", response.data); // Log the response
     } catch (error) {
         console.error("Error sending city selection:", error.response?.data || error.message);
     }
@@ -273,18 +281,20 @@ const sendCitySelection = async (to) => {
 
 const sendOrderSummary = async (to, session) => {
     try {
-        const summaryText = `✅ *Order Summary:*\n\n` +
-            `🔹 *Name:* ${session.data.name}\n` +
-            `📞 *Phone:* ${session.data.phone}\n` +
-            `📧 *Email:* ${session.data.email}\n` +
-            `📍 *Address:* ${session.data.address}\n` +
-            `🌆 *City:* ${session.data.city}\n` +
-            `🏠 *Street:* ${session.data.street}\n` +
-            `🏢 *Building Name:* ${session.data.building_name}\n` +
-            `🏠 *Flat Number:* ${session.data.flat_no}\n` +
-            `📍 *Location:* (Latitude: ${session.data.latitude}, Longitude: ${session.data.longitude})\n` +
-            `📦 *Quantity:* ${session.data.quantity}\n\n` +
-            `Is the information correct? Please confirm below:`;
+        const summaryText = await getOpenAIResponse(
+            `Generate an order summary in a user-friendly way, including the following details:
+            Name: ${session.data.name},
+            Phone: ${session.data.phone},
+            Email: ${session.data.email},
+            Address: ${session.data.address},
+            City: ${session.data.city},
+            Street: ${session.data.street},
+            Building Name: ${session.data.building_name},
+            Flat Number: ${session.data.flat_no},
+            Location: (Latitude: ${session.data.latitude}, Longitude: ${session.data.longitude}),
+            Quantity: ${session.data.quantity}.
+            Also, ask the user to confirm if the details are correct.`,
+        );
 
         await axios.post(process.env.WHATSAPP_API_URL, {
             messaging_product: "whatsapp",
@@ -293,7 +303,9 @@ const sendOrderSummary = async (to, session) => {
             type: "interactive",
             interactive: {
                 type: "button",
-                body: { text: summaryText },
+                body: {
+                    text: summaryText
+                },
                 action: {
                     buttons: [
                         { type: "reply", reply: { id: "yes_confirm", title: "✅ Yes, Confirm" } },
@@ -309,6 +321,89 @@ const sendOrderSummary = async (to, session) => {
         });
     } catch (error) {
         console.error("❌ Failed to send order summary:", error.response?.data || error.message);
+    }
+};
+
+
+let dataStore = [];  // Array to temporarily store data
+
+function formatPhoneNumber(phoneNumber) {
+    // إزالة أي مسافات أو رموز غير ضرورية
+    let cleanedNumber = phoneNumber.replace(/\D/g, "");
+
+    // التأكد من أن الرقم يبدأ بـ "+"
+    if (!cleanedNumber.startsWith("+")) {
+        cleanedNumber = `+${cleanedNumber}`;
+    }
+    // إضافة مسافة بعد رمز الدولة (أول 3 أو 4 أرقام)
+    const match = cleanedNumber.match(/^\+(\d{1,4})(\d+)$/);
+    if (match) {
+        return `+${match[1]} ${match[2]}`; // إضافة المسافة بعد كود الدولة
+    }
+    return cleanedNumber; // إرجاع الرقم إذا لم ينطبق النمط
+}
+
+
+const STATES = {
+    WELCOME: 0,
+    FAQ: "faq",
+    NAME: 1,
+    PHONE_CONFIRM: "phone_confirm",
+    PHONE_INPUT: "phone_input",
+    EMAIL: 3,
+    ADDRESS: 4,
+    CITY: 7,
+    STREET: 9,
+    BUILDING_NAME: 10,
+    FLAT_NO: 11,
+    LATITUDE: 12,
+    LONGITUDE: 13,
+    QUANTITY: 6,
+    CONFIRMATION: 5,
+    MODIFY: "modify"  // New state for modification
+};
+
+const sendUpdatedSummary = async (to, session) => {
+    try {
+        let summary = `✅ *Updated Order Summary:*\n\n`;
+        summary += `🔹 *Name:* ${session.data.name}\n`;
+        summary += `📞 *Phone Number:* ${session.data.phone}\n`;
+        summary += `📧 *Email:* ${session.data.email}\n`;
+        summary += `📍 *Address:* ${session.data.address}\n`;
+        summary += `🌆 *City:* ${session.data.city}\n`;
+        summary += `🏠 *Street:* ${session.data.street}\n`;
+        summary += `🏢 *Building Name:* ${session.data.building_name}\n`;
+        summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;
+        summary += `📍 *Latitude:* ${session.data.latitude}\n`;
+        summary += `📍 *Longitude:* ${session.data.longitude}\n`;
+        summary += `📦 *Quantity:* ${session.data.quantity}\n\n`;
+        summary += `Is the information correct? Please confirm below:`;
+
+        await axios.post(process.env.WHATSAPP_API_URL, {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: to,
+            type: "interactive",
+            interactive: {
+                type: "button",
+                body: {
+                    text: summary
+                },
+                action: {
+                    buttons: [
+                        { type: "reply", reply: { id: "yes_confirm", title: "✅ Yes" } },
+                        { type: "reply", reply: { id: "no_correct", title: "❌ No" } }
+                    ]
+                }
+            }
+        }, {
+            headers: {
+                "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                "Content-Type": "application/json"
+            }
+        });
+    } catch (error) {
+        console.error("❌ Failed to send updated order summary:", error.response?.data || error.message);
     }
 };
 
@@ -330,7 +425,6 @@ const sendInteractiveButtons = async (to, message, buttons) => {
         }
     });
 };
-
 const sendLocationRequest = async (to, message) => {
     await axios.post(process.env.WHATSAPP_API_URL, {
         messaging_product: "whatsapp",
@@ -349,14 +443,15 @@ const sendLocationRequest = async (to, message) => {
     });
 };
 
+
 function extractQuantity(text) {
-    const match = text.match(/\b\d+\b/);
-    return match ? match[0] : null;
+    const match = text.match(/\b\d+\b/); // Extracts only the first numeric value
+    return match ? match[0] : null; // Returns the number or null if not found
 }
 
 async function extractInformationFromText(text) {
     const extractedData = {
-        quantity: extractQuantity(text)
+        quantity: extractQuantity(text) // Use extractQuantity function
     };
 
     const prompt = `
@@ -379,16 +474,18 @@ async function extractInformationFromText(text) {
         Text: ${text}
     `;
 
-    const aiResponse = await getOpenAIResponse(prompt);
+    const aiResponse = await getOpenAIResponse(prompt); // Pass prompt, not textRaw
 
     try {
         const aiExtractedData = JSON.parse(aiResponse);
         return { ...aiExtractedData, ...extractedData };
     } catch (e) {
         console.error("❌ Failed to parse AI response as JSON:", aiResponse);
-        return extractedData;
+        return extractedData; // Return at least the manually extracted data
     }
 }
+
+
 
 function getMissingFields(sessionData) {
     const requiredFields = [
@@ -407,6 +504,7 @@ function getMissingFields(sessionData) {
                 missingFields.push(field);
             }
         }
+        // For non-string values (like numbers), assume they are valid if they are not null or undefined.
     });
 
     return missingFields;
@@ -422,6 +520,7 @@ const askForNextMissingField = async (session, from) => {
 
     const nextMissingField = missingFields[0];
 
+    // Special handling for city
     if (nextMissingField === 'city') {
         session.step = STATES.CITY_SELECTION;
         return await sendCitySelection(from);
@@ -429,20 +528,7 @@ const askForNextMissingField = async (session, from) => {
 
     session.step = `ASK_${nextMissingField.toUpperCase()}`;
 
-    const fieldPromptMap = {
-        name: "May I have your full name, please? 😊",
-        phone: "Could you share your phone number with us? 📱",
-        email: "What’s your email address? We’ll use it to keep you updated! ✉️",
-        address: "Could you provide your complete address? 🏠",
-        street: "What’s the name of your street? 🛣️",
-        building_name: "Could you tell us the name of your building? 🏢",
-        flat_no: "What’s your flat number? 🏠",
-        latitude: "Please share your live location to help us serve you better! 📍",
-        longitude: "Please share your live location to help us serve you better! 📍",
-        quantity: "How many liters would you like to order? ⛽"
-    };
-
-    const fieldPrompt = fieldPromptMap[nextMissingField];
+    const fieldPrompt = await generateMissingFieldPrompt(nextMissingField);
     if (fieldPrompt) {
         await sendToWhatsApp(from, fieldPrompt);
     } else {
@@ -450,7 +536,6 @@ const askForNextMissingField = async (session, from) => {
         await sendToWhatsApp(from, `Please provide your ${nextMissingField}. 😊`);
     }
 };
-
 async function isQuestionOrRequest(text) {
     const prompt = `
     Classify the user's input into one of the following categories:
@@ -481,13 +566,14 @@ async function isQuestionOrRequest(text) {
     Respond ONLY with one of these words: "request", "question", "greeting", or "other".
 
     **User Input:** "${text}"
-    `;
+`;
 
     const aiResponse = await getOpenAIResponse(prompt);
     const response = aiResponse.trim().toLowerCase();
 
     return response;
 }
+
 
 const generateWelcomeMessage = async () => {
     const systemPrompt = `
@@ -501,6 +587,37 @@ const generateWelcomeMessage = async () => {
     return await getOpenAIResponse("Generate a welcome message.", systemPrompt);
 };
 
+
+
+const generateMissingFieldPrompt = async (field) => {
+    const fieldPromptMap = {
+        name: "Ask the user to provide their full name in a friendly and casual tone. Example: 'May I have your full name, please? 😊'",
+        phone: "Ask the user for their phone number in a casual and friendly way. Example: 'Could you share your phone number with us? 📱'",
+        email: "Ask the user for their email address politely. Example: 'What’s your email address? We’ll use it to keep you updated! ✉️'",
+        address: "Ask the user for their full address in a simple and friendly way. Example: 'Could you provide your complete address? 🏠'",
+        street: "Ask the user for their street name in a cheerful tone. Example: 'What’s the name of your street? 🛣️'",
+        building_name: "Ask the user for their building name in a friendly way. Example: 'Could you tell us the name of your building? 🏢'",
+        flat_no: "Ask the user for their flat number politely. Example: 'What’s your flat number? 🏠'",
+        latitude: "Ask the user to share their live location via WhatsApp. Example: 'Please share your live location to help us serve you better! 📍'",
+        longitude: "Ask the user to share their live location via WhatsApp. Example: 'Please share your live location to help us serve you better! 📍'",
+        quantity: "Ask the user how many liters they want in a friendly tone. Example: 'How many liters would you like to order? ⛽'",
+        // Add city with null to prevent text prompt
+        city: null
+    };
+
+    if (!fieldPromptMap[field]) return null;
+
+    const prompt = `
+        The user is filling out a form. They need to provide their "${field}".
+        Ensure your response is **ONLY** a polite request for the missing field, without any unrelated information.
+        Do **not** mention AI, email, or apologies.
+        Do **not** generate anything except the request prompt.
+        
+        ${fieldPromptMap[field]}
+    `;
+
+    return await getOpenAIResponse(prompt, ``);
+};
 const analyzeInput = async (input, expectedField) => {
     const prompt = `
         You are a helpful assistant for Lootah Biofuels. Your task is to analyze the user's input and determine if it matches the expected field.
@@ -522,11 +639,10 @@ const analyzeInput = async (input, expectedField) => {
         - Do not respond as if you are the user. Your task is to analyze the input and provide a response based on the rules above.
     `;
 
-    const response = await getOpenAIResponse(prompt);
-    console.log(`Analyze Input Response: ${response}`);
+    const response = await getOpenAIResponse(prompt, ``);
+    console.log(`Analyze Input Response: ${response}`); // Debugging
     return response;
 };
-
 const shouldEndRequest = (text) => {
     const endPhrases = [
         "end the request",
@@ -562,8 +678,9 @@ app.post('/webhook', async (req, res) => {
         const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
 
+        // 1. Check if the user wants to end the request
         if (shouldEndRequest(text)) {
-            delete userSessions[from];
+            delete userSessions[from]; // Reset the session
             const welcomeMessage = await generateWelcomeMessage();
             await sendInteractiveButtons(from, welcomeMessage, [
                 { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
@@ -572,6 +689,7 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(200);
         }
 
+        // 2. Initialize user session if it doesn't exist
         if (!userSessions[from]) {
             userSessions[from] = {
                 step: STATES.WELCOME,
@@ -592,13 +710,18 @@ app.post('/webhook', async (req, res) => {
             session.data.phone = formatPhoneNumber(from);
         }
 
+        // 3. Handle interactive button replies (e.g., new request, contact us)
         if (message.interactive && message.interactive.button_reply) {
             const buttonId = message.interactive.button_reply.id;
 
             if (buttonId === "new_request") {
+                // Reset session data for a new request
                 session.data = { phone: formatPhoneNumber(from) };
                 session.step = STATES.NAME;
-                await sendToWhatsApp(from, "May I have your full name, please? 😊");
+
+                // Ask for the user's name
+                const namePrompt = await generateMissingFieldPrompt("name");
+                await sendToWhatsApp(from, namePrompt);
                 return res.sendStatus(200);
             } else if (buttonId === "contact_us") {
                 await sendToWhatsApp(from, "You can reach us at support@example.com. 📞");
@@ -606,6 +729,7 @@ app.post('/webhook', async (req, res) => {
             }
         }
 
+        // 4. Process message based on current step FIRST
         switch (session.step) {
             case STATES.WELCOME:
                 if (message.type === "text") {
@@ -629,9 +753,10 @@ app.post('/webhook', async (req, res) => {
                 const nameValidationResponse = await analyzeInput(textRaw, "name");
 
                 if (nameValidationResponse.toLowerCase().includes("valid")) {
-                    session.data.name = textRaw.trim();
+                    session.data.name = textRaw.trim(); // Trim whitespace
                     session.step = STATES.EMAIL;
-                    await sendToWhatsApp(from, "What’s your email address? We’ll use it to keep you updated! ✉️");
+                    const nextPrompt = await getOpenAIResponse("Thanks! Now, please provide your email.", "");
+                    await sendToWhatsApp(from, nextPrompt);
                 } else {
                     await sendToWhatsApp(from, nameValidationResponse.replace("invalid:", ""));
                 }
@@ -643,41 +768,48 @@ app.post('/webhook', async (req, res) => {
                 if (emailValidationResponse.toLowerCase().includes("valid")) {
                     session.data.email = textRaw;
                     session.step = STATES.LONGITUDE;
-                    await sendLocationRequest(from, "Please share your location to help us serve you better! 📍");
+                    const locationPrompt = await getOpenAIResponse("Please share your location.");
+                    await sendToWhatsApp(from, locationPrompt);
                     session.locationPromptSent = true;
                 } else {
                     await sendToWhatsApp(from, emailValidationResponse);
                 }
                 break;
-
-            case STATES.LONGITUDE:
-                if (message.location) {
-                    const { latitude, longitude } = message.location;
-                    const UAE_BOUNDS = {
-                        minLat: 22.5,
-                        maxLat: 26.5,
-                        minLng: 51.6,
-                        maxLng: 56.5
-                    };
-
-                    if (
-                        latitude >= UAE_BOUNDS.minLat &&
-                        latitude <= UAE_BOUNDS.maxLat &&
-                        longitude >= UAE_BOUNDS.minLng &&
-                        longitude <= UAE_BOUNDS.maxLng
-                    ) {
-                        session.data.latitude = latitude;
-                        session.data.longitude = longitude;
-                        session.step = STATES.CITY_SELECTION;
-                        await sendCitySelection(from);
-                    } else {
-                        await sendToWhatsApp(from, "Invalid location. Please share a valid location within the UAE.");
+                case STATES.LONGITUDE:
+                    if (message.location) {
+                        const { latitude, longitude } = message.location;
+                        const UAE_BOUNDS = {
+                            minLat: 22.5,
+                            maxLat: 26.5,
+                            minLng: 51.6,
+                            maxLng: 56.5
+                        };
+                
+                        if (
+                            latitude >= UAE_BOUNDS.minLat &&
+                            latitude <= UAE_BOUNDS.maxLat &&
+                            longitude >= UAE_BOUNDS.minLng &&
+                            longitude <= UAE_BOUNDS.maxLng
+                        ) {
+                            session.data.latitude = latitude;
+                            session.data.longitude = longitude;
+                            session.step = STATES.CITY_SELECTION;
+                            await sendCitySelection(from);
+                        } else {
+                            await sendToWhatsApp(from, "Invalid location. Please share a valid location within the UAE.");
+                        }
+                    } else if (!session.locationPromptSent) {
+                        const locationPrompt = await getOpenAIResponse("Please share your location by clicking the button below.");
+                        
+                        // This sends a message with a clickable text to open the location-sharing feature
+                        await sendLocationRequest(from, locationPrompt);
+                
+                        session.locationPromptSent = true;
                     }
-                } else if (!session.locationPromptSent) {
-                    await sendLocationRequest(from, "Please share your location by clicking the button below.");
-                    session.locationPromptSent = true;
-                }
-                break;
+                    break;
+                
+                
+
 
             case STATES.CITY_SELECTION:
                 if (message.interactive && message.interactive.button_reply) {
@@ -691,7 +823,8 @@ app.post('/webhook', async (req, res) => {
                     if (cityMap[citySelection]) {
                         session.data.city = cityMap[citySelection];
                         session.step = STATES.ADDRESS;
-                        await sendToWhatsApp(from, "Could you provide your complete address? 🏠");
+                        const addressPrompt = await generateMissingFieldPrompt("address");
+                        await sendToWhatsApp(from, addressPrompt);
                     } else {
                         await sendCitySelection(from);
                     }
@@ -704,7 +837,8 @@ app.post('/webhook', async (req, res) => {
                 if (addressValidationResponse.toLowerCase().includes("valid")) {
                     session.data.address = textRaw;
                     session.step = STATES.STREET;
-                    await sendToWhatsApp(from, "What’s the name of your street? 🛣️");
+                    const streetPrompt = await generateMissingFieldPrompt("street");
+                    await sendToWhatsApp(from, streetPrompt);
                 } else {
                     await sendToWhatsApp(from, addressValidationResponse);
                 }
@@ -716,7 +850,8 @@ app.post('/webhook', async (req, res) => {
                 if (streetValidationResponse.toLowerCase().includes("valid")) {
                     session.data.street = textRaw;
                     session.step = STATES.BUILDING_NAME;
-                    await sendToWhatsApp(from, "Could you tell us the name of your building? 🏢");
+                    const buildingPrompt = await getOpenAIResponse("Please provide the building name.");
+                    await sendToWhatsApp(from, buildingPrompt);
                 } else {
                     await sendToWhatsApp(from, streetValidationResponse);
                 }
@@ -728,7 +863,8 @@ app.post('/webhook', async (req, res) => {
                 if (buildingValidationResponse.toLowerCase().includes("valid")) {
                     session.data.building_name = textRaw;
                     session.step = STATES.FLAT_NO;
-                    await sendToWhatsApp(from, "What’s your flat number? 🏠");
+                    const flatPrompt = await getOpenAIResponse("Please provide your apartment number.");
+                    await sendToWhatsApp(from, flatPrompt);
                 } else {
                     await sendToWhatsApp(from, buildingValidationResponse);
                 }
@@ -740,7 +876,8 @@ app.post('/webhook', async (req, res) => {
                 if (flatValidationResponse.toLowerCase().includes("valid")) {
                     session.data.flat_no = textRaw;
                     session.step = STATES.QUANTITY;
-                    await sendToWhatsApp(from, "How many liters would you like to order? ⛽");
+                    const quantityPrompt = await getOpenAIResponse("Please provide the quantity.");
+                    await sendToWhatsApp(from, quantityPrompt);
                 } else {
                     await sendToWhatsApp(from, flatValidationResponse);
                 }
@@ -752,11 +889,148 @@ app.post('/webhook', async (req, res) => {
                 if (quantityValidationResponse.toLowerCase().includes("valid")) {
                     session.data.quantity = extractQuantity(textRaw);
                     session.step = STATES.CONFIRMATION;
-                    await sendOrderSummary(from, session);
+                    const summary = await getOpenAIResponse("Here is your order summary. Please confirm.");
+                    sendOrderSummary(from, session, summary);
                 } else {
                     await sendToWhatsApp(from, quantityValidationResponse);
                 }
                 break;
+
+
+            case "ASK_NAME": {
+                session.data.name = textRaw;
+                const missingAfterName = getMissingFields(session.data);
+                if (missingAfterName.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    await askForNextMissingField(session, from, missingAfterName);
+                }
+                break;
+            }
+
+            case "ASK_EMAIL": {
+                if (!isValidEmail(textRaw)) {
+                    await sendToWhatsApp(from, "❌ Invalid email address, please enter a valid one.");
+                    return res.sendStatus(200);
+                }
+                session.data.email = textRaw;
+                const missingAfterEmail = getMissingFields(session.data);
+                if (missingAfterEmail.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    await askForNextMissingField(session, from, missingAfterEmail);
+                }
+                break;
+            }
+
+            case "ASK_ADDRESS": {
+                session.data.address = textRaw;
+                const missingAfterAddress = getMissingFields(session.data);
+                if (missingAfterAddress.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    await askForNextMissingField(session, from, missingAfterAddress);
+                }
+                break;
+            }
+
+            case "ASK_CITY": {
+                session.step = STATES.CITY_SELECTION;
+                return await sendCitySelection(from);
+            }
+
+            case "ASK_STREET": {
+                session.data.street = textRaw;
+                const missingAfterStreet = getMissingFields(session.data);
+                if (missingAfterStreet.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    await askForNextMissingField(session, from, missingAfterStreet);
+                }
+                break;
+            }
+
+            case "ASK_BUILDING_NAME": {
+                session.data.building_name = textRaw;
+                const missingAfterBuilding = getMissingFields(session.data);
+                if (missingAfterBuilding.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    await askForNextMissingField(session, from, missingAfterBuilding);
+                }
+                break;
+            }
+
+            case "ASK_FLAT_NO": {
+                session.data.flat_no = textRaw;
+                const missingAfterFlat = getMissingFields(session.data);
+                if (missingAfterFlat.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    await askForNextMissingField(session, from, missingAfterFlat);
+                }
+                break;
+            }
+
+            case "ASK_LATITUDE": {
+                if (message.location) {
+                    session.data.latitude = message.location.latitude;
+                    session.data.longitude = message.location.longitude;
+                    const missingAfterLocation = getMissingFields(session.data);
+                    if (missingAfterLocation.length === 0) {
+                        session.step = STATES.CONFIRMATION;
+                        await sendOrderSummary(from, session);
+                    } else {
+                        await askForNextMissingField(session, from, missingAfterLocation);
+                    }
+                } else {
+                    await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
+                }
+                break;
+            }
+
+            case "ASK_LONGITUDE": {
+                if (message.location) {
+                    session.data.latitude = message.location.latitude;
+                    session.data.longitude = message.location.longitude;
+                    const missingAfterLocation = getMissingFields(session.data);
+                    if (missingAfterLocation.length === 0) {
+                        session.step = STATES.CONFIRMATION;
+                        await sendOrderSummary(from, session);
+                    } else {
+                        await askForNextMissingField(session, from, missingAfterLocation);
+                    }
+                } else {
+                    await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
+                }
+                break;
+            }
+
+            case "ASK_QUANTITY": {
+                const quantity = extractQuantity(textRaw);
+
+                if (!quantity) {
+                    await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
+                    return res.sendStatus(200);
+                }
+
+                session.data.quantity = quantity;
+                const missingAfterQuantity = getMissingFields(session.data);
+
+                if (missingAfterQuantity.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    await askForNextMissingField(session, from, missingAfterQuantity);
+                }
+                break;
+            }
 
             case STATES.CONFIRMATION:
                 if (message.type === "interactive" && message.interactive.type === "button_reply") {
