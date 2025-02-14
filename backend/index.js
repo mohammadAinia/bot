@@ -62,50 +62,6 @@ const sendToWhatsApp = async (to, message, buttons = []) => {
     }
 };
 
-// Use OpenAI only for general inquiries (not disposal requests)
-const getOpenAIResponse = async (userMessage, sessionData) => {
-    const context = `You are a WhatsApp bot for Lootah Biofuels. Strictly follow these rules:
-
-1. When handling oil disposal requests:
-- Collect information in EXACTLY this order:
-  1. Name
-  2. Email
-  3. Building name
-  4. Apartment number
-  5. Location (via location-sharing)
-- Ask ONE question at a time
-- Never deviate from this order
-- Confirm each input before proceeding
-
-2. For general inquiries:
-- Answer questions about biodiesel production, UCO collection, fuel storage, and delivery
-- Keep responses under 2 sentences
-
-3. Conversation rules:
-- Use friendly emojis
-- Never suggest other services during form filling
-- If user goes off-track during form filling, say: "Let's finish your disposal request first!"`;
-
-    try {
-        const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-            model: 'gpt-4',
-            messages: [
-                { 
-                    role: 'system', 
-                    content: context + `\n\nCurrent Session State: ${JSON.stringify(sessionData)}` 
-                },
-                { role: 'user', content: userMessage }
-            ],
-            temperature: 0.3 // Reduce randomness
-        });
-
-        return response.data.choices[0].message.content;
-    } catch (error) {
-        console.error('❌ OpenAI API error:', error.response?.data || error.message);
-        return "Sorry, I couldn't process your request. Please try again later.";
-    }
-};
-
 // Define form flow fields, prompts, and validations
 const formFlow = ['name', 'email', 'buildingName', 'apartmentNumber', 'location'];
 const prompts = {
@@ -124,6 +80,18 @@ const validations = {
     location: (input) => !!input && input.latitude !== undefined && input.longitude !== undefined
 };
 
+// Generate submission summary
+const generateSubmissionSummary = (formData) => {
+    return `📋 Request Summary:
+• Name: ${formData.name}
+• Email: ${formData.email}
+• Building: ${formData.buildingName}
+• Apartment: ${formData.apartmentNumber}
+• Location: ${formData.location.address || 'Shared via GPS'}
+    
+Please confirm these details are correct.`;
+};
+
 app.post('/webhook', async (req, res) => {
     const body = req.body;
     
@@ -140,7 +108,7 @@ app.post('/webhook', async (req, res) => {
                     // Initialize or retrieve session
                     if (!userSessions.has(phoneNumber)) {
                         userSessions.set(phoneNumber, { 
-                            flowState: 'IDLE', // Possible states: IDLE, FORM_FILLING, AWAITING_CONFIRMATION, COMPLETED
+                            flowState: 'IDLE',
                             formData: {},
                             currentFieldIndex: 0,
                             retryCount: 0
@@ -148,111 +116,29 @@ app.post('/webhook', async (req, res) => {
                     }
 
                     const session = userSessions.get(phoneNumber);
-
+                    
                     // Handle form abandonment
                     if (session.flowState === 'FORM_FILLING' && session.retryCount > 2) {
                         await sendToWhatsApp(phoneNumber, "Seems like you want to stop. Type 'restart' to begin again.");
                         session.flowState = 'IDLE';
                         continue;
                     }
-
+                    
                     // If waiting for confirmation, check user's reply
                     if (session.flowState === 'AWAITING_CONFIRMATION') {
-                        if (userMessage && userMessage.toLowerCase().includes('confirm')) {
-                            await sendToWhatsApp(phoneNumber, "Your request is complete! Submitting now...");
+                        if (userMessage?.toLowerCase().includes('confirm')) {
                             try {
                                 await axios.post(API_REQUEST_URL, session.formData);
-                                await sendToWhatsApp(phoneNumber, "✅ Request submitted! Thank you!");
+                                await sendToWhatsApp(phoneNumber, "✅ Request submitted successfully!\nThank you for choosing Lootah Biofuels!");
                             } catch (error) {
-                                await sendToWhatsApp(phoneNumber, "Sorry, there was an error submitting your request. Please try again later.");
+                                await sendToWhatsApp(phoneNumber, "⚠️ Failed to submit. Please try again later.");
                             }
                             userSessions.delete(phoneNumber);
-                        } else if (userMessage && userMessage.toLowerCase().includes('restart')) {
-                            session.flowState = 'FORM_FILLING';
-                            session.currentFieldIndex = 0;
-                            session.formData = {};
-                            session.retryCount = 0;
-                            const currentField = formFlow[session.currentFieldIndex];
-                            await sendToWhatsApp(phoneNumber, prompts[currentField]);
                         } else {
-                            await sendToWhatsApp(phoneNumber, "Please type 'confirm' to submit your request or 'restart' to start over.");
+                            await sendToWhatsApp(phoneNumber, "Request cancelled. Type 'start' to begin again.");
+                            userSessions.delete(phoneNumber);
                         }
                         continue;
-                    }
-
-                    // Start disposal form flow if disposal request is initiated
-                    if (userMessage?.toLowerCase().match(/dispose|submit|request/)) {
-                        session.flowState = 'FORM_FILLING';
-                        session.currentFieldIndex = 0;
-                        session.formData = {};
-                        session.retryCount = 0;
-                        const currentField = formFlow[session.currentFieldIndex];
-                        await sendToWhatsApp(phoneNumber, prompts[currentField]);
-                        continue;
-                    }
-
-                    // FORM FILLING STATE MACHINE
-                    if (session.flowState === 'FORM_FILLING') {
-                        const currentField = formFlow[session.currentFieldIndex];
-                        
-                        // Process the "location" field separately
-                        if (currentField === 'location') {
-                            if (locationMessage) {
-                                if (validations.location(locationMessage)) {
-                                    session.formData.location = {
-                                        latitude: locationMessage.latitude,
-                                        longitude: locationMessage.longitude,
-                                        address: locationMessage.address || "Unknown address"
-                                    };
-                                    session.retryCount = 0;
-                                    session.currentFieldIndex++;
-                                } else {
-                                    session.retryCount++;
-                                    await sendToWhatsApp(phoneNumber, "Invalid location data. Please try again 📍");
-                                    continue;
-                                }
-                            } else {
-                                await sendToWhatsApp(phoneNumber, "Please share your location using the location-sharing feature instead of typing it.");
-                                continue;
-                            }
-                        } else {
-                            // Process text input for other fields
-                            if (userMessage && validations[currentField](userMessage)) {
-                                session.formData[currentField] = userMessage;
-                                session.retryCount = 0;
-                                session.currentFieldIndex++;
-                            } else {
-                                session.retryCount++;
-                                await sendToWhatsApp(phoneNumber, "Hmm, that doesn't look right. Please try again 🔄");
-                                continue;
-                            }
-                        }
-                        
-                        // Check if there are more fields to fill
-                        if (session.currentFieldIndex < formFlow.length) {
-                            const nextField = formFlow[session.currentFieldIndex];
-                            await sendToWhatsApp(phoneNumber, prompts[nextField]);
-                        } else {
-                            // All fields collected; send summary and ask for confirmation
-                            let summary = "Here is the summary of your disposal request:\n";
-                            summary += `Name: ${session.formData.name}\n`;
-                            summary += `Email: ${session.formData.email}\n`;
-                            summary += `Building Name: ${session.formData.buildingName}\n`;
-                            summary += `Apartment Number: ${session.formData.apartmentNumber}\n`;
-                            if (session.formData.location) {
-                                summary += `Location: Lat ${session.formData.location.latitude}, Lon ${session.formData.location.longitude}, Address: ${session.formData.location.address}\n`;
-                            }
-                            summary += "\nPlease type 'confirm' to submit your request or 'restart' to start over.";
-                            session.flowState = 'AWAITING_CONFIRMATION';
-                            await sendToWhatsApp(phoneNumber, summary);
-                        }
-                        continue;
-                    }
-
-                    // GENERAL CONVERSATION (if no disposal request is active)
-                    if (userMessage) {
-                        const botResponse = await getOpenAIResponse(userMessage, session);
-                        await sendToWhatsApp(phoneNumber, botResponse);
                     }
                 }
             }
@@ -261,29 +147,8 @@ app.post('/webhook', async (req, res) => {
     res.sendStatus(200);
 });
 
-// Send a welcome message with buttons for first interaction.
-const sendWelcomeMessage = async (phoneNumber) => {
-    const welcomeMessage = await getOpenAIResponse("Generate a welcome message for a new user.");
-    const buttons = [
-        {
-            "type": "reply",
-            "reply": {
-                "id": "1",
-                "title": "Disposal Request"
-            }
-        },
-        {
-            "type": "reply",
-            "reply": {
-                "id": "2",
-                "title": "Service Inquiry"
-            }
-        }
-    ];
-    await sendToWhatsApp(phoneNumber, welcomeMessage, buttons);
-};
-
 app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+
 
 
 
