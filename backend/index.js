@@ -713,6 +713,9 @@ app.post('/webhook', async (req, res) => {
             if (missingFields.length === 0) {
                 session.step = STATES.CONFIRMATION;
                 await sendOrderSummary(from, session);
+            } else if (missingFields.includes("city")) {
+                session.step = STATES.CITY_SELECTION;
+                await sendCitySelection(from);
             } else {
                 await askForNextMissingField(session, from);
             }
@@ -751,9 +754,12 @@ app.post('/webhook', async (req, res) => {
                     const missingFields = getMissingFields(session.data);
                     if (missingFields.length === 0) {
                         session.step = STATES.CONFIRMATION;
-                        await sendOrderSummary(from, session); // Pass language here
+                        await sendOrderSummary(from, session);
+                    } else if (missingFields.includes("city")) {
+                        session.step = STATES.CITY_SELECTION;
+                        await sendCitySelection(from);
                     } else {
-                        await askForNextMissingField(session, from); // Pass language here
+                        await askForNextMissingField(session, from);
                     }
                 }
                 break;
@@ -763,11 +769,11 @@ app.post('/webhook', async (req, res) => {
 
                 if (nameValidationResponse.toLowerCase().includes("valid")) {
                     session.data.name = textRaw;
-                    await askForNextMissingField(session, from); // Pass language here
+                    await askForNextMissingField(session, from);
                 } else if (nameValidationResponse.startsWith("alternative:")) {
                     const altField = nameValidationResponse.split(":")[1];
                     session.data[altField] = textRaw; // Store the alternative data
-                    await askForNextMissingField(session, from); // Pass language here
+                    await askForNextMissingField(session, from);
                 } else {
                     await sendToWhatsApp(from, nameValidationResponse.replace("invalid:", ""));
                 }
@@ -985,6 +991,7 @@ app.post('/webhook', async (req, res) => {
                 session.step = STATES.CITY_SELECTION; // Set session state properly before sending buttons
                 return await sendCitySelection(from); // Ensure only one message is sent
             }
+        
             case "ASK_STREET": {
                 session.data.street = textRaw;
                 const missingAfterStreet = getMissingFields(session.data);
