@@ -140,7 +140,7 @@ app.post('/webhook', async (req, res) => {
                     // Initialize or retrieve session
                     if (!userSessions.has(phoneNumber)) {
                         userSessions.set(phoneNumber, { 
-                            flowState: 'IDLE', // IDLE | FORM_FILLING | COMPLETED
+                            flowState: 'IDLE', // Possible states: IDLE, FORM_FILLING, AWAITING_CONFIRMATION, COMPLETED
                             formData: {},
                             currentFieldIndex: 0,
                             retryCount: 0
@@ -153,6 +153,30 @@ app.post('/webhook', async (req, res) => {
                     if (session.flowState === 'FORM_FILLING' && session.retryCount > 2) {
                         await sendToWhatsApp(phoneNumber, "Seems like you want to stop. Type 'restart' to begin again.");
                         session.flowState = 'IDLE';
+                        continue;
+                    }
+
+                    // If waiting for confirmation, check user's reply
+                    if (session.flowState === 'AWAITING_CONFIRMATION') {
+                        if (userMessage && userMessage.toLowerCase().includes('confirm')) {
+                            await sendToWhatsApp(phoneNumber, "Your request is complete! Submitting now...");
+                            try {
+                                await axios.post(API_REQUEST_URL, session.formData);
+                                await sendToWhatsApp(phoneNumber, "✅ Request submitted! Thank you!");
+                            } catch (error) {
+                                await sendToWhatsApp(phoneNumber, "Sorry, there was an error submitting your request. Please try again later.");
+                            }
+                            userSessions.delete(phoneNumber);
+                        } else if (userMessage && userMessage.toLowerCase().includes('restart')) {
+                            session.flowState = 'FORM_FILLING';
+                            session.currentFieldIndex = 0;
+                            session.formData = {};
+                            session.retryCount = 0;
+                            const currentField = formFlow[session.currentFieldIndex];
+                            await sendToWhatsApp(phoneNumber, prompts[currentField]);
+                        } else {
+                            await sendToWhatsApp(phoneNumber, "Please type 'confirm' to submit your request or 'restart' to start over.");
+                        }
                         continue;
                     }
 
@@ -188,7 +212,6 @@ app.post('/webhook', async (req, res) => {
                                     continue;
                                 }
                             } else {
-                                // If expecting location but received text, prompt the user to share their location
                                 await sendToWhatsApp(phoneNumber, "Please share your location using the location-sharing feature instead of typing it.");
                                 continue;
                             }
@@ -210,16 +233,18 @@ app.post('/webhook', async (req, res) => {
                             const nextField = formFlow[session.currentFieldIndex];
                             await sendToWhatsApp(phoneNumber, prompts[nextField]);
                         } else {
-                            // All fields collected; submit the disposal request
-                            await sendToWhatsApp(phoneNumber, "Your request is complete! Submitting now...");
-                            try {
-                                await axios.post(API_REQUEST_URL, session.formData);
-                                await sendToWhatsApp(phoneNumber, "✅ Request submitted! Thank you!");
-                            } catch (error) {
-                                await sendToWhatsApp(phoneNumber, "Sorry, there was an error submitting your request. Please try again later.");
+                            // All fields collected; send summary and ask for confirmation
+                            let summary = "Here is the summary of your disposal request:\n";
+                            summary += `Name: ${session.formData.name}\n`;
+                            summary += `Email: ${session.formData.email}\n`;
+                            summary += `Building Name: ${session.formData.buildingName}\n`;
+                            summary += `Apartment Number: ${session.formData.apartmentNumber}\n`;
+                            if (session.formData.location) {
+                                summary += `Location: Lat ${session.formData.location.latitude}, Lon ${session.formData.location.longitude}, Address: ${session.formData.location.address}\n`;
                             }
-                            // Clear session data
-                            userSessions.delete(phoneNumber);
+                            summary += "\nPlease type 'confirm' to submit your request or 'restart' to start over.";
+                            session.flowState = 'AWAITING_CONFIRMATION';
+                            await sendToWhatsApp(phoneNumber, summary);
                         }
                         continue;
                     }
@@ -259,6 +284,7 @@ const sendWelcomeMessage = async (phoneNumber) => {
 };
 
 app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+
 
 
 
