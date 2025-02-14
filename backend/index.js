@@ -101,7 +101,7 @@ app.post('/webhook', async (req, res) => {
     if (body.object === 'whatsapp_business_account') {
         for (const entry of body.entry) {
             for (const message of entry.changes) {
-                if (!message.value.messages || !Array.isArray(message.value.messages) || message.value.messages.length === 0) {
+                if (!message.value.messages || !Array.isArray(message.value.messages)) {
                     console.error('❌ No messages found in the incoming webhook data.');
                     continue;
                 }
@@ -112,6 +112,7 @@ app.post('/webhook', async (req, res) => {
 
                 if (!userMessage && !locationMessage) continue;
 
+                // Initialize session if it doesn't exist
                 if (!userSessions.has(phoneNumber)) {
                     userSessions.set(phoneNumber, { isSubmittingRequest: false, data: {}, currentField: null });
                     await sendWelcomeMessage(phoneNumber);
@@ -120,50 +121,61 @@ app.post('/webhook', async (req, res) => {
 
                 const sessionData = userSessions.get(phoneNumber);
 
-                if (userMessage) {
-                    if (userMessage.toLowerCase().includes("submit disposal request") || userMessage.toLowerCase().includes("dispose oil")) {
-                        sessionData.isSubmittingRequest = true;
-                        sessionData.data = {};
-                        sessionData.currentField = "name";
-                        await sendToWhatsApp(phoneNumber, "Great! Let's start your oil disposal request. What's your name?");
-                        continue;
-                    }
-
-                    if (sessionData.isSubmittingRequest) {
-                        const requiredFields = [
-                            { key: "name", prompt: "Thanks! Now, please share your email." },
-                            { key: "email", prompt: "Got it! Now, please share your building name." },
-                            { key: "buildingName", prompt: "Thanks! Please provide your apartment number." },
-                            { key: "apartmentNumber", prompt: "Great! Lastly, please share your location (latitude and longitude)." },
-                            { key: "location", prompt: "Thank you! You're almost done. Let's confirm everything and submit your request." }
-                        ];
-
-                        sessionData.data[sessionData.currentField] = userMessage;
-                        const nextField = requiredFields.find(f => !sessionData.data[f.key]);
-
-                        if (nextField) {
-                            sessionData.currentField = nextField.key;
-                            await sendToWhatsApp(phoneNumber, nextField.prompt);
-                        } else {
-                            await sendToWhatsApp(phoneNumber, "Your request is complete! Submitting now...");
-                            try {
-                                await axios.post(API_REQUEST_URL, sessionData.data);
-                                await sendToWhatsApp(phoneNumber, "Your request has been submitted successfully. Thank you!");
-                            } catch (error) {
-                                await sendToWhatsApp(phoneNumber, "Sorry, there was an error submitting your request. Please try again later.");
-                            }
-                            sessionData.isSubmittingRequest = false;
-                            sessionData.currentField = null;
-                        }
-                        continue;
-                    }
-                    
-                    if (!sessionData.isSubmittingRequest) {
-                        const botResponse = await getOpenAIResponse(userMessage, sessionData);
-                        await sendToWhatsApp(phoneNumber, botResponse);
-                    }
+                // Start the oil disposal request process
+                if (userMessage && (userMessage.toLowerCase().includes("submit disposal request") || userMessage.toLowerCase().includes("dispose oil"))) {
+                    sessionData.isSubmittingRequest = true;
+                    sessionData.data = {};
+                    sessionData.currentField = "name";
+                    await sendToWhatsApp(phoneNumber, "Great! Let's start your oil disposal request. What's your name?");
+                    continue;
                 }
 
+                // Handle the oil disposal request process
+                if (sessionData.isSubmittingRequest) {
+                    const requiredFields = [
+                        { key: "name", prompt: "Thanks! Now, please share your email." },
+                        { key: "email", prompt: "Got it! Now, please share your building name." },
+                        { key: "buildingName", prompt: "Thanks! Please provide your apartment number." },
+                        { key: "apartmentNumber", prompt: "Great! Lastly, please share your location (latitude and longitude)." },
+                        { key: "location", prompt: "Thank you! You're almost done. Let's confirm everything and submit your request." }
+                    ];
+
+                    // Save the user's response to the current field
+                    if (sessionData.currentField) {
+                        sessionData.data[sessionData.currentField] = userMessage;
+                    }
+
+                    // Find the next field that hasn't been filled yet
+                    const nextField = requiredFields.find(f => !sessionData.data[f.key]);
+
+                    if (nextField) {
+                        // Move to the next field and prompt the user
+                        sessionData.currentField = nextField.key;
+                        await sendToWhatsApp(phoneNumber, nextField.prompt);
+                    } else {
+                        // All fields are filled, submit the request
+                        await sendToWhatsApp(phoneNumber, "Your request is complete! Submitting now...");
+                        try {
+                            await axios.post(API_REQUEST_URL, sessionData.data);
+                            await sendToWhatsApp(phoneNumber, "Your request has been submitted successfully. Thank you!");
+                        } catch (error) {
+                            await sendToWhatsApp(phoneNumber, "Sorry, there was an error submitting your request. Please try again later.");
+                        }
+                        // Reset the session
+                        sessionData.isSubmittingRequest = false;
+                        sessionData.currentField = null;
+                        sessionData.data = {};
+                    }
+                    continue;
+                }
+
+                // Handle non-request-related messages
+                if (!sessionData.isSubmittingRequest) {
+                    const botResponse = await getOpenAIResponse(userMessage, sessionData);
+                    await sendToWhatsApp(phoneNumber, botResponse);
+                }
+
+                // Handle location sharing
                 if (locationMessage && sessionData.isSubmittingRequest && sessionData.currentField === "location") {
                     sessionData.data.location = {
                         latitude: locationMessage.latitude,
@@ -181,8 +193,10 @@ app.post('/webhook', async (req, res) => {
                         } catch (error) {
                             await sendToWhatsApp(phoneNumber, "Sorry, there was an error submitting your request. Please try again later.");
                         }
+                        // Reset the session
                         sessionData.isSubmittingRequest = false;
                         sessionData.currentField = null;
+                        sessionData.data = {};
                     } else {
                         await sendToWhatsApp(phoneNumber, "Thank you for sharing your location. Please provide the remaining details.");
                     }
@@ -194,7 +208,6 @@ app.post('/webhook', async (req, res) => {
         res.sendStatus(404);
     }
 });
-
 
 
 // Send a welcome message with buttons for first interaction
