@@ -172,6 +172,14 @@ const sendWelcomeMessage = async (phoneNumber) => {
         );
     }
 };
+const validations = {
+    name: (input) => typeof input === 'string' && input.trim().length > 1,
+    email: (input) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input),
+    buildingName: (input) => typeof input === 'string' && input.trim().length > 1,
+    apartmentNumber: (input) => /^\d+$/.test(input),
+    location: (input) => input && typeof input.latitude === 'number' && typeof input.longitude === 'number'
+};
+
 
 app.post('/webhook', async (req, res) => {
     const body = req.body;
