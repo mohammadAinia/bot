@@ -735,6 +735,12 @@ app.post('/webhook', async (req, res) => {
             await sendToWhatsApp(from, aiResponse);
             return res.sendStatus(200);
         }
+        if (inputType === "greeting" || inputType === "other") {
+            if (text.includes("thank")) {
+                await sendToWhatsApp(from, "You're welcome!");
+            }
+            return res.sendStatus(200);
+        }
 
         // Handle messages based on the current state
         switch (session.step) {
