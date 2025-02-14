@@ -106,7 +106,7 @@ const prompts = {
 };
 
 const validations = {
-    name: (input) => input && input.length >= 2,
+    name: (input) => input && input.length >= 2 && !/\S+@\S+\.\S+/.test(input), // Exclude email patterns for name
     email: (input) => /\S+@\S+\.\S+/.test(input),
     buildingName: (input) => input && input.length >= 3,
     apartmentNumber: (input) => !isNaN(input),
@@ -169,7 +169,6 @@ app.post('/webhook', async (req, res) => {
                         userSessions.set(phoneNumber, { 
                             flowState: 'IDLE', // Possible states: IDLE, FORM_FILLING, AWAITING_CONFIRMATION, COMPLETED
                             formData: {},
-                            currentFieldIndex: 0,
                             retryCount: 0
                         });
                     }
@@ -195,11 +194,11 @@ app.post('/webhook', async (req, res) => {
                             userSessions.delete(phoneNumber);
                         } else if (userMessage && userMessage.toLowerCase().includes('restart')) {
                             session.flowState = 'FORM_FILLING';
-                            session.currentFieldIndex = 0;
                             session.formData = {};
                             session.retryCount = 0;
-                            const currentField = formFlow[session.currentFieldIndex];
-                            await sendToWhatsApp(phoneNumber, prompts[currentField]);
+                            // Prompt for the first missing field in order
+                            const firstMissing = formFlow.find(field => !(field in session.formData));
+                            await sendToWhatsApp(phoneNumber, prompts[firstMissing]);
                         } else {
                             await sendToWhatsApp(phoneNumber, "Please type 'confirm' to submit your request or 'restart' to start over.");
                         }
@@ -209,55 +208,58 @@ app.post('/webhook', async (req, res) => {
                     // Start disposal form flow if disposal request is initiated
                     if (userMessage?.toLowerCase().match(/dispose|submit|request/)) {
                         session.flowState = 'FORM_FILLING';
-                        session.currentFieldIndex = 0;
                         session.formData = {};
                         session.retryCount = 0;
-                        const currentField = formFlow[session.currentFieldIndex];
-                        await sendToWhatsApp(phoneNumber, prompts[currentField]);
+                        // Prompt for the first missing field in order
+                        const firstMissing = formFlow.find(field => !(field in session.formData));
+                        await sendToWhatsApp(phoneNumber, prompts[firstMissing]);
                         continue;
                     }
                     
                     // FORM FILLING STATE MACHINE
                     if (session.flowState === 'FORM_FILLING') {
-                        const currentField = formFlow[session.currentFieldIndex];
+                        // For the current message, try to see if it matches any missing field
+                        const missingFields = formFlow.filter(field => !(field in session.formData));
+                        let matchedField = null;
                         
-                        // Process the "location" field separately
-                        if (currentField === 'location') {
-                            if (locationMessage) {
-                                if (validations.location(locationMessage)) {
-                                    session.formData.location = {
-                                        latitude: locationMessage.latitude,
-                                        longitude: locationMessage.longitude,
-                                        address: locationMessage.address || "Unknown address"
-                                    };
-                                    session.retryCount = 0;
-                                    session.currentFieldIndex++;
-                                } else {
-                                    session.retryCount++;
-                                    await sendToWhatsApp(phoneNumber, "Invalid location data. Please try again 📍");
-                                    continue;
-                                }
-                            } else {
-                                await sendToWhatsApp(phoneNumber, "Please share your location using the location-sharing feature instead of typing it.");
-                                continue;
+                        // Special handling for location: only accept locationMessage
+                        if (missingFields.includes('location') && locationMessage) {
+                            if (validations.location(locationMessage)) {
+                                matchedField = 'location';
                             }
-                        } else {
-                            // Process text input for other fields
-                            if (userMessage && validations[currentField](userMessage)) {
-                                session.formData[currentField] = userMessage;
-                                session.retryCount = 0;
-                                session.currentFieldIndex++;
-                            } else {
-                                session.retryCount++;
-                                await sendToWhatsApp(phoneNumber, "Hmm, that doesn't look right. Please try again 🔄");
-                                continue;
+                        } else if (userMessage) {
+                            // For each missing field (except location), check if the input matches
+                            for (const field of missingFields) {
+                                if (field === 'location') continue; // skip text for location
+                                if (validations[field](userMessage)) {
+                                    matchedField = field;
+                                    break;
+                                }
                             }
                         }
                         
-                        // Check if there are more fields to fill
-                        if (session.currentFieldIndex < formFlow.length) {
-                            const nextField = formFlow[session.currentFieldIndex];
-                            await sendToWhatsApp(phoneNumber, prompts[nextField]);
+                        if (matchedField) {
+                            // Record the data for the matched field
+                            if (matchedField === 'location') {
+                                session.formData.location = {
+                                    latitude: locationMessage.latitude,
+                                    longitude: locationMessage.longitude,
+                                    address: locationMessage.address || "Unknown address"
+                                };
+                            } else {
+                                session.formData[matchedField] = userMessage;
+                            }
+                            session.retryCount = 0;
+                        } else {
+                            session.retryCount++;
+                            await sendToWhatsApp(phoneNumber, "Hmm, that doesn't look right. Please try again 🔄");
+                            continue;
+                        }
+                        
+                        // Determine the next missing field in the predefined order
+                        const nextMissing = formFlow.find(field => !(field in session.formData));
+                        if (nextMissing) {
+                            await sendToWhatsApp(phoneNumber, prompts[nextMissing]);
                         } else {
                             // All fields collected; send summary and ask for confirmation
                             const summary = generateSubmissionSummary(session.formData);
@@ -283,6 +285,7 @@ app.post('/webhook', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+
 
 
 
