@@ -64,19 +64,19 @@ const sendToWhatsApp = async (to, message, buttons = []) => {
 
 const getOpenAIResponse = async (userMessage, sessionData) => {
     const context = `You are a WhatsApp bot for Lootah Biofuels.
-    Lootah Biofuels was founded in 2010 in Dubai to address the growing demand for alternative fuels. The company focuses on sustainable energy solutions, including biodiesel production from Used Cooking Oil (UCO). 
-    Mission: Deliver economic, operational, and environmental benefits for long-term customer satisfaction and sustainable growth.
-    Services: Biodiesel production, fuel storage solutions, UCO collection, and fuel delivery.
-    
+Lootah Biofuels was founded in 2010 in Dubai to address the growing demand for alternative fuels. The company focuses on sustainable energy solutions, including biodiesel production from Used Cooking Oil (UCO). 
+Mission: Deliver economic, operational, and environmental benefits for long-term customer satisfaction and sustainable growth.
+Services: Biodiesel production, fuel storage solutions, UCO collection, and fuel delivery.
+
 You help users by:
 - Responding to company-related inquiries based on the company information provided.
 - Dynamically handling used cooking oil disposal requests.
-- Collecting the following details: Name, Phone (automatically detected from the user's number), Email, Address (neighborhood where he lives), Location (latitude, longitude, street), Building name, Apartment number, City (Dubai, Abu Dhabi, Sharjah, Umm Al Quwain, Al Khaimah).
-- Collect these details step by step and not all the information in one message
-- After collecting each piece of information, record it and save it to send a summary of all the information provided
+- Collecting the following details: Name, Phone (automatically detected), Email, Address (neighborhood), Location (latitude, longitude, street), Building name, Apartment number, City (Dubai, Abu Dhabi, Sharjah, Umm Al Quwain, Al Khaimah).
+- Collect these details step by step – not all in one message.
+- After collecting each piece of information, record it to send a summary.
 - Politely ask for missing details and confirm before sending.
 - Sending valid requests to ${API_REQUEST_URL}.
-- Use concise, polite and engaging language.`;
+- Use concise, polite, and engaging language.`;
 
     try {
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
@@ -96,31 +96,38 @@ You help users by:
     }
 };
 
+const requiredFields = [
+    { key: "name", prompt: "Thanks! Now, please share your email." },
+    { key: "email", prompt: "Got it! Now, please share your building name." },
+    { key: "buildingName", prompt: "Thanks! Please provide your apartment number." },
+    { key: "apartmentNumber", prompt: "Great! Lastly, please share your location (latitude and longitude) using the location-sharing feature." },
+    { key: "location", prompt: "Thank you! You're almost done. Let's confirm everything and submit your request." }
+];
+
 app.post('/webhook', async (req, res) => {
     const body = req.body;
-    console.log('Incoming webhook payload:', JSON.stringify(body, null, 2)); // Log the full payload for debugging
+    console.log('Incoming webhook payload:', JSON.stringify(body, null, 2)); // Debug log
 
     if (body.object === 'whatsapp_business_account') {
         for (const entry of body.entry) {
             for (const change of entry.changes) {
-                // Check if the change contains valid messages
                 if (!change.value.messages || !Array.isArray(change.value.messages)) {
-                    console.error('❌ No messages found in the incoming webhook data. This could be a status update or other event.');
-                    continue; // Skip this change and proceed to the next one
+                    console.error('❌ No messages found in the incoming webhook data.');
+                    continue;
                 }
 
-                // Process each message in the messages array
                 for (const message of change.value.messages) {
                     const phoneNumber = message.from;
                     const userMessage = message.text?.body;
                     const locationMessage = message.location;
 
+                    // Skip messages without text or location
                     if (!userMessage && !locationMessage) {
-                        console.error('❌ No valid message content found (text or location).');
-                        continue; // Skip this message and proceed to the next one
+                        console.error('❌ No valid message content found.');
+                        continue;
                     }
 
-                    // Initialize session if it doesn't exist
+                    // Initialize session if new user
                     if (!userSessions.has(phoneNumber)) {
                         userSessions.set(phoneNumber, { isSubmittingRequest: false, data: {}, currentField: null });
                         await sendWelcomeMessage(phoneNumber);
@@ -129,7 +136,7 @@ app.post('/webhook', async (req, res) => {
 
                     const sessionData = userSessions.get(phoneNumber);
 
-                    // Handle the oil disposal request process
+                    // Start the disposal request process
                     if (userMessage && (userMessage.toLowerCase().includes("submit disposal request") || userMessage.toLowerCase().includes("dispose oil"))) {
                         sessionData.isSubmittingRequest = true;
                         sessionData.data = {};
@@ -138,30 +145,33 @@ app.post('/webhook', async (req, res) => {
                         continue;
                     }
 
-                    // Handle the oil disposal request process
+                    // Process disposal request if active
                     if (sessionData.isSubmittingRequest) {
-                        const requiredFields = [
-                            { key: "name", prompt: "Thanks! Now, please share your email." },
-                            { key: "email", prompt: "Got it! Now, please share your building name." },
-                            { key: "buildingName", prompt: "Thanks! Please provide your apartment number." },
-                            { key: "apartmentNumber", prompt: "Great! Lastly, please share your location (latitude and longitude)." },
-                            { key: "location", prompt: "Thank you! You're almost done. Let's confirm everything and submit your request." }
-                        ];
-
-                        // Save the user's response to the current field
-                        if (sessionData.currentField) {
-                            sessionData.data[sessionData.currentField] = userMessage || "Unknown";
+                        // If current field is 'location' and a location message is received
+                        if (locationMessage && sessionData.currentField === "location") {
+                            sessionData.data.location = {
+                                latitude: locationMessage.latitude,
+                                longitude: locationMessage.longitude,
+                                address: locationMessage.address || "Unknown address"
+                            };
+                        } else if (userMessage) {
+                            // If the current field is 'location' but user sends text, prompt them to share location properly
+                            if (sessionData.currentField === "location") {
+                                await sendToWhatsApp(phoneNumber, "Please share your location using the location-sharing feature instead of typing it.");
+                                continue;
+                            }
+                            // Otherwise, save the text response for the current field
+                            sessionData.data[sessionData.currentField] = userMessage;
                         }
 
-                        // Find the next field that hasn't been filled yet
+                        // Determine the next field that hasn't been filled
                         const nextField = requiredFields.find(f => !sessionData.data[f.key]);
 
                         if (nextField) {
-                            // Move to the next field and prompt the user
                             sessionData.currentField = nextField.key;
                             await sendToWhatsApp(phoneNumber, nextField.prompt);
                         } else {
-                            // All fields are filled, submit the request
+                            // All fields are filled – submit the request
                             await sendToWhatsApp(phoneNumber, "Your request is complete! Submitting now...");
                             try {
                                 await axios.post(API_REQUEST_URL, sessionData.data);
@@ -174,40 +184,14 @@ app.post('/webhook', async (req, res) => {
                             sessionData.currentField = null;
                             sessionData.data = {};
                         }
+                        // After processing disposal request messages, skip further processing
                         continue;
                     }
 
-                    // Handle non-request-related messages
-                    if (!sessionData.isSubmittingRequest) {
+                    // Process non-request messages (general inquiries)
+                    if (!sessionData.isSubmittingRequest && userMessage) {
                         const botResponse = await getOpenAIResponse(userMessage, sessionData);
                         await sendToWhatsApp(phoneNumber, botResponse);
-                    }
-
-                    // Handle location sharing
-                    if (locationMessage && sessionData.isSubmittingRequest && sessionData.currentField === "location") {
-                        sessionData.data.location = {
-                            latitude: locationMessage.latitude,
-                            longitude: locationMessage.longitude,
-                            address: locationMessage.address || "Unknown address"
-                        };
-
-                        const requiredFields = ["name", "email", "buildingName", "apartmentNumber", "location"];
-                        const isComplete = requiredFields.every(field => sessionData.data[field]);
-
-                        if (isComplete) {
-                            try {
-                                await axios.post(API_REQUEST_URL, sessionData.data);
-                                await sendToWhatsApp(phoneNumber, "Your request has been submitted successfully. Thank you!");
-                            } catch (error) {
-                                await sendToWhatsApp(phoneNumber, "Sorry, there was an error submitting your request. Please try again later.");
-                            }
-                            // Reset the session
-                            sessionData.isSubmittingRequest = false;
-                            sessionData.currentField = null;
-                            sessionData.data = {};
-                        } else {
-                            await sendToWhatsApp(phoneNumber, "Thank you for sharing your location. Please provide the remaining details.");
-                        }
                     }
                 }
             }
@@ -218,8 +202,7 @@ app.post('/webhook', async (req, res) => {
     }
 });
 
-
-// Send a welcome message with buttons for first interaction
+// Send a welcome message with buttons for the first interaction
 const sendWelcomeMessage = async (phoneNumber) => {
     const welcomeMessage = await getOpenAIResponse("Generate a welcome message for a new user.", {});
     const buttons = [
@@ -227,14 +210,14 @@ const sendWelcomeMessage = async (phoneNumber) => {
             "type": "reply",
             "reply": {
                 "id": "1",
-                "title": "Disposal Request" // Shortened to 17 characters
+                "title": "Disposal Request"
             }
         },
         {
             "type": "reply",
             "reply": {
                 "id": "2",
-                "title": "Service Inquiry" // Shortened to 16 characters
+                "title": "Service Inquiry"
             }
         }
     ];
@@ -244,6 +227,7 @@ const sendWelcomeMessage = async (phoneNumber) => {
 
 // Start the server
 app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+
 
 
 // "https://api.lootahbiofuels.com/api/v1/whatsapp_request"
