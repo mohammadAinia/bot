@@ -33,7 +33,7 @@ app.get("/webhook", (req, res) => {
 
 // Send message to WhatsApp with optional buttons
 const sendToWhatsApp = async (to, message, buttons = []) => {
-    let payload = {
+    const payload = {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
         to: to,
@@ -42,7 +42,7 @@ const sendToWhatsApp = async (to, message, buttons = []) => {
 
     if (buttons.length) {
         payload.interactive = {
-            type: "button", 
+            type: "button",
             body: { text: message },
             action: { buttons: buttons }
         };
@@ -62,21 +62,13 @@ const sendToWhatsApp = async (to, message, buttons = []) => {
     }
 };
 
-const getOpenAIResponse = async (userMessage, sessionData) => {
+// Use OpenAI only for general inquiries (not disposal requests)
+const getOpenAIResponse = async (userMessage) => {
     const context = `You are a WhatsApp bot for Lootah Biofuels.
-Lootah Biofuels was founded in 2010 in Dubai to address the growing demand for alternative fuels. The company focuses on sustainable energy solutions, including biodiesel production from Used Cooking Oil (UCO). 
-Mission: Deliver economic, operational, and environmental benefits for long-term customer satisfaction and sustainable growth.
-Services: Biodiesel production, fuel storage solutions, UCO collection, and fuel delivery.
-
-You help users by:
-- Responding to company-related inquiries based on the company information provided.
-- Dynamically handling used cooking oil disposal requests.
-- Collecting the following details: Name, Phone (automatically detected), Email, Address (neighborhood), Location (latitude, longitude, street), Building name, Apartment number, City (Dubai, Abu Dhabi, Sharjah, Umm Al Quwain, Al Khaimah).
-- Collect these details step by step – not all in one message.
-- After collecting each piece of information, record it to send a summary.
-- Politely ask for missing details and confirm before sending.
-- Sending valid requests to ${API_REQUEST_URL}.
-- Use concise, polite, and engaging language.`;
+Lootah Biofuels was founded in 2010 in Dubai to address the growing demand for alternative fuels.
+Your role is to answer general inquiries about our services such as biodiesel production, fuel storage, used cooking oil (UCO) collection, and fuel delivery.
+Do not handle disposal request step-by-step – that is managed by dedicated code.
+Use concise, polite, and engaging language.`;
 
     try {
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
@@ -88,7 +80,6 @@ You help users by:
         }, {
             headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` }
         });
-
         return response.data.choices[0].message.content;
     } catch (error) {
         console.error('❌ OpenAI API error:', error.response?.data || error.message);
@@ -96,6 +87,7 @@ You help users by:
     }
 };
 
+// Define the order of fields for disposal requests
 const requiredFields = [
     { key: "name", prompt: "Thanks! Now, please share your email." },
     { key: "email", prompt: "Got it! Now, please share your building name." },
@@ -106,7 +98,7 @@ const requiredFields = [
 
 app.post('/webhook', async (req, res) => {
     const body = req.body;
-    console.log('Incoming webhook payload:', JSON.stringify(body, null, 2)); // Debug log
+    console.log('Incoming webhook payload:', JSON.stringify(body, null, 2));
 
     if (body.object === 'whatsapp_business_account') {
         for (const entry of body.entry) {
@@ -121,7 +113,7 @@ app.post('/webhook', async (req, res) => {
                     const userMessage = message.text?.body;
                     const locationMessage = message.location;
 
-                    // Skip messages without text or location
+                    // Skip messages with neither text nor location
                     if (!userMessage && !locationMessage) {
                         console.error('❌ No valid message content found.');
                         continue;
@@ -136,7 +128,7 @@ app.post('/webhook', async (req, res) => {
 
                     const sessionData = userSessions.get(phoneNumber);
 
-                    // Start the disposal request process
+                    // START: Disposal request flow
                     if (userMessage && (userMessage.toLowerCase().includes("submit disposal request") || userMessage.toLowerCase().includes("dispose oil"))) {
                         sessionData.isSubmittingRequest = true;
                         sessionData.data = {};
@@ -145,9 +137,9 @@ app.post('/webhook', async (req, res) => {
                         continue;
                     }
 
-                    // Process disposal request if active
+                    // If a disposal request is active, handle it exclusively:
                     if (sessionData.isSubmittingRequest) {
-                        // If current field is 'location' and a location message is received
+                        // Handle location: if current field is "location"
                         if (locationMessage && sessionData.currentField === "location") {
                             sessionData.data.location = {
                                 latitude: locationMessage.latitude,
@@ -155,23 +147,23 @@ app.post('/webhook', async (req, res) => {
                                 address: locationMessage.address || "Unknown address"
                             };
                         } else if (userMessage) {
-                            // If the current field is 'location' but user sends text, prompt them to share location properly
+                            // If we are expecting a location but receive text, ask the user to share their location properly.
                             if (sessionData.currentField === "location") {
                                 await sendToWhatsApp(phoneNumber, "Please share your location using the location-sharing feature instead of typing it.");
                                 continue;
                             }
-                            // Otherwise, save the text response for the current field
+                            // Otherwise, record the answer for the current field.
                             sessionData.data[sessionData.currentField] = userMessage;
                         }
 
-                        // Determine the next field that hasn't been filled
+                        // Determine the next field that hasn't been filled.
                         const nextField = requiredFields.find(f => !sessionData.data[f.key]);
 
                         if (nextField) {
                             sessionData.currentField = nextField.key;
                             await sendToWhatsApp(phoneNumber, nextField.prompt);
                         } else {
-                            // All fields are filled – submit the request
+                            // All fields are filled; submit the disposal request.
                             await sendToWhatsApp(phoneNumber, "Your request is complete! Submitting now...");
                             try {
                                 await axios.post(API_REQUEST_URL, sessionData.data);
@@ -179,18 +171,19 @@ app.post('/webhook', async (req, res) => {
                             } catch (error) {
                                 await sendToWhatsApp(phoneNumber, "Sorry, there was an error submitting your request. Please try again later.");
                             }
-                            // Reset the session
+                            // Reset the session.
                             sessionData.isSubmittingRequest = false;
                             sessionData.currentField = null;
                             sessionData.data = {};
                         }
-                        // After processing disposal request messages, skip further processing
+                        // End disposal request processing here.
                         continue;
                     }
+                    // END: Disposal request flow
 
-                    // Process non-request messages (general inquiries)
-                    if (!sessionData.isSubmittingRequest && userMessage) {
-                        const botResponse = await getOpenAIResponse(userMessage, sessionData);
+                    // If no disposal request is active, process the message as a general inquiry.
+                    if (userMessage) {
+                        const botResponse = await getOpenAIResponse(userMessage);
                         await sendToWhatsApp(phoneNumber, botResponse);
                     }
                 }
@@ -202,9 +195,9 @@ app.post('/webhook', async (req, res) => {
     }
 });
 
-// Send a welcome message with buttons for the first interaction
+// Send a welcome message with buttons for first interaction.
 const sendWelcomeMessage = async (phoneNumber) => {
-    const welcomeMessage = await getOpenAIResponse("Generate a welcome message for a new user.", {});
+    const welcomeMessage = await getOpenAIResponse("Generate a welcome message for a new user.");
     const buttons = [
         {
             "type": "reply",
@@ -221,7 +214,6 @@ const sendWelcomeMessage = async (phoneNumber) => {
             }
         }
     ];
-
     await sendToWhatsApp(phoneNumber, welcomeMessage, buttons);
 };
 
