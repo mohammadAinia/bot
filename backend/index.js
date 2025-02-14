@@ -783,11 +783,28 @@ app.post('/webhook', async (req, res) => {
 
                 if (nameValidationResponse.toLowerCase().includes("valid")) {
                     session.data.name = textRaw;
-                    await askForNextMissingField(session, from);
+
+                    // Check for any remaining missing fields after receiving the name
+                    const missingAfterName = getMissingFields(session.data);
+                    if (missingAfterName.length === 0) {
+                        session.step = STATES.CONFIRMATION;
+                        await sendOrderSummary(from, session);
+                    } else {
+                        // Ask for the next missing field using the updated list
+                        await askForNextMissingField(session, from, missingAfterName);
+                    }
                 } else if (nameValidationResponse.startsWith("alternative:")) {
                     const altField = nameValidationResponse.split(":")[1];
                     session.data[altField] = textRaw; // Store the alternative data
-                    await askForNextMissingField(session, from);
+
+                    // Check for missing fields after handling the alternative data
+                    const missingAfterName = getMissingFields(session.data);
+                    if (missingAfterName.length === 0) {
+                        session.step = STATES.CONFIRMATION;
+                        await sendOrderSummary(from, session);
+                    } else {
+                        await askForNextMissingField(session, from, missingAfterName);
+                    }
                 } else {
                     await sendToWhatsApp(from, nameValidationResponse.replace("invalid:", ""));
                 }
