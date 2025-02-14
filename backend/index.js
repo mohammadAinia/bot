@@ -425,6 +425,24 @@ const sendInteractiveButtons = async (to, message, buttons) => {
         }
     });
 };
+const sendLocationRequest = async (to, message) => {
+    await axios.post(process.env.WHATSAPP_API_URL, {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: to,
+        type: "text",
+        text: { 
+            body: message + "\n\n📍 *Click here to send your location:*",
+            preview_url: false
+        }
+    }, {
+        headers: {
+            "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+            "Content-Type": "application/json"
+        }
+    });
+};
+
 
 function extractQuantity(text) {
     const match = text.match(/\b\d+\b/); // Extracts only the first numeric value
@@ -736,43 +754,11 @@ app.post('/webhook', async (req, res) => {
 
                 if (nameValidationResponse.toLowerCase().includes("valid")) {
                     session.data.name = textRaw.trim(); // Trim whitespace
-                    const missingAfterName = getMissingFields(session.data);
-                    if (missingAfterName.length === 0) {
-                        session.step = STATES.CONFIRMATION;
-                        await sendOrderSummary(from, session);
-                    } else {
-                        await askForNextMissingField(session, from, missingAfterName);
-                    }
-                } else if (nameValidationResponse.startsWith("alternative:")) {
-                    const altField = nameValidationResponse.split(":")[1];
-                    session.data[altField] = textRaw; // Store the alternative data
-                    const missingAfterName = getMissingFields(session.data);
-                    if (missingAfterName.length === 0) {
-                        session.step = STATES.CONFIRMATION;
-                        await sendOrderSummary(from, session);
-                    } else {
-                        await askForNextMissingField(session, from, missingAfterName);
-                    }
+                    session.step = STATES.EMAIL;
+                    const nextPrompt = await getOpenAIResponse("Thanks! Now, please provide your email.", "");
+                    await sendToWhatsApp(from, nextPrompt);
                 } else {
                     await sendToWhatsApp(from, nameValidationResponse.replace("invalid:", ""));
-                }
-                break;
-
-            case STATES.PHONE_INPUT:
-                const phoneValidationResponse = await analyzeInput(textRaw, "phone number");
-
-                if (phoneValidationResponse.toLowerCase().includes("valid")) {
-                    session.data.phone = formatPhoneNumber(textRaw);
-                    session.step = STATES.EMAIL;
-                    const nextPrompt = await getOpenAIResponse("Thanks! Now, please provide your email.", ``);
-                    await sendToWhatsApp(from, nextPrompt);
-                } else if (phoneValidationResponse.startsWith("alternative:")) {
-                    const altField = phoneValidationResponse.split(":")[1];
-                    session.data[altField] = textRaw; // Store the alternative data
-                    const missingFields = getMissingFields(session.data);
-                    await askForNextMissingField(session, from, missingFields);
-                } else {
-                    await sendToWhatsApp(from, phoneValidationResponse.replace("invalid:", ""));
                 }
                 break;
 
@@ -781,27 +767,49 @@ app.post('/webhook', async (req, res) => {
 
                 if (emailValidationResponse.toLowerCase().includes("valid")) {
                     session.data.email = textRaw;
-                    session.step = STATES.ADDRESS;
-                    const addressPrompt = await generateMissingFieldPrompt("address");
-                    await sendToWhatsApp(from, addressPrompt);
+                    session.step = STATES.LONGITUDE;
+                    const locationPrompt = await getOpenAIResponse("Please share your location.");
+                    await sendToWhatsApp(from, locationPrompt);
+                    session.locationPromptSent = true;
                 } else {
                     await sendToWhatsApp(from, emailValidationResponse);
-                    session.step = STATES.EMAIL;
                 }
                 break;
+                case STATES.LONGITUDE:
+                    if (message.location) {
+                        const { latitude, longitude } = message.location;
+                        const UAE_BOUNDS = {
+                            minLat: 22.5,
+                            maxLat: 26.5,
+                            minLng: 51.6,
+                            maxLng: 56.5
+                        };
+                
+                        if (
+                            latitude >= UAE_BOUNDS.minLat &&
+                            latitude <= UAE_BOUNDS.maxLat &&
+                            longitude >= UAE_BOUNDS.minLng &&
+                            longitude <= UAE_BOUNDS.maxLng
+                        ) {
+                            session.data.latitude = latitude;
+                            session.data.longitude = longitude;
+                            session.step = STATES.CITY_SELECTION;
+                            await sendCitySelection(from);
+                        } else {
+                            await sendToWhatsApp(from, "Invalid location. Please share a valid location within the UAE.");
+                        }
+                    } else if (!session.locationPromptSent) {
+                        const locationPrompt = await getOpenAIResponse("Please share your location by clicking the button below.");
+                        
+                        // This sends a message with a clickable text to open the location-sharing feature
+                        await sendLocationRequest(from, locationPrompt);
+                
+                        session.locationPromptSent = true;
+                    }
+                    break;
+                
+                
 
-            case STATES.ADDRESS:
-                const addressValidationResponse = await analyzeInput(textRaw, "address");
-
-                if (addressValidationResponse.toLowerCase().includes("valid")) {
-                    session.data.address = textRaw;
-                    session.step = STATES.CITY_SELECTION;
-                    await sendCitySelection(from);
-                } else {
-                    await sendToWhatsApp(from, addressValidationResponse);
-                    session.step = STATES.ADDRESS;
-                }
-                break;
 
             case STATES.CITY_SELECTION:
                 if (message.interactive && message.interactive.button_reply) {
@@ -814,23 +822,25 @@ app.post('/webhook', async (req, res) => {
 
                     if (cityMap[citySelection]) {
                         session.data.city = cityMap[citySelection];
-                        session.step = STATES.STREET;
-                        const streetPrompt = await generateMissingFieldPrompt("street");
-                        await sendToWhatsApp(from, streetPrompt);
+                        session.step = STATES.ADDRESS;
+                        const addressPrompt = await generateMissingFieldPrompt("address");
+                        await sendToWhatsApp(from, addressPrompt);
                     } else {
                         await sendCitySelection(from);
                     }
-                } else if (message.type === "text") {
-                    const extractedData = await extractInformationFromText(textRaw);
-                    if (extractedData.city) {
-                        session.data.city = extractedData.city;
-                        session.step = STATES.STREET;
-                        const streetPrompt = await generateMissingFieldPrompt("street");
-                        await sendToWhatsApp(from, streetPrompt);
-                    } else {
-                        await sendToWhatsApp(from, "Please select your city using the buttons below 👇");
-                        await sendCitySelection(from);
-                    }
+                }
+                break;
+
+            case STATES.ADDRESS:
+                const addressValidationResponse = await analyzeInput(textRaw, "address");
+
+                if (addressValidationResponse.toLowerCase().includes("valid")) {
+                    session.data.address = textRaw;
+                    session.step = STATES.STREET;
+                    const streetPrompt = await generateMissingFieldPrompt("street");
+                    await sendToWhatsApp(from, streetPrompt);
+                } else {
+                    await sendToWhatsApp(from, addressValidationResponse);
                 }
                 break;
 
@@ -840,11 +850,10 @@ app.post('/webhook', async (req, res) => {
                 if (streetValidationResponse.toLowerCase().includes("valid")) {
                     session.data.street = textRaw;
                     session.step = STATES.BUILDING_NAME;
-                    const streetResponse = await getOpenAIResponse(`User provided the street ${textRaw}. Ask them for the building name.`);
-                    await sendToWhatsApp(from, streetResponse);
+                    const buildingPrompt = await getOpenAIResponse("Please provide the building name.");
+                    await sendToWhatsApp(from, buildingPrompt);
                 } else {
                     await sendToWhatsApp(from, streetValidationResponse);
-                    session.step = STATES.STREET;
                 }
                 break;
 
@@ -854,11 +863,10 @@ app.post('/webhook', async (req, res) => {
                 if (buildingValidationResponse.toLowerCase().includes("valid")) {
                     session.data.building_name = textRaw;
                     session.step = STATES.FLAT_NO;
-                    const buildingResponse = await getOpenAIResponse(`User provided the building name ${textRaw}. Ask them for the flat number.`);
-                    await sendToWhatsApp(from, buildingResponse);
+                    const flatPrompt = await getOpenAIResponse("Please provide your apartment number.");
+                    await sendToWhatsApp(from, flatPrompt);
                 } else {
                     await sendToWhatsApp(from, buildingValidationResponse);
-                    session.step = STATES.BUILDING_NAME;
                 }
                 break;
 
@@ -867,50 +875,11 @@ app.post('/webhook', async (req, res) => {
 
                 if (flatValidationResponse.toLowerCase().includes("valid")) {
                     session.data.flat_no = textRaw;
-                    session.step = STATES.LONGITUDE;
-                    const flatResponse = await getOpenAIResponse(`User provided the flat number ${textRaw}. Ask them to share their location.`);
-                    if (!session.locationPromptSent) {
-                        await sendToWhatsApp(from, flatResponse);
-                        session.locationPromptSent = true;
-                    }
+                    session.step = STATES.QUANTITY;
+                    const quantityPrompt = await getOpenAIResponse("Please provide the quantity.");
+                    await sendToWhatsApp(from, quantityPrompt);
                 } else {
                     await sendToWhatsApp(from, flatValidationResponse);
-                    session.step = STATES.FLAT_NO;
-                }
-                break;
-
-            case STATES.LONGITUDE:
-                if (message.location) {
-                    const { latitude, longitude } = message.location;
-                    const UAE_BOUNDS = {
-                        minLat: 22.5,
-                        maxLat: 26.5,
-                        minLng: 51.6,
-                        maxLng: 56.5
-                    };
-
-                    if (
-                        latitude >= UAE_BOUNDS.minLat &&
-                        latitude <= UAE_BOUNDS.maxLat &&
-                        longitude >= UAE_BOUNDS.minLng &&
-                        longitude <= UAE_BOUNDS.maxLng
-                    ) {
-                        session.data.latitude = latitude;
-                        session.data.longitude = longitude;
-                        session.step = STATES.QUANTITY;
-                        session.awaitingQuantityInput = true;
-                        const locationResponse = await getOpenAIResponse("User shared a valid location within the UAE. Now, ask them for the quantity.");
-                        await sendToWhatsApp(from, locationResponse);
-                    } else {
-                        const invalidLocationResponse = await getOpenAIResponse("User shared an invalid location outside the UAE. Ask them to provide a valid location within the UAE.");
-                        await sendToWhatsApp(from, invalidLocationResponse);
-                    }
-                } else {
-                    if (!session.locationPromptSent) {
-                        const missingPrompt = await getOpenAIResponse("The user hasn't shared their location yet. Kindly ask them again to share their live location.");
-                        await sendToWhatsApp(from, missingPrompt);
-                        session.locationPromptSent = true;
-                    }
                 }
                 break;
 
@@ -920,13 +889,13 @@ app.post('/webhook', async (req, res) => {
                 if (quantityValidationResponse.toLowerCase().includes("valid")) {
                     session.data.quantity = extractQuantity(textRaw);
                     session.step = STATES.CONFIRMATION;
-                    const summary = await getOpenAIResponse("User provided a valid quantity. Now, provide the order summary.");
+                    const summary = await getOpenAIResponse("Here is your order summary. Please confirm.");
                     sendOrderSummary(from, session, summary);
                 } else {
                     await sendToWhatsApp(from, quantityValidationResponse);
-                    session.step = STATES.QUANTITY;
                 }
                 break;
+
 
             case "ASK_NAME": {
                 session.data.name = textRaw;
