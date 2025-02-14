@@ -99,14 +99,15 @@ Current session state: ${JSON.stringify(sessionData)}`;
 };
 
 // Define form flow fields and bilingual prompts
-const formFlow = ['name', 'email', 'buildingName', 'apartmentNumber', 'location'];
+const formFlow = ['name', 'email', 'buildingName', 'apartmentNumber', 'location', 'oilQuantity'];
 
 const prompts_en = {
     name: "Please enter your full name 🖊️",
     email: "Thanks! Now, please share your email 📧",
     buildingName: "Got it! What's your building name? 🏢",
     apartmentNumber: "Please provide your apartment number 🏠",
-    location: "Great! Lastly, please share your location using WhatsApp's location-sharing feature 📍"
+    location: "Great! Lastly, please share your location using WhatsApp's location-sharing feature 📍",
+    oilQuantity: "How much oil are you looking to dispose of (in liters)? 🛢️"
 };
 
 const prompts_ar = {
@@ -114,8 +115,10 @@ const prompts_ar = {
     email: "شكرًا! الآن، من فضلك شارك بريدك الإلكتروني 📧",
     buildingName: "حسنًا! ما اسم المبنى الخاص بك؟ 🏢",
     apartmentNumber: "من فضلك، اذكر رقم الشقة 🏠",
-    location: "رائع! أخيرًا، شارك موقعك باستخدام ميزة مشاركة الموقع على واتساب 📍"
+    location: "رائع! أخيرًا، شارك موقعك باستخدام ميزة مشاركة الموقع على واتساب 📍",
+    oilQuantity: "كمية الزيت التي ترغب في التخلص منها (باللترات)؟ 🛢️"
 };
+
 
 // Define bilingual error messages
 const errorMessage_en = "Hmm, that doesn't look right. Please try again 🔄";
@@ -132,6 +135,7 @@ const generateSubmissionSummary_en = (formData) => {
 • Building: ${formData.buildingName}
 • Apartment: ${formData.apartmentNumber}
 • Location: ${formData.location.address || 'Shared via GPS'}
+• Oil Quantity: ${formData.oilQuantity} liters
 
 Please type 'confirm' to submit your request or 'restart' to start over.`;
 };
@@ -143,9 +147,11 @@ const generateSubmissionSummary_ar = (formData) => {
 • اسم المبنى: ${formData.buildingName}
 • رقم الشقة: ${formData.apartmentNumber}
 • الموقع: ${formData.location.address || 'تم المشاركة عبر GPS'}
+• كمية الزيت: ${formData.oilQuantity} لتر
 
 يرجى كتابة "أكد" لتأكيد طلبك أو "ابدأ من جديد" لإعادة البدء.`;
 };
+
 
 // Enhanced welcome message system (bilingual)
 const sendWelcomeMessage = async (phoneNumber) => {
@@ -177,8 +183,10 @@ const validations = {
     email: (input) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input),
     buildingName: (input) => typeof input === 'string' && input.trim().length > 1,
     apartmentNumber: (input) => /^\d+$/.test(input),
-    location: (input) => input && typeof input.latitude === 'number' && typeof input.longitude === 'number'
+    location: (input) => input && typeof input.latitude === 'number' && typeof input.longitude === 'number',
+    oilQuantity: (input) => !isNaN(input) && parseFloat(input) > 0
 };
+
 
 
 app.post('/webhook', async (req, res) => {
@@ -265,62 +273,76 @@ app.post('/webhook', async (req, res) => {
                     }
                     
                     // FORM FILLING STATE MACHINE with flexible input parsing
-                    if (session.flowState === 'FORM_FILLING') {
-                        const missingFields = formFlow.filter(field => !(field in session.formData));
-                        let matchedField = null;
-                        
-                        // For location, only accept a location message
-                        if (missingFields.includes('location') && locationMessage) {
-                            if (validations.location(locationMessage)) {
-                                matchedField = 'location';
-                            }
-                        } else if (userMessage) {
-                            // Check if userMessage validates for any missing field (except location)
-                            for (const field of missingFields) {
-                                if (field === 'location') continue;
-                                if (validations[field](userMessage)) {
-                                    matchedField = field;
-                                    break;
-                                }
-                            }
-                        }
-                        
-                        if (matchedField) {
-                            if (matchedField === 'location') {
-                                session.formData.location = {
-                                    latitude: locationMessage.latitude,
-                                    longitude: locationMessage.longitude,
-                                    address: locationMessage.address || "Unknown address"
-                                };
-                            } else {
-                                session.formData[matchedField] = userMessage;
-                            }
-                            session.retryCount = 0;
-                        } else {
-                            const errMsg = session.language === 'ar' ? errorMessage_ar : errorMessage_en;
-                            session.retryCount++;
-                            await sendToWhatsApp(phoneNumber, errMsg);
-                            continue;
-                        }
-                        
-                        // Determine the next missing field (in order)
-                        const nextMissing = formFlow.find(field => !(field in session.formData));
-                        if (nextMissing) {
-                            const nextPrompt = session.language === 'ar' ? prompts_ar[nextMissing] : prompts_en[nextMissing];
-                            await sendToWhatsApp(phoneNumber, nextPrompt);
-                        } else {
-                            // All fields collected; send summary and ask for confirmation
-                            const summary = session.language === 'ar'
-                                ? generateSubmissionSummary_ar(session.formData)
-                                : generateSubmissionSummary_en(session.formData);
-                            await sendToWhatsApp(phoneNumber, summary, [
-                                { type: "reply", reply: { id: "confirm_yes", title: session.language === 'ar' ? "✅ أكد" : "✅ Confirm" } },
-                                { type: "reply", reply: { id: "confirm_no", title: session.language === 'ar' ? "❌ إلغاء" : "❌ Cancel" } }
-                            ]);
-                            session.flowState = 'AWAITING_CONFIRMATION';
-                        }
-                        continue;
-                    }
+// FORM FILLING STATE MACHINE with flexible input parsing
+if (session.flowState === 'FORM_FILLING') {
+    const missingFields = formFlow.filter(field => !(field in session.formData));
+    let matchedField = null;
+    
+    // For location, only accept a location message
+    if (missingFields.includes('location') && locationMessage) {
+        if (validations.location(locationMessage)) {
+            matchedField = 'location';
+        }
+    } else if (missingFields.includes('oilQuantity') && userMessage) {
+        // Add your logic for validating oilQuantity
+        if (validations.oilQuantity(userMessage)) {
+            session.formData.oilQuantity = userMessage; // Save valid oil quantity
+            session.retryCount = 0;
+            matchedField = 'oilQuantity'; // Mark as matched
+        } else {
+            const errMsg = session.language === 'ar' ? errorMessage_ar : errorMessage_en;
+            session.retryCount++;
+            await sendToWhatsApp(phoneNumber, errMsg);
+            continue;
+        }
+    } else if (userMessage) {
+        // Check if userMessage validates for any missing field (except location and oilQuantity)
+        for (const field of missingFields) {
+            if (field === 'location' || field === 'oilQuantity') continue;
+            if (validations[field](userMessage)) {
+                matchedField = field;
+                break;
+            }
+        }
+    }
+    
+    if (matchedField) {
+        if (matchedField === 'location') {
+            session.formData.location = {
+                latitude: locationMessage.latitude,
+                longitude: locationMessage.longitude,
+                address: locationMessage.address || "Unknown address"
+            };
+        } else {
+            session.formData[matchedField] = userMessage;
+        }
+        session.retryCount = 0;
+    } else {
+        const errMsg = session.language === 'ar' ? errorMessage_ar : errorMessage_en;
+        session.retryCount++;
+        await sendToWhatsApp(phoneNumber, errMsg);
+        continue;
+    }
+    
+    // Determine the next missing field (in order)
+    const nextMissing = formFlow.find(field => !(field in session.formData));
+    if (nextMissing) {
+        const nextPrompt = session.language === 'ar' ? prompts_ar[nextMissing] : prompts_en[nextMissing];
+        await sendToWhatsApp(phoneNumber, nextPrompt);
+    } else {
+        // All fields collected; send summary and ask for confirmation
+        const summary = session.language === 'ar'
+            ? generateSubmissionSummary_ar(session.formData)
+            : generateSubmissionSummary_en(session.formData);
+        await sendToWhatsApp(phoneNumber, summary, [
+            { type: "reply", reply: { id: "confirm_yes", title: session.language === 'ar' ? "✅ أكد" : "✅ Confirm" } },
+            { type: "reply", reply: { id: "confirm_no", title: session.language === 'ar' ? "❌ إلغاء" : "❌ Cancel" } }
+        ]);
+        session.flowState = 'AWAITING_CONFIRMATION';
+    }
+    continue;
+}
+
                     
                     // GENERAL CONVERSATION (if no disposal request is active)
                     if (userMessage) {
