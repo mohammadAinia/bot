@@ -64,9 +64,10 @@ const sendToWhatsApp = async (to, message, buttons = []) => {
 
 // Use OpenAI only for general inquiries (not disposal requests)
 const getOpenAIResponse = async (userMessage, sessionData) => {
-    // Bypass OpenAI if the user is in the middle of a disposal request
     if (sessionData.flowState === 'FORM_FILLING') {
-        return "Please complete the current disposal request. Type 'cancel' to abort.";
+        return sessionData.language === 'ar'
+            ? "يرجى إكمال طلب التخلّص الحالي. اكتب 'إلغاء' للإيقاف."
+            : "Please complete the current disposal request. Type 'cancel' to abort.";
     }
 
     const context = `You are a customer service bot for Lootah Biofuels.
@@ -91,13 +92,16 @@ Current session state: ${JSON.stringify(sessionData)}`;
         return response.data.choices[0].message.content;
     } catch (error) {
         console.error('❌ OpenAI API error:', error.response?.data || error.message);
-        return "I'm having trouble answering that. Please contact our support team directly.";
+        return sessionData.language === 'ar'
+            ? "أواجه مشكلة في الإجابة. يرجى التواصل مع فريق الدعم لدينا."
+            : "I'm having trouble answering that. Please contact our support team directly.";
     }
 };
 
-// Define form flow fields, prompts, and validations
+// Define form flow fields and bilingual prompts
 const formFlow = ['name', 'email', 'buildingName', 'apartmentNumber', 'location'];
-const prompts = {
+
+const prompts_en = {
     name: "Please enter your full name 🖊️",
     email: "Thanks! Now, please share your email 📧",
     buildingName: "Got it! What's your building name? 🏢",
@@ -105,17 +109,23 @@ const prompts = {
     location: "Great! Lastly, please share your location using WhatsApp's location-sharing feature 📍"
 };
 
-const validations = {
-    // Exclude email patterns for the name field to avoid recording an email as a name.
-    name: (input) => input && input.length >= 2 && !/\S+@\S+\.\S+/.test(input),
-    email: (input) => /\S+@\S+\.\S+/.test(input),
-    buildingName: (input) => input && input.length >= 3,
-    apartmentNumber: (input) => !isNaN(input),
-    location: (input) => !!input && input.latitude !== undefined && input.longitude !== undefined
+const prompts_ar = {
+    name: "من فضلك ادخل اسمك الكامل 🖊️",
+    email: "شكرًا! الآن، من فضلك شارك بريدك الإلكتروني 📧",
+    buildingName: "حسنًا! ما اسم المبنى الخاص بك؟ 🏢",
+    apartmentNumber: "من فضلك، اذكر رقم الشقة 🏠",
+    location: "رائع! أخيرًا، شارك موقعك باستخدام ميزة مشاركة الموقع على واتساب 📍"
 };
 
-// Generate submission summary
-const generateSubmissionSummary = (formData) => {
+// Define bilingual error messages
+const errorMessage_en = "Hmm, that doesn't look right. Please try again 🔄";
+const errorMessage_ar = "همم، يبدو أن المدخل غير صحيح. يرجى المحاولة مرة أخرى 🔄";
+
+const abandonmentMessage_en = "Seems like you want to stop. Type 'restart' to begin again.";
+const abandonmentMessage_ar = "يبدو أنك تريد التوقف. اكتب 'ابدأ من جديد' للبدء مرة أخرى.";
+
+// Generate bilingual submission summary
+const generateSubmissionSummary_en = (formData) => {
     return `📋 Request Summary:
 • Name: ${formData.name}
 • Email: ${formData.email}
@@ -126,7 +136,18 @@ const generateSubmissionSummary = (formData) => {
 Please type 'confirm' to submit your request or 'restart' to start over.`;
 };
 
-// Enhanced welcome message system
+const generateSubmissionSummary_ar = (formData) => {
+    return `📋 ملخص الطلب:
+• الاسم: ${formData.name}
+• البريد الإلكتروني: ${formData.email}
+• اسم المبنى: ${formData.buildingName}
+• رقم الشقة: ${formData.apartmentNumber}
+• الموقع: ${formData.location.address || 'تم المشاركة عبر GPS'}
+
+يرجى كتابة "أكد" لتأكيد طلبك أو "ابدأ من جديد" لإعادة البدء.`;
+};
+
+// Enhanced welcome message system (bilingual)
 const sendWelcomeMessage = async (phoneNumber) => {
     try {
         await sendToWhatsApp(phoneNumber, 
@@ -170,7 +191,8 @@ app.post('/webhook', async (req, res) => {
                         userSessions.set(phoneNumber, { 
                             flowState: 'IDLE', // States: IDLE, FORM_FILLING, AWAITING_CONFIRMATION, COMPLETED
                             formData: {},
-                            retryCount: 0
+                            retryCount: 0,
+                            language: 'en'  // default language
                         });
                     }
                     
@@ -178,19 +200,26 @@ app.post('/webhook', async (req, res) => {
                     
                     // Handle form abandonment
                     if (session.flowState === 'FORM_FILLING' && session.retryCount > 2) {
-                        await sendToWhatsApp(phoneNumber, "Seems like you want to stop. Type 'restart' to begin again.");
+                        const msg = session.language === 'ar' ? abandonmentMessage_ar : abandonmentMessage_en;
+                        await sendToWhatsApp(phoneNumber, msg);
                         session.flowState = 'IDLE';
                         continue;
                     }
                     
-                    // Handle confirmation state (bilingual: English & Arabic)
+                    // Handle confirmation state (bilingual)
                     if (session.flowState === 'AWAITING_CONFIRMATION') {
                         if (userMessage && (userMessage.toLowerCase().includes('confirm') || userMessage.includes('أكد'))) {
                             try {
                                 await axios.post(API_REQUEST_URL, session.formData);
-                                await sendToWhatsApp(phoneNumber, "✅ Request submitted successfully!\nThank you for choosing Lootah Biofuels!");
+                                const confirmMsg = session.language === 'ar'
+                                    ? "✅ تم تقديم الطلب بنجاح!\nشكرًا لاختيارك لوتة للوقود الحيوي!"
+                                    : "✅ Request submitted successfully!\nThank you for choosing Lootah Biofuels!";
+                                await sendToWhatsApp(phoneNumber, confirmMsg);
                             } catch (error) {
-                                await sendToWhatsApp(phoneNumber, "⚠️ Failed to submit. Please try again later.");
+                                const failMsg = session.language === 'ar'
+                                    ? "⚠️ فشل في تقديم الطلب. يرجى المحاولة مرة أخرى."
+                                    : "⚠️ Failed to submit. Please try again later.";
+                                await sendToWhatsApp(phoneNumber, failMsg);
                             }
                             userSessions.delete(phoneNumber);
                         } else if (userMessage && (userMessage.toLowerCase().includes('restart') || userMessage.toLowerCase().includes('ابدأ') || userMessage.toLowerCase().includes('أعد'))) {
@@ -198,27 +227,37 @@ app.post('/webhook', async (req, res) => {
                             session.formData = {};
                             session.retryCount = 0;
                             const firstMissing = formFlow.find(field => !(field in session.formData));
-                            await sendToWhatsApp(phoneNumber, prompts[firstMissing]);
+                            const prompt = session.language === 'ar' ? prompts_ar[firstMissing] : prompts_en[firstMissing];
+                            await sendToWhatsApp(phoneNumber, prompt);
                         } else {
-                            await sendToWhatsApp(phoneNumber, "Please type 'confirm' (أكد) to submit your request or 'restart' (ابدأ من جديد) to start over.");
+                            const reconfirmMsg = session.language === 'ar'
+                                ? "يرجى كتابة 'أكد' لتأكيد طلبك أو 'ابدأ من جديد' لإعادة البدء."
+                                : "Please type 'confirm' to submit your request or 'restart' to start over.";
+                            await sendToWhatsApp(phoneNumber, reconfirmMsg);
                         }
                         continue;
                     }
                     
-                    // Bilingual disposal request trigger
+                    // Bilingual disposal request trigger – detect language if not already set
                     const disposalKeywords = /dispose|submit|request|تخلص|تقديم|طلب/;
                     if (userMessage && disposalKeywords.test(userMessage.toLowerCase())) {
                         session.flowState = 'FORM_FILLING';
                         session.formData = {};
                         session.retryCount = 0;
+                        // If userMessage contains Arabic letters, set language to 'ar'
+                        if (/[؀-\u06FF]/.test(userMessage)) {
+                            session.language = 'ar';
+                        } else {
+                            session.language = 'en';
+                        }
                         const firstMissing = formFlow.find(field => !(field in session.formData));
-                        await sendToWhatsApp(phoneNumber, prompts[firstMissing]);
+                        const prompt = session.language === 'ar' ? prompts_ar[firstMissing] : prompts_en[firstMissing];
+                        await sendToWhatsApp(phoneNumber, prompt);
                         continue;
                     }
                     
                     // FORM FILLING STATE MACHINE with flexible input parsing
                     if (session.flowState === 'FORM_FILLING') {
-                        // Determine missing fields
                         const missingFields = formFlow.filter(field => !(field in session.formData));
                         let matchedField = null;
                         
@@ -250,21 +289,25 @@ app.post('/webhook', async (req, res) => {
                             }
                             session.retryCount = 0;
                         } else {
+                            const errMsg = session.language === 'ar' ? errorMessage_ar : errorMessage_en;
                             session.retryCount++;
-                            await sendToWhatsApp(phoneNumber, "Hmm, that doesn't look right. Please try again 🔄");
+                            await sendToWhatsApp(phoneNumber, errMsg);
                             continue;
                         }
                         
                         // Determine the next missing field (in order)
                         const nextMissing = formFlow.find(field => !(field in session.formData));
                         if (nextMissing) {
-                            await sendToWhatsApp(phoneNumber, prompts[nextMissing]);
+                            const nextPrompt = session.language === 'ar' ? prompts_ar[nextMissing] : prompts_en[nextMissing];
+                            await sendToWhatsApp(phoneNumber, nextPrompt);
                         } else {
                             // All fields collected; send summary and ask for confirmation
-                            const summary = generateSubmissionSummary(session.formData);
+                            const summary = session.language === 'ar'
+                                ? generateSubmissionSummary_ar(session.formData)
+                                : generateSubmissionSummary_en(session.formData);
                             await sendToWhatsApp(phoneNumber, summary, [
-                                { type: "reply", reply: { id: "confirm_yes", title: "✅ Confirm" } },
-                                { type: "reply", reply: { id: "confirm_no", title: "❌ Cancel" } }
+                                { type: "reply", reply: { id: "confirm_yes", title: session.language === 'ar' ? "✅ أكد" : "✅ Confirm" } },
+                                { type: "reply", reply: { id: "confirm_no", title: session.language === 'ar' ? "❌ إلغاء" : "❌ Cancel" } }
                             ]);
                             session.flowState = 'AWAITING_CONFIRMATION';
                         }
@@ -284,6 +327,7 @@ app.post('/webhook', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+
 
 
 
