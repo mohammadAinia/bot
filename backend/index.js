@@ -127,14 +127,16 @@ const sendWelcomeMessage = async (phoneNumber) => {
     try {
         await sendToWhatsApp(phoneNumber, 
             "🌱 Welcome to Lootah Biofuels!\n\n" +
-            "How can we assist you today?\n" +
+            "How can we assist you today?\n\n" +
+            "You can choose one of the following options:\n" +
             "1. Schedule oil pickup\n" +
-            "2. Service inquiry\n" +
-            "3. Account support", 
+            "2. Get information about our services\n" +
+            "3. Account support or inquiries\n\n" +
+            "Just reply with the number or describe your request, and we'll be happy to help!",
             [
-                {type: "reply", reply: {id: "1", title: "Schedule Pickup"}},
-                {type: "reply", reply: {id: "2", title: "Service Info"}},
-                {type: "reply", reply: {id: "3", title: "Account Help"}}
+                {type: "reply", reply: {id: "1", title: "Schedule Pickup"}} ,
+                {type: "reply", reply: {id: "2", title: "Service Info"}} ,
+                {type: "reply", reply: {id: "3", title: "Account Help"}} 
             ]
         );
     } catch (error) {
@@ -147,6 +149,7 @@ const sendWelcomeMessage = async (phoneNumber) => {
         );
     }
 };
+
 
 app.post('/webhook', async (req, res) => {
     const body = req.body;
@@ -168,6 +171,9 @@ app.post('/webhook', async (req, res) => {
                             formData: {},
                             retryCount: 0
                         });
+                        
+                        // Send the welcome message when a new user interacts
+                        await sendWelcomeMessage(phoneNumber);
                     }
                     
                     const session = userSessions.get(phoneNumber);
@@ -278,6 +284,7 @@ app.post('/webhook', async (req, res) => {
     }
     res.sendStatus(200);
 });
+
 
 app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
 
