@@ -65,38 +65,28 @@ const sendToWhatsApp = async (to, message, buttons = []) => {
 // Use OpenAI only for general inquiries (not disposal requests)
 const getOpenAIResponse = async (userMessage, sessionData) => {
     if (sessionData.flowState === 'FORM_FILLING') {
-        return sessionData.language === 'ar'
-            ? "يرجى إكمال طلب التخلّص الحالي. اكتب 'إلغاء' للإيقاف."
-            : "Please complete the current disposal request. Type 'cancel' to abort.";
-    }
+        const missingFields = formFlow.filter(field => !(field in sessionData.formData));
+        const nextMissing = missingFields[0]; // Get the next field to ask for
+        const questionPrompt = sessionData.language === 'ar'
+            ? prompts_ar[nextMissing]
+            : prompts_en[nextMissing];
 
-    const context = `You are a customer service bot for Lootah Biofuels.
-Keep responses under 2 sentences.
-If a disposal request is in progress, say: "Let's finish your disposal request first!".
-Current session state: ${JSON.stringify(sessionData)}`;
-
-    try {
+        // Get OpenAI's dynamic response for the next question
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
             model: 'gpt-4',
             messages: [
-                { role: 'system', content: context },
-                { role: 'user', content: userMessage }
+                { role: 'system', content: `You are a customer service bot for Lootah Biofuels. Ask questions based on the user's missing information: ${nextMissing}` },
+                { role: 'user', content: questionPrompt }
             ],
             temperature: 0.3
         }, {
-            headers: { 
-                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-                'Content-Type': 'application/json'
-            }
+            headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}` }
         });
+
         return response.data.choices[0].message.content;
-    } catch (error) {
-        console.error('❌ OpenAI API error:', error.response?.data || error.message);
-        return sessionData.language === 'ar'
-            ? "أواجه مشكلة في الإجابة. يرجى التواصل مع فريق الدعم لدينا."
-            : "I'm having trouble answering that. Please contact our support team directly.";
     }
 };
+
 
 // Define form flow fields and bilingual prompts
 const formFlow = ['name', 'email', 'buildingName', 'apartmentNumber', 'location', 'oilQuantity'];
@@ -179,7 +169,7 @@ const sendWelcomeMessage = async (phoneNumber) => {
     }
 };
 const validations = {
-    name: (input) => typeof input === 'string' && input.trim().length > 1,
+    name: (input) => typeof input === 'string' && input.trim().length > 0,
     email: (input) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input),
     buildingName: (input) => typeof input === 'string' && input.trim().length > 1,
     apartmentNumber: (input) => /^\d+$/.test(input),
