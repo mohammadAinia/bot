@@ -813,46 +813,52 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-            case STATES.ADDRESS:
-                const addressValidationResponse = await analyzeInput(textRaw, "address");
-
-                if (addressValidationResponse.toLowerCase().includes("valid")) {
-                    session.data.address = textRaw;
-                    session.step = STATES.CITY_SELECTION;
-
-                    // Directly send city selection buttons without an additional prompt
-                    await sendCitySelection(from);
-                } else {
-                    await sendToWhatsApp(from, addressValidationResponse);
-                    session.step = STATES.ADDRESS;
-                }
-                break;
-
-            case STATES.CITY_SELECTION:
-                if (message.interactive && message.interactive.button_reply) {
-                    const citySelection = message.interactive.button_reply.id;
-                    const cityMap = {
-                        "abu_dhabi": "Abu Dhabi",
-                        "dubai": "Dubai",
-                        "sharjah": "Sharjah"
-                    };
-
-                    if (cityMap[citySelection]) {
-                        session.data.city = cityMap[citySelection];
-                        session.step = STATES.STREET;
-
-                        // Ask for the street name after city selection
-                        const streetPrompt = await generateMissingFieldPrompt("street");
-                        await sendToWhatsApp(from, streetPrompt);
-                    } else {
-                        // Re-send city selection buttons for invalid selections
+                case STATES.ADDRESS:
+                    const addressValidationResponse = await analyzeInput(textRaw, "address");
+    
+                    if (addressValidationResponse.toLowerCase().includes("valid")) {
+                        session.data.address = textRaw;
+                        session.step = STATES.CITY_SELECTION;
+                        // Only send city buttons here, no text prompt
                         await sendCitySelection(from);
+                    } else {
+                        await sendToWhatsApp(from, addressValidationResponse);
+                        session.step = STATES.ADDRESS;
                     }
-                } else {
-                    // Send city selection buttons if the message is not interactive
-                    await sendCitySelection(from);
-                }
-                break;
+                    break;
+    
+                case STATES.CITY_SELECTION:
+                    if (message.interactive && message.interactive.button_reply) {
+                        const citySelection = message.interactive.button_reply.id;
+                        const cityMap = {
+                            "abu_dhabi": "Abu Dhabi",
+                            "dubai": "Dubai",
+                            "sharjah": "Sharjah"
+                        };
+    
+                        if (cityMap[citySelection]) {
+                            session.data.city = cityMap[citySelection];
+                            session.step = STATES.STREET;
+                            const streetPrompt = await generateMissingFieldPrompt("street");
+                            await sendToWhatsApp(from, streetPrompt);
+                        } else {
+                            // Re-send city buttons for invalid selections
+                            await sendCitySelection(from);
+                        }
+                    } else if (message.type === "text") {
+                        // If user types text instead of using buttons, process it
+                        const extractedData = await extractInformationFromText(textRaw);
+                        if (extractedData.city) {
+                            session.data.city = extractedData.city;
+                            session.step = STATES.STREET;
+                            const streetPrompt = await generateMissingFieldPrompt("street");
+                            await sendToWhatsApp(from, streetPrompt);
+                        } else {
+                            await sendToWhatsApp(from, "Please select your city using the buttons below 👇");
+                            await sendCitySelection(from);
+                        }
+                    }
+                    break;
 
             case STATES.STREET:
                 const streetValidationResponse = await analyzeInput(textRaw, "street name"); // Pass language here
@@ -987,10 +993,10 @@ app.post('/webhook', async (req, res) => {
                 break;
             }
 
-            // case "ASK_CITY": {
-            //     session.step = STATES.CITY_SELECTION; // Set session state properly before sending buttons
-            //     return await sendCitySelection(from); // Ensure only one message is sent
-            // }
+            case "ASK_CITY": {
+                session.step = STATES.CITY_SELECTION; // Set session state properly before sending buttons
+                return await sendCitySelection(from); // Ensure only one message is sent
+            }
         
             case "ASK_STREET": {
                 session.data.street = textRaw;
