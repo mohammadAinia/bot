@@ -10,7 +10,7 @@ if (!process.env.OPENAI_API_KEY || !process.env.WHATSAPP_API_URL || !process.env
     console.error('❌ Missing required environment variables');
     process.exit(1);
 }
-//
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 const VERIFY_TOKEN = "Mohammad";
@@ -62,6 +62,39 @@ const sendToWhatsApp = async (to, message, buttons = []) => {
     }
 };
 
+// Use OpenAI only for general inquiries (not disposal requests)
+const getOpenAIResponse = async (userMessage, sessionData) => {
+    // Bypass OpenAI if the user is in the middle of a disposal request
+    if (sessionData.flowState === 'FORM_FILLING') {
+        return "Please complete the current disposal request. Type 'cancel' to abort.";
+    }
+
+    const context = `You are a customer service bot for Lootah Biofuels.
+Keep responses under 2 sentences.
+If a disposal request is in progress, say: "Let's finish your disposal request first!".
+Current session state: ${JSON.stringify(sessionData)}`;
+
+    try {
+        const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+            model: 'gpt-4',
+            messages: [
+                { role: 'system', content: context },
+                { role: 'user', content: userMessage }
+            ],
+            temperature: 0.3
+        }, {
+            headers: { 
+                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        return response.data.choices[0].message.content;
+    } catch (error) {
+        console.error('❌ OpenAI API error:', error.response?.data || error.message);
+        return "I'm having trouble answering that. Please contact our support team directly.";
+    }
+};
+
 // Define form flow fields, prompts, and validations
 const formFlow = ['name', 'email', 'buildingName', 'apartmentNumber', 'location'];
 const prompts = {
@@ -88,8 +121,34 @@ const generateSubmissionSummary = (formData) => {
 • Building: ${formData.buildingName}
 • Apartment: ${formData.apartmentNumber}
 • Location: ${formData.location.address || 'Shared via GPS'}
-    
-Please confirm these details are correct.`;
+
+Please type 'confirm' to submit your request or 'restart' to start over.`;
+};
+
+// Enhanced welcome message system
+const sendWelcomeMessage = async (phoneNumber) => {
+    try {
+        await sendToWhatsApp(phoneNumber, 
+            "🌱 Welcome to Lootah Biofuels!\n\n" +
+            "How can we assist you today?\n" +
+            "1. Schedule oil pickup\n" +
+            "2. Service inquiry\n" +
+            "3. Account support", 
+            [
+                {type: "reply", reply: {id: "1", title: "Schedule Pickup"}},
+                {type: "reply", reply: {id: "2", title: "Service Info"}},
+                {type: "reply", reply: {id: "3", title: "Account Help"}}
+            ]
+        );
+    } catch (error) {
+        console.error('Welcome message failed:', error);
+        await sendToWhatsApp(phoneNumber, 
+            "Welcome to Lootah Biofuels! Please type your request or choose an option:\n" +
+            "- Schedule pickup\n" +
+            "- Service info\n" +
+            "- Account help"
+        );
+    }
 };
 
 app.post('/webhook', async (req, res) => {
@@ -99,22 +158,22 @@ app.post('/webhook', async (req, res) => {
         for (const entry of body.entry) {
             for (const change of entry.changes) {
                 if (!change.value.messages) continue;
-
+                
                 for (const message of change.value.messages) {
                     const phoneNumber = message.from;
                     const userMessage = message.text?.body;
                     const locationMessage = message.location;
-
+                    
                     // Initialize or retrieve session
                     if (!userSessions.has(phoneNumber)) {
                         userSessions.set(phoneNumber, { 
-                            flowState: 'IDLE',
+                            flowState: 'IDLE', // Possible states: IDLE, FORM_FILLING, AWAITING_CONFIRMATION, COMPLETED
                             formData: {},
                             currentFieldIndex: 0,
                             retryCount: 0
                         });
                     }
-
+                    
                     const session = userSessions.get(phoneNumber);
                     
                     // Handle form abandonment
@@ -124,9 +183,9 @@ app.post('/webhook', async (req, res) => {
                         continue;
                     }
                     
-                    // If waiting for confirmation, check user's reply
+                    // Handle confirmation state
                     if (session.flowState === 'AWAITING_CONFIRMATION') {
-                        if (userMessage?.toLowerCase().includes('confirm')) {
+                        if (userMessage && userMessage.toLowerCase().includes('confirm')) {
                             try {
                                 await axios.post(API_REQUEST_URL, session.formData);
                                 await sendToWhatsApp(phoneNumber, "✅ Request submitted successfully!\nThank you for choosing Lootah Biofuels!");
@@ -134,11 +193,87 @@ app.post('/webhook', async (req, res) => {
                                 await sendToWhatsApp(phoneNumber, "⚠️ Failed to submit. Please try again later.");
                             }
                             userSessions.delete(phoneNumber);
+                        } else if (userMessage && userMessage.toLowerCase().includes('restart')) {
+                            session.flowState = 'FORM_FILLING';
+                            session.currentFieldIndex = 0;
+                            session.formData = {};
+                            session.retryCount = 0;
+                            const currentField = formFlow[session.currentFieldIndex];
+                            await sendToWhatsApp(phoneNumber, prompts[currentField]);
                         } else {
-                            await sendToWhatsApp(phoneNumber, "Request cancelled. Type 'start' to begin again.");
-                            userSessions.delete(phoneNumber);
+                            await sendToWhatsApp(phoneNumber, "Please type 'confirm' to submit your request or 'restart' to start over.");
                         }
                         continue;
+                    }
+                    
+                    // Start disposal form flow if disposal request is initiated
+                    if (userMessage?.toLowerCase().match(/dispose|submit|request/)) {
+                        session.flowState = 'FORM_FILLING';
+                        session.currentFieldIndex = 0;
+                        session.formData = {};
+                        session.retryCount = 0;
+                        const currentField = formFlow[session.currentFieldIndex];
+                        await sendToWhatsApp(phoneNumber, prompts[currentField]);
+                        continue;
+                    }
+                    
+                    // FORM FILLING STATE MACHINE
+                    if (session.flowState === 'FORM_FILLING') {
+                        const currentField = formFlow[session.currentFieldIndex];
+                        
+                        // Process the "location" field separately
+                        if (currentField === 'location') {
+                            if (locationMessage) {
+                                if (validations.location(locationMessage)) {
+                                    session.formData.location = {
+                                        latitude: locationMessage.latitude,
+                                        longitude: locationMessage.longitude,
+                                        address: locationMessage.address || "Unknown address"
+                                    };
+                                    session.retryCount = 0;
+                                    session.currentFieldIndex++;
+                                } else {
+                                    session.retryCount++;
+                                    await sendToWhatsApp(phoneNumber, "Invalid location data. Please try again 📍");
+                                    continue;
+                                }
+                            } else {
+                                await sendToWhatsApp(phoneNumber, "Please share your location using the location-sharing feature instead of typing it.");
+                                continue;
+                            }
+                        } else {
+                            // Process text input for other fields
+                            if (userMessage && validations[currentField](userMessage)) {
+                                session.formData[currentField] = userMessage;
+                                session.retryCount = 0;
+                                session.currentFieldIndex++;
+                            } else {
+                                session.retryCount++;
+                                await sendToWhatsApp(phoneNumber, "Hmm, that doesn't look right. Please try again 🔄");
+                                continue;
+                            }
+                        }
+                        
+                        // Check if there are more fields to fill
+                        if (session.currentFieldIndex < formFlow.length) {
+                            const nextField = formFlow[session.currentFieldIndex];
+                            await sendToWhatsApp(phoneNumber, prompts[nextField]);
+                        } else {
+                            // All fields collected; send summary and ask for confirmation
+                            const summary = generateSubmissionSummary(session.formData);
+                            await sendToWhatsApp(phoneNumber, summary, [
+                                { type: "reply", reply: { id: "confirm_yes", title: "✅ Confirm" } },
+                                { type: "reply", reply: { id: "confirm_no", title: "❌ Cancel" } }
+                            ]);
+                            session.flowState = 'AWAITING_CONFIRMATION';
+                        }
+                        continue;
+                    }
+                    
+                    // GENERAL CONVERSATION (if no disposal request is active)
+                    if (userMessage) {
+                        const botResponse = await getOpenAIResponse(userMessage, session);
+                        await sendToWhatsApp(phoneNumber, botResponse);
                     }
                 }
             }
@@ -148,6 +283,7 @@ app.post('/webhook', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+
 
 
 
