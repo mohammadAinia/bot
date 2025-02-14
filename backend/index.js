@@ -32,6 +32,7 @@ app.get("/webhook", (req, res) => {
 });
 
 // Send message to WhatsApp with optional buttons
+// Send message to WhatsApp with optional buttons
 const sendToWhatsApp = async (to, message, buttons = []) => {
     const payload = {
         messaging_product: 'whatsapp',
@@ -61,10 +62,9 @@ const sendToWhatsApp = async (to, message, buttons = []) => {
         // Plain text message
         payload.type = 'text';
         payload.text = {  // Ensure 'body' is part of the payload
-            body: message
+            body: message // Add body here for plain text messages
         };
     }
-    
 
     try {
         await axios.post(process.env.WHATSAPP_API_URL, payload, {
@@ -77,6 +77,7 @@ const sendToWhatsApp = async (to, message, buttons = []) => {
         console.error('❌ Failed to send message:', error.response?.data || error.message);
     }
 };
+
 
 // Use OpenAI only for general inquiries (not disposal requests)
 const getOpenAIResponse = async (userMessage, sessionData) => {
