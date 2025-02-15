@@ -838,10 +838,15 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(from, getNameMessage(session.language)); // Ask for name again
                 } else {
                     session.data.name = textRaw;
-                    session.step = STATES.PHONE_INPUT;
-                    await sendToWhatsApp(from, getPhoneMessage(session.language)); // Ask for phone number
+
+                    // Automatically detect the user's phone number
+                    session.data.phone = from;
+
+                    session.step = STATES.EMAIL; // Move to the email step
+                    await sendToWhatsApp(from, getEmailMessage(session.language)); // Ask for email
                 }
                 break;
+
 
             case STATES.PHONE_INPUT:
                 if (!isValidPhone(textRaw)) {
