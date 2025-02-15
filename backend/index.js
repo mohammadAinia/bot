@@ -960,19 +960,26 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-            case STATES.NAME:
-                if (!textRaw) {
-                    await sendToWhatsApp(from, getNameMessage(session.language)); // Ask for name again
-                } else {
-                    session.data.name = textRaw;
-
-                    // Automatically detect the user's phone number
-                    session.data.phone = from;
-
-                    session.step = STATES.EMAIL; // Move to the email step
-                    await sendToWhatsApp(from, getEmailMessage(session.language)); // Ask for email
-                }
-                break;
+                case STATES.NAME:
+                    if (!textRaw) {
+                        await sendToWhatsApp(from, getNameMessage(session.language)); // Ask for name again
+                    } else {
+                        // Validate the name using analyzeInput
+                        const validationResult = await analyzeInput(textRaw, "name");
+                        if (validationResult === "valid") {
+                            session.data.name = textRaw;
+                
+                            // Automatically detect the user's phone number
+                            session.data.phone = from;
+                
+                            // Transition to the next step (email)
+                            session.step = STATES.EMAIL;
+                            await sendToWhatsApp(from, getEmailMessage(session.language)); // Ask for email
+                        } else {
+                            await sendToWhatsApp(from, "❌ Please provide a valid name. 😊");
+                        }
+                    }
+                    break;
 
 
             case STATES.PHONE_INPUT:
