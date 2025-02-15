@@ -408,6 +408,34 @@ const sendUpdatedSummary = async (to, session) => {
     }
 };
 
+// const sendInteractiveButtons = async (to, message, buttons) => {
+//     try {
+//         const payload = {
+//             messaging_product: "whatsapp",
+//             recipient_type: "individual",
+//             to: to,
+//             type: "interactive",
+//             interactive: {
+//                 type: "button",
+//                 body: { text: message },
+//                 action: { buttons }
+//             }
+//         };
+
+//         console.log("Sending Interactive Buttons Payload:", JSON.stringify(payload, null, 2));
+
+//         const response = await axios.post(process.env.WHATSAPP_API_URL, payload, {
+//             headers: {
+//                 "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+//                 "Content-Type": "application/json"
+//             }
+//         });
+
+//         console.log("Interactive Buttons Response:", response.data);
+//     } catch (error) {
+//         console.error("❌ Failed to send interactive buttons:", error.response?.data || error.message);
+//     }
+// };
 const sendInteractiveButtons = async (to, message, buttons) => {
     try {
         const payload = {
@@ -418,7 +446,24 @@ const sendInteractiveButtons = async (to, message, buttons) => {
             interactive: {
                 type: "button",
                 body: { text: message },
-                action: { buttons }
+                action: {
+                    buttons: buttons.map(button => {
+                        if (button.type === "location_request") {
+                            return {
+                                type: "location_request",
+                                title: button.title || "📍 Send Location"
+                            };
+                        } else {
+                            return {
+                                type: "reply",
+                                reply: {
+                                    id: button.reply.id,
+                                    title: button.reply.title
+                                }
+                            };
+                        }
+                    })
+                }
             }
         };
 
@@ -723,7 +768,7 @@ function getFlatMessage(language) {
     return language === 'ar' ? '🚪 يرجى تقديم رقم الشقة.' : '🚪 Please provide the flat number.';
 }
 
-function getLocationMessage(language) { 
+function getLocationMessage(language) {
     return language === 'ar' ?
         '📍 يرجى مشاركة موقعك باستخدام زر "أرسل الموقع" أدناه أو من خلال واتساب. اضغط على 📎 ثم اختر "موقع".' :
         '📍 Please share your location using the "Send Location" button below or via WhatsApp. Tap the 📎 icon and select "Location".';
@@ -751,6 +796,11 @@ function getContinueMessage(language) {
     return language === 'ar' ?
         'لإكمال الاستفسار، يمكنك طرح أسئلة أخرى. إذا كنت ترغب في تقديم طلب أو الاتصال بنا، اختر من الخيارات التالية:' :
         'To complete the inquiry, you can ask other questions. If you want to submit a request or contact us, choose from the following options:';
+}
+function getInvalidUAERegionMessage(language) {
+    return language === 'ar' ?
+        '❌ الموقع الذي أرسلته خارج الإمارات. يرجى إرسال موقع داخل الإمارات.' :
+        '❌ The location you shared is outside the UAE. Please send a location within the Emirates.';
 }
 
 
@@ -869,49 +919,50 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, getLocationMessage(session.language)); // Ask for location
                 break;
 
-            case STATES.LONGITUDE:
-                if (message.location) {
-                    const { latitude, longitude } = message.location;
-
-                    const UAE_BOUNDS = {
-                        minLat: 22.5,
-                        maxLat: 26.5,
-                        minLng: 51.6,
-                        maxLng: 56.5
-                    };
-
-                    if (
-                        latitude >= UAE_BOUNDS.minLat &&
-                        latitude <= UAE_BOUNDS.maxLat &&
-                        longitude >= UAE_BOUNDS.minLng &&
-                        longitude <= UAE_BOUNDS.maxLng
-                    ) {
-                        session.data.latitude = latitude;
-                        session.data.longitude = longitude;
-                        session.step = STATES.ADDRESS;
-
-                        await sendToWhatsApp(from, getAddressMessage(session.language)); // Ask for address
+                case STATES.LONGITUDE:
+                    if (message.location) {
+                        const { latitude, longitude } = message.location;
+                
+                        const UAE_BOUNDS = {
+                            minLat: 22.5,
+                            maxLat: 26.5,
+                            minLng: 51.6,
+                            maxLng: 56.5
+                        };
+                
+                        if (
+                            latitude >= UAE_BOUNDS.minLat &&
+                            latitude <= UAE_BOUNDS.maxLat &&
+                            longitude >= UAE_BOUNDS.minLng &&
+                            longitude <= UAE_BOUNDS.maxLng
+                        ) {
+                            session.data.latitude = latitude;
+                            session.data.longitude = longitude;
+                            session.step = STATES.ADDRESS;
+                
+                            await sendToWhatsApp(from, getAddressMessage(session.language)); // Ask for address
+                        } else {
+                            await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language)); // Location outside UAE
+                            console.error("Location outside UAE received:", { latitude, longitude });
+                        }
                     } else {
-                        await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language)); // Location outside UAE
-                        console.error("Location outside UAE received:", { latitude, longitude });
+                        if (!session.locationPromptSent) {
+                            const locationMessage = getLocationMessage(session.language);
+                
+                            // "Send Location" button
+                            const locationButton = [
+                                {
+                                    type: "location_request",
+                                    title: session.language === 'ar' ? '📍 أرسل الموقع' : '📍 Send Location'
+                                }
+                            ];
+                
+                            await sendInteractiveButtons(from, locationMessage, locationButton);
+                            session.locationPromptSent = true;
+                        }
+                        console.error("Invalid input received in LONGITUDE state:", textRaw);
                     }
-                } else {
-                    if (!session.locationPromptSent) {
-                        const locationMessage = getLocationMessage(session.language);
-
-                        // "Send Location" button
-                        const locationButton = [
-                            {
-                                type: "location_request"
-                            }
-                        ];
-
-                        await sendInteractiveButtons(from, locationMessage, locationButton);
-                        session.locationPromptSent = true;
-                    }
-                    console.error("Invalid input received in LONGITUDE state:", textRaw);
-                }
-                break;
+                    break;
 
 
 
