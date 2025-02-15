@@ -774,12 +774,6 @@ function getLocationMessage(language) {
         : '📍 Please share your location using WhatsApp’s location feature. Tap the 📎 icon and select "Location".';
 }
 
-function getInvalidUAERegionMessage(language) {
-    return language === 'ar'
-        ? '❌ الموقع خارج الإمارات. يرجى إرسال موقع داخل الإمارات.'
-        : '❌ Location is outside the UAE. Please send a location within the Emirates.';
-}
-
 function getQuantityMessage(language) {
     return language === 'ar' ? '📦 يرجى إدخال الكمية (باللترات).' : '📦 Please provide the quantity (in liters).';
 }
