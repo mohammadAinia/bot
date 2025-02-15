@@ -3,6 +3,8 @@ import express from 'express';
 import axios from 'axios';
 import bodyParser from 'body-parser';
 import cors from 'cors';
+import {langdetect} from 'langdetect';
+
 
 dotenv.config();
 
@@ -166,12 +168,13 @@ For more details, visit: [Lootah Biofuels Website](https://www.lootahbiofuels.co
 
 `;
 
-const getOpenAIResponse = async (userMessage, context = "") => {
+const getOpenAIResponse = async (userMessage, context = "", language = "en") => {
     try {
         const systemMessage = `
             You are a friendly and intelligent WhatsApp assistant for Lootah Biofuels. 
             Your goal is to assist users in completing their orders and answering their questions.
             Always respond concisely, use emojis sparingly, and maintain a helpful attitude.
+            Generate the response in the user's language: ${language}.
         `;
 
         const messages = [
@@ -186,7 +189,7 @@ const getOpenAIResponse = async (userMessage, context = "") => {
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
             model: "gpt-4",
             messages,
-            max_tokens: 300,
+            max_tokens: 350,
             temperature: 0.7
         }, {
             headers: {
@@ -201,6 +204,7 @@ const getOpenAIResponse = async (userMessage, context = "") => {
         return "❌ Oops! Something went wrong. Please try again later.";
     }
 };
+
 
 const userSessions = {};
 const sendToWhatsApp = async (to, message) => {
@@ -236,22 +240,16 @@ const isValidPhone = (phone) => {
     return regex.test(phone);
 };
 
-const sendCitySelection = async (to) => {
+const sendCitySelection = async (to, language) => {
     try {
+        const cityPrompt = language === 'ar' ? 'يرجى اختيار المدينة من الخيارات المتاحة:' : 'Please select your city from the available options:';
 
-        // Generate the city selection prompt in the detected language
-        const cityPrompt = await getOpenAIResponse(
-            "Ask the user to select their city from the available options.",
-        );
-
-        // Define the buttons for city selection
         const cityButtons = [
-            { type: "reply", reply: { id: "abu_dhabi", title: "Abu Dhabi" } },
-            { type: "reply", reply: { id: "dubai", title: "Dubai" } },
-            { type: "reply", reply: { id: "sharjah", title: "Sharjah" } }
+            { type: "reply", reply: { id: "abu_dhabi", title: language === 'ar' ? 'أبو ظبي' : 'Abu Dhabi' } },
+            { type: "reply", reply: { id: "dubai", title: language === 'ar' ? 'دبي' : 'Dubai' } },
+            { type: "reply", reply: { id: "sharjah", title: language === 'ar' ? 'الشارقة' : 'Sharjah' } }
         ];
 
-        // Log the payload being sent
         const payload = {
             messaging_product: "whatsapp",
             recipient_type: "individual",
@@ -263,9 +261,7 @@ const sendCitySelection = async (to) => {
                 action: { buttons: cityButtons }
             }
         };
-        console.log("City Selection Payload:", JSON.stringify(payload, null, 2));
 
-        // Send the interactive message
         const response = await axios.post(process.env.WHATSAPP_API_URL, payload, {
             headers: {
                 Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
@@ -273,7 +269,7 @@ const sendCitySelection = async (to) => {
             }
         });
 
-        console.log("City Selection Response:", response.data); // Log the response
+        console.log("City Selection Response:", response.data);
     } catch (error) {
         console.error("Error sending city selection:", error.response?.data || error.message);
     }
@@ -294,6 +290,7 @@ const sendOrderSummary = async (to, session) => {
             Location: (Latitude: ${session.data.latitude}, Longitude: ${session.data.longitude}),
             Quantity: ${session.data.quantity}.
             Also, ask the user to confirm if the details are correct.`,
+            session.language
         );
 
         await axios.post(process.env.WHATSAPP_API_URL, {
@@ -308,8 +305,8 @@ const sendOrderSummary = async (to, session) => {
                 },
                 action: {
                     buttons: [
-                        { type: "reply", reply: { id: "yes_confirm", title: "✅ Yes, Confirm" } },
-                        { type: "reply", reply: { id: "no_correct", title: "❌ No, Edit Details" } }
+                        { type: "reply", reply: { id: "yes_confirm", title: session.language === 'ar' ? '✅ نعم' : '✅ Yes' } },
+                        { type: "reply", reply: { id: "no_correct", title: session.language === 'ar' ? '❌ لا' : '❌ No' } }
                     ]
                 }
             }
@@ -658,10 +655,20 @@ const shouldEndRequest = (text) => {
 
     return endPhrases.some(phrase => text.includes(phrase));
 };
+function getButtonTitle(buttonId, language) {
+    const buttons = {
+        contact_us: { en: '📞 Contact Us', ar: '📞 اتصل بنا' },
+        new_request: { en: '📝 New Request', ar: '📝 طلب جديد' }
+    };
+    return buttons[buttonId][language === 'ar' ? 'ar' : 'en'];
+}
+function getContactMessage(language) {
+    return language === 'ar' ? '📞 يمكنك الاتصال بنا على support@example.com أو الاتصال على +1234567890.' : '📞 You can contact us at support@example.com or call +1234567890.';
+}
 
 app.post('/webhook', async (req, res) => {
     try {
-        console.log('Incoming Webhook Data:', req.body); // Log the incoming data for debugging
+        console.log('Incoming Webhook Data:', req.body);
 
         const entry = req.body.entry?.[0];
         const changes = entry?.changes?.[0];
@@ -678,16 +685,22 @@ app.post('/webhook', async (req, res) => {
         const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
 
-        console.log(`📩 New message from ${from}: ${text}`);
+        // Detect the language of the incoming message
+        const language = langdetect.detect(textRaw)[0].lang;
+
+        console.log(`📩 New message from ${from}: ${text} (Language: ${language})`);
 
         // Initialize user session if it doesn't exist
         if (!userSessions[from]) {
-            userSessions[from] = { step: STATES.WELCOME, data: {} };
+            userSessions[from] = { step: STATES.WELCOME, data: {}, language: language };
+
+            // Get dynamic welcome message from OpenAI
+            const welcomeMessage = await getOpenAIResponse("Generate a WhatsApp welcome message for Lootah Biofuels.", "", language);
 
             // Send welcome message with options
-            await sendInteractiveButtons(from, defaultWelcomeMessage, [
-                { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
-                { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
+            await sendInteractiveButtons(from, welcomeMessage, [
+                { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", language) } },
+                { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", language) } }
             ]);
             return res.sendStatus(200);
         }
@@ -697,26 +710,24 @@ app.post('/webhook', async (req, res) => {
         // Handle messages based on the current state
         switch (session.step) {
             case STATES.WELCOME:
-                // If the user sends a message (not a button reply), treat it as a question
                 if (message.type === "text") {
-                    const aiResponse = await getOpenAIResponse(textRaw, systemMessage, guidanceMessage);
-                    const reply = `${aiResponse}\n\nTo complete the inquiry, you can ask other questions. If you want to submit a request or contact us, choose from the following options:`;
+                    const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+                    const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
 
-                    // Send the AI response with options to continue or proceed
                     await sendInteractiveButtons(from, reply, [
-                        { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
-                        { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
+                        { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+                        { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
                     ]);
                 } else if (message.type === "interactive" && message.interactive.type === "button_reply") {
                     const buttonId = message.interactive.button_reply.id;
 
                     if (buttonId === "contact_us") {
-                        await sendToWhatsApp(from, "📞 You can contact us at support@example.com or call +1234567890.");
+                        await sendToWhatsApp(from, getContactMessage(session.language));
                     } else if (buttonId === "new_request") {
                         session.step = STATES.NAME;
-                        await sendToWhatsApp(from, "🔹 Please provide your full name.");
+                        await sendToWhatsApp(from, getNameMessage(session.language));
                     } else {
-                        await sendToWhatsApp(from, "❌ Invalid option, please select a valid button.");
+                        await sendToWhatsApp(from, getInvalidOptionMessage(session.language));
                     }
                 }
                 break;
