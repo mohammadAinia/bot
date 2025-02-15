@@ -939,10 +939,10 @@ app.post('/webhook', async (req, res) => {
         }
 
         if (!userSessions[from]) {
-            userSessions[from] = { 
-                step: STATES.WELCOME, 
+            userSessions[from] = {
+                step: STATES.WELCOME,
                 data: { phone: from }, // Auto-capture phone number
-                language: detectedLanguage 
+                language: detectedLanguage
             };
             const welcomeMessage = await getOpenAIResponse("Generate a WhatsApp welcome message for Lootah Biofuels.", "", detectedLanguage);
             await sendInteractiveButtons(from, welcomeMessage, [
@@ -959,12 +959,18 @@ app.post('/webhook', async (req, res) => {
             // Extract and store information
             const extractedData = await extractInformationFromText(textRaw);
             console.log("Extracted Data:", extractedData); // Debugging
+
+            // Preserve the phone number if it's already set in the session
+            if (session.data.phone) {
+                extractedData.phone = session.data.phone;
+            }
+
             session.data = { ...session.data, ...extractedData };
-        
+
             // Check for missing fields
             const missingFields = getMissingFields(session.data);
             console.log("Missing Fields:", missingFields); // Debugging
-        
+
             if (missingFields.length === 0) {
                 session.step = STATES.CONFIRMATION;
                 await sendOrderSummary(from, session);
@@ -1375,40 +1381,40 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-                case "ASK_LOCATION":
-                    // If the user hasn't shared their location yet, ask for it
-                    if (!message.location) {
-                        await sendToWhatsApp(from, getLocationMessage(session.language));
-                        return res.sendStatus(200); // Exit and wait for the user's response
-                    }
-                
-                    // If the location is shared, store it and proceed to the next step
-                    const { latitude, longitude } = message.location;
-                
-                    // Validate UAE location
-                    const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
-                    if (
-                        latitude >= UAE_BOUNDS.minLat &&
-                        latitude <= UAE_BOUNDS.maxLat &&
-                        longitude >= UAE_BOUNDS.minLng &&
-                        longitude <= UAE_BOUNDS.maxLng
-                    ) {
-                        session.data.latitude = latitude;
-                        session.data.longitude = longitude;
-                
-                        // Check for other missing fields
-                        const missingFields = getMissingFields(session.data);
-                        if (missingFields.length === 0) {
-                            session.step = STATES.CONFIRMATION;
-                            await sendOrderSummary(from, session);
-                        } else {
-                            session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                            await askForNextMissingField(session, from);
-                        }
+            case "ASK_LOCATION":
+                // If the user hasn't shared their location yet, ask for it
+                if (!message.location) {
+                    await sendToWhatsApp(from, getLocationMessage(session.language));
+                    return res.sendStatus(200); // Exit and wait for the user's response
+                }
+
+                // If the location is shared, store it and proceed to the next step
+                const { latitude, longitude } = message.location;
+
+                // Validate UAE location
+                const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
+                if (
+                    latitude >= UAE_BOUNDS.minLat &&
+                    latitude <= UAE_BOUNDS.maxLat &&
+                    longitude >= UAE_BOUNDS.minLng &&
+                    longitude <= UAE_BOUNDS.maxLng
+                ) {
+                    session.data.latitude = latitude;
+                    session.data.longitude = longitude;
+
+                    // Check for other missing fields
+                    const missingFields = getMissingFields(session.data);
+                    if (missingFields.length === 0) {
+                        session.step = STATES.CONFIRMATION;
+                        await sendOrderSummary(from, session);
                     } else {
-                        await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
+                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                        await askForNextMissingField(session, from);
                     }
-                    break;
+                } else {
+                    await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
+                }
+                break;
 
             case "ASK_QUANTITY":
                 // If the user hasn't provided a quantity yet, ask for it
