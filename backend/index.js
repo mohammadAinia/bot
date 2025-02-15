@@ -724,15 +724,7 @@ app.post('/webhook', async (req, res) => {
         // Handle messages based on the current state
         switch (session.step) {
             case STATES.WELCOME:
-                if (message.type === "text") {
-                    const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-                    const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-
-                    await sendInteractiveButtons(from, reply, [
-                        { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-                        { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-                    ]);
-                } else if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+                if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                     const buttonId = message.interactive.button_reply.id;
 
                     if (buttonId === "contact_us") {
@@ -740,11 +732,13 @@ app.post('/webhook', async (req, res) => {
                     } else if (buttonId === "new_request") {
                         session.step = STATES.NAME;
                         await sendToWhatsApp(from, getNameMessage(session.language));
+                        return res.sendStatus(200);  // ✅ Stops execution so it waits for user's response
                     } else {
                         await sendToWhatsApp(from, getInvalidOptionMessage(session.language));
                     }
                 }
                 break;
+
 
             case STATES.NAME:
                 session.data.name = textRaw;
