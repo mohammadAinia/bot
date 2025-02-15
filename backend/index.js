@@ -834,14 +834,11 @@ app.post('/webhook', async (req, res) => {
 
             case STATES.NAME:
                 if (!textRaw) {
-                    // If no name is provided, ask for the name again
-                    await sendToWhatsApp(from, getNameMessage(session.language));
+                    await sendToWhatsApp(from, getNameMessage(session.language)); // Ask for name again
                 } else {
-                    // Store the name and move to the next step
                     session.data.name = textRaw;
-                    session.data.phone = formatPhoneNumber(from); // Automatically store the sender's number
-                    session.step = STATES.EMAIL;
-                    await sendToWhatsApp(from, getEmailMessage(session.language)); // Ask for email
+                    session.step = STATES.PHONE_INPUT;
+                    await sendToWhatsApp(from, getPhoneMessage(session.language)); // Ask for phone number
                 }
                 break;
 
@@ -852,11 +849,8 @@ app.post('/webhook', async (req, res) => {
                 }
                 session.data.phone = formatPhoneNumber(textRaw);
                 session.step = STATES.EMAIL;
-                await sendToWhatsApp(from, getEmailMessage(session.language));
+                await sendToWhatsApp(from, getEmailMessage(session.language)); // Ask for email
                 break;
-
-
-
 
             case STATES.EMAIL:
                 if (!isValidEmail(textRaw)) {
@@ -864,15 +858,49 @@ app.post('/webhook', async (req, res) => {
                     return res.sendStatus(200);
                 }
                 session.data.email = textRaw;
-                session.step = STATES.ADDRESS;
-                await sendToWhatsApp(from, getAddressMessage(session.language)); // ✅ Use the function to support Arabic
+                session.step = STATES.LONGITUDE;
+                await sendToWhatsApp(from, getLocationMessage(session.language)); // Ask for location
+                break;
+
+            case STATES.LONGITUDE:
+                if (message.location) {
+                    const { latitude, longitude } = message.location;
+
+                    const UAE_BOUNDS = {
+                        minLat: 22.5,
+                        maxLat: 26.5,
+                        minLng: 51.6,
+                        maxLng: 56.5
+                    };
+
+                    if (
+                        latitude >= UAE_BOUNDS.minLat &&
+                        latitude <= UAE_BOUNDS.maxLat &&
+                        longitude >= UAE_BOUNDS.minLng &&
+                        longitude <= UAE_BOUNDS.maxLng
+                    ) {
+                        session.data.latitude = latitude;
+                        session.data.longitude = longitude;
+                        session.step = STATES.ADDRESS;
+
+                        await sendToWhatsApp(from, getAddressMessage(session.language)); // Ask for address
+                    } else {
+                        await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language)); // Location outside UAE
+                        console.error("Location outside UAE received:", { latitude, longitude });
+                    }
+                } else {
+                    if (!session.locationPromptSent) {
+                        await sendToWhatsApp(from, getInvalidLocationMessage(session.language));
+                        session.locationPromptSent = true;
+                    }
+                    console.error("Invalid input received in LONGITUDE state:", textRaw);
+                }
                 break;
 
             case STATES.ADDRESS:
                 session.data.address = textRaw;
                 session.step = STATES.CITY_SELECTION;
-                return await sendCitySelection(from, session.language); // ✅ Pass language
-
+                return await sendCitySelection(from, session.language); // ✅ Ask user to select city
 
             case STATES.CITY_SELECTION:
                 if (message.interactive && message.interactive.button_reply) {
@@ -911,64 +939,23 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-
             case STATES.STREET:
                 session.data.street = textRaw;
                 session.step = STATES.BUILDING_NAME;
-                await sendToWhatsApp(from, getBuildingMessage(session.language)); // ✅ Send message in correct language
+                await sendToWhatsApp(from, getBuildingMessage(session.language)); // Ask for building name
                 break;
 
             case STATES.BUILDING_NAME:
                 session.data.building_name = textRaw;
                 session.step = STATES.FLAT_NO;
-                await sendToWhatsApp(from, getFlatMessage(session.language)); // ✅ Use dynamic language support
+                await sendToWhatsApp(from, getFlatMessage(session.language)); // Ask for flat number
                 break;
 
             case STATES.FLAT_NO:
                 session.data.flat_no = textRaw;
-                session.step = STATES.LONGITUDE;
+                session.step = STATES.QUANTITY;
 
-                if (!session.locationPromptSent) {
-                    await sendToWhatsApp(from, getLocationMessage(session.language)); // ✅ Send location message dynamically
-                    session.locationPromptSent = true;
-                }
-                break;
-
-            case STATES.LONGITUDE:
-                if (message.location) {
-                    const { latitude, longitude } = message.location;
-
-                    // UAE geographical boundaries
-                    const UAE_BOUNDS = {
-                        minLat: 22.5,
-                        maxLat: 26.5,
-                        minLng: 51.6,
-                        maxLng: 56.5
-                    };
-
-                    if (
-                        latitude >= UAE_BOUNDS.minLat &&
-                        latitude <= UAE_BOUNDS.maxLat &&
-                        longitude >= UAE_BOUNDS.minLng &&
-                        longitude <= UAE_BOUNDS.maxLng
-                    ) {
-                        session.data.latitude = latitude;
-                        session.data.longitude = longitude;
-                        session.step = STATES.QUANTITY;
-                        session.awaitingQuantityInput = true;
-
-                        await sendToWhatsApp(from, getQuantityMessage(session.language)); // ✅ Send dynamic quantity message
-                    } else {
-                        await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language)); // ❌ Location outside UAE
-                        console.error("Location outside UAE received:", { latitude, longitude });
-                    }
-                } else {
-                    if (!session.locationPromptSent) {
-                        await sendToWhatsApp(from, getInvalidLocationMessage(session.language)); // ❌ Invalid input message
-                        session.locationPromptSent = true;
-                    }
-                    console.error("Invalid input received in LONGITUDE state:", textRaw);
-                }
+                await sendToWhatsApp(from, getQuantityMessage(session.language)); // Ask for quantity
                 break;
 
             case STATES.QUANTITY:
@@ -987,6 +974,7 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(from, getQuantityMessage(session.language)); // ✅ Ask for quantity dynamically
                 }
                 break;
+
 
 
 
