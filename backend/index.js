@@ -928,14 +928,18 @@ app.post('/webhook', async (req, res) => {
         const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
 
-        let detectedLanguage = "en";
+        let detectedLanguage = "en"; // Default to English
         try {
             const detected = langdetect.detect(textRaw);
             if (Array.isArray(detected) && detected.length > 0) {
                 detectedLanguage = detected[0].lang;
             }
+            // Ensure the detected language is either Arabic or English
+            if (detectedLanguage !== "ar" && detectedLanguage !== "en") {
+                detectedLanguage = "en"; // Default to English if not Arabic or English
+            }
         } catch (error) {
-            console.log("⚠️ Language detection failed.", error);
+            console.log("⚠️ Language detection failed. Defaulting to English.", error);
         }
 
         if (!userSessions[from]) {
@@ -945,11 +949,20 @@ app.post('/webhook', async (req, res) => {
                 language: detectedLanguage,
                 inRequest: false // Track if the user is in a request
             };
-            const welcomeMessage = await getOpenAIResponse("Generate a WhatsApp welcome message for Lootah Biofuels.", "", detectedLanguage);
+
+            // Generate the welcome message in the detected or default language
+            const welcomeMessage = await getOpenAIResponse(
+                "Generate a WhatsApp welcome message for Lootah Biofuels.",
+                "",
+                detectedLanguage // Use the detected or default language
+            );
+
+            // Send the welcome message with buttons
             await sendInteractiveButtons(from, welcomeMessage, [
                 { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
                 { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
             ]);
+
             return res.sendStatus(200);
         }
 
