@@ -604,7 +604,27 @@ async function askForNextMissingField(session, from) {
             case "phone":
                 await sendToWhatsApp(from, "📞 Please provide your phone number.");
                 break;
-            // Add cases for other fields as needed
+            case "address":
+                await sendToWhatsApp(from, "🏠 Please provide your address.");
+                break;
+            case "city":
+                await sendCitySelection(from, session.language);
+                break;
+            case "street":
+                await sendToWhatsApp(from, "🛣️ Please provide your street name.");
+                break;
+            case "building_name":
+                await sendToWhatsApp(from, "🏢 Please provide your building name.");
+                break;
+            case "flat_no":
+                await sendToWhatsApp(from, "🏠 Please provide your flat number.");
+                break;
+            case "location":
+                await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
+                break;
+            case "quantity":
+                await sendToWhatsApp(from, "🔢 Please provide the quantity (in liters).");
+                break;
             default:
                 await sendToWhatsApp(from, `🔹 Please provide your ${nextField.replace(/_/g, " ")}.`);
                 break;
@@ -1138,19 +1158,51 @@ app.post('/webhook', async (req, res) => {
 
 
             case "ASK_NAME":
+                // If the user hasn't provided a name yet, ask for it
+                if (!textRaw) {
+                    await sendToWhatsApp(from, "👤 Please provide your full name.");
+                    return res.sendStatus(200); // Exit and wait for the user's response
+                }
+
+                // If the name is provided, store it and proceed to the next step
                 session.data.name = textRaw;
-                session.step = STATES.CONFIRMATION;
-                await sendUpdatedSummary(from, session);
+
+                // Check for other missing fields
+                const missingFieldsName = getMissingFields(session.data);
+                if (missingFieldsName.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    session.step = `ASK_${missingFieldsName[0].toUpperCase()}`;
+                    await askForNextMissingField(session, from);
+                }
                 break;
 
             case "ASK_PHONE":
+                // If the user hasn't provided a phone number yet, ask for it
+                if (!textRaw) {
+                    await sendToWhatsApp(from, "📞 Please provide your phone number.");
+                    return res.sendStatus(200); // Exit and wait for the user's response
+                }
+
+                // Validate the phone number after the user provides it
                 if (!isValidPhone(textRaw)) {
                     await sendToWhatsApp(from, "❌ Invalid phone number, please enter a valid number.");
-                    return res.sendStatus(200);
+                    return res.sendStatus(200); // Exit and wait for the user to correct their input
                 }
+
+                // If the phone number is valid, store it and proceed to the next step
                 session.data.phone = formatPhoneNumber(textRaw);
-                session.step = STATES.CONFIRMATION;
-                await sendUpdatedSummary(from, session);
+
+                // Check for other missing fields
+                const missingFieldsPhone = getMissingFields(session.data);
+                if (missingFieldsPhone.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    session.step = `ASK_${missingFieldsPhone[0].toUpperCase()}`;
+                    await askForNextMissingField(session, from);
+                }
                 break;
 
             case "ASK_EMAIL":
@@ -1170,64 +1222,168 @@ app.post('/webhook', async (req, res) => {
                 session.data.email = textRaw;
 
                 // Check for other missing fields
-                const missingFields = getMissingFields(session.data);
-                if (missingFields.length === 0) {
+                const missingFieldsEmail = getMissingFields(session.data);
+                if (missingFieldsEmail.length === 0) {
                     session.step = STATES.CONFIRMATION;
                     await sendOrderSummary(from, session);
                 } else {
-                    session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                    session.step = `ASK_${missingFieldsEmail[0].toUpperCase()}`;
                     await askForNextMissingField(session, from);
                 }
                 break;
 
             case "ASK_ADDRESS":
+                // If the user hasn't provided an address yet, ask for it
+                if (!textRaw) {
+                    await sendToWhatsApp(from, "🏠 Please provide your address.");
+                    return res.sendStatus(200); // Exit and wait for the user's response
+                }
+
+                // If the address is provided, store it and proceed to the next step
                 session.data.address = textRaw;
-                session.step = STATES.CONFIRMATION;
-                await sendUpdatedSummary(from, session);
+
+                // Check for other missing fields
+                const missingFieldsAddress = getMissingFields(session.data);
+                if (missingFieldsAddress.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    session.step = `ASK_${missingFieldsAddress[0].toUpperCase()}`;
+                    await askForNextMissingField(session, from);
+                }
                 break;
 
             case "ASK_CITY":
-                await sendCitySelection(from, session.language);
-                session.step = STATES.CONFIRMATION;
+                // If the user hasn't selected a city yet, ask for it
+                if (!textRaw) {
+                    await sendCitySelection(from, session.language);
+                    return res.sendStatus(200); // Exit and wait for the user's response
+                }
+
+                // If the city is selected, store it and proceed to the next step
+                session.data.city = textRaw;
+
+                // Check for other missing fields
+                const missingFieldsCity = getMissingFields(session.data);
+                if (missingFieldsCity.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    session.step = `ASK_${missingFieldsCity[0].toUpperCase()}`;
+                    await askForNextMissingField(session, from);
+                }
                 break;
 
             case "ASK_STREET":
+                // If the user hasn't provided a street name yet, ask for it
+                if (!textRaw) {
+                    await sendToWhatsApp(from, "🛣️ Please provide your street name.");
+                    return res.sendStatus(200); // Exit and wait for the user's response
+                }
+
+                // If the street name is provided, store it and proceed to the next step
                 session.data.street = textRaw;
-                session.step = STATES.CONFIRMATION;
-                await sendUpdatedSummary(from, session);
+
+                // Check for other missing fields
+                const missingFieldsStreet = getMissingFields(session.data);
+                if (missingFieldsStreet.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    session.step = `ASK_${missingFieldsStreet[0].toUpperCase()}`;
+                    await askForNextMissingField(session, from);
+                }
                 break;
 
             case "ASK_BUILDING_NAME":
+                // If the user hasn't provided a building name yet, ask for it
+                if (!textRaw) {
+                    await sendToWhatsApp(from, "🏢 Please provide your building name.");
+                    return res.sendStatus(200); // Exit and wait for the user's response
+                }
+
+                // If the building name is provided, store it and proceed to the next step
                 session.data.building_name = textRaw;
-                session.step = STATES.CONFIRMATION;
-                await sendUpdatedSummary(from, session);
+
+                // Check for other missing fields
+                const missingFieldsBuilding = getMissingFields(session.data);
+                if (missingFieldsBuilding.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    session.step = `ASK_${missingFieldsBuilding[0].toUpperCase()}`;
+                    await askForNextMissingField(session, from);
+                }
                 break;
 
             case "ASK_FLAT_NO":
+                // If the user hasn't provided a flat number yet, ask for it
+                if (!textRaw) {
+                    await sendToWhatsApp(from, "🏠 Please provide your flat number.");
+                    return res.sendStatus(200); // Exit and wait for the user's response
+                }
+
+                // If the flat number is provided, store it and proceed to the next step
                 session.data.flat_no = textRaw;
-                session.step = STATES.CONFIRMATION;
-                await sendUpdatedSummary(from, session);
+
+                // Check for other missing fields
+                const missingFieldsFlat = getMissingFields(session.data);
+                if (missingFieldsFlat.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    session.step = `ASK_${missingFieldsFlat[0].toUpperCase()}`;
+                    await askForNextMissingField(session, from);
+                }
                 break;
 
             case "ASK_LOCATION":
-                if (message.location) {
-                    session.data.latitude = message.location.latitude;
-                    session.data.longitude = message.location.longitude;
-                    session.step = STATES.CONFIRMATION;
-                    await sendUpdatedSummary(from, session);
-                } else {
+                // If the user hasn't shared their location yet, ask for it
+                if (!message.location) {
                     await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
+                    return res.sendStatus(200); // Exit and wait for the user's response
+                }
+
+                // If the location is shared, store it and proceed to the next step
+                session.data.latitude = message.location.latitude;
+                session.data.longitude = message.location.longitude;
+
+                // Check for other missing fields
+                const missingFieldsLocation = getMissingFields(session.data);
+                if (missingFieldsLocation.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    session.step = `ASK_${missingFieldsLocation[0].toUpperCase()}`;
+                    await askForNextMissingField(session, from);
                 }
                 break;
 
             case "ASK_QUANTITY":
+                // If the user hasn't provided a quantity yet, ask for it
+                if (!textRaw) {
+                    await sendToWhatsApp(from, "🔢 Please provide the quantity (in liters).");
+                    return res.sendStatus(200); // Exit and wait for the user's response
+                }
+
+                // Validate the quantity after the user provides it
                 if (isNaN(textRaw) || textRaw.trim() === "") {
                     await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
-                    return res.sendStatus(200);
+                    return res.sendStatus(200); // Exit and wait for the user to correct their input
                 }
+
+                // If the quantity is valid, store it and proceed to the next step
                 session.data.quantity = textRaw;
-                session.step = STATES.CONFIRMATION;
-                await sendUpdatedSummary(from, session);
+
+                // Check for other missing fields
+                const missingFieldsQuantity = getMissingFields(session.data);
+                if (missingFieldsQuantity.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    session.step = `ASK_${missingFieldsQuantity[0].toUpperCase()}`;
+                    await askForNextMissingField(session, from);
+                }
                 break;
 
             case STATES.CONFIRMATION:
