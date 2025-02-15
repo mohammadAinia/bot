@@ -512,6 +512,13 @@ async function extractInformationFromText(text) {
         city: extractCity(text) // Extract city
     };
 
+    // Extract name using regex or simple logic
+    const nameMatch = text.match(/(?:i am|my name is|name is)\s+([a-zA-Z]+)/i);
+    if (nameMatch && nameMatch[1]) {
+        extractedData.name = nameMatch[1].trim();
+    }
+
+    // Use OpenAI for additional extraction
     const prompt = `
         Extract the following information from the text and return a valid JSON object:
         {
@@ -912,10 +919,12 @@ app.post('/webhook', async (req, res) => {
         if (classification === "request") {
             // Extract and store information
             const extractedData = await extractInformationFromText(textRaw);
+            console.log("Extracted Data:", extractedData); // Debugging
             session.data = { ...session.data, ...extractedData };
 
             // Check for missing fields
             const missingFields = getMissingFields(session.data);
+            console.log("Missing Fields:", missingFields); // Debugging
 
             if (missingFields.length === 0) {
                 session.step = STATES.CONFIRMATION;
@@ -942,12 +951,12 @@ app.post('/webhook', async (req, res) => {
                     const isRequestStart = await detectRequestStart(textRaw);
                     if (isRequestStart) {
                         const extractedData = await extractInformationFromText(textRaw);
+                        console.log("Extracted Data:", extractedData); // Debugging
                         session.data = { ...session.data, ...extractedData };
 
-                        console.log(`Extracted Data: ${JSON.stringify(extractedData, null, 2)}`); // Debugging
-
+                        // Check for missing fields
                         const missingFields = getMissingFields(session.data);
-                        console.log(`Missing Fields: ${missingFields}`); // Debugging
+                        console.log("Missing Fields:", missingFields); // Debugging
 
                         if (missingFields.length === 0) {
                             session.step = STATES.CONFIRMATION;
@@ -1125,6 +1134,83 @@ app.post('/webhook', async (req, res) => {
                     session.awaitingQuantityInput = true;
                     await sendToWhatsApp(from, getQuantityMessage(session.language)); // ✅ Ask for quantity dynamically
                 }
+                break;
+
+
+            case "ASK_NAME":
+                session.data.name = textRaw;
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
+                break;
+
+            case "ASK_PHONE":
+                if (!isValidPhone(textRaw)) {
+                    await sendToWhatsApp(from, "❌ Invalid phone number, please enter a valid number.");
+                    return res.sendStatus(200);
+                }
+                session.data.phone = formatPhoneNumber(textRaw);
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
+                break;
+
+            case "ASK_EMAIL":
+                if (!isValidEmail(textRaw)) {
+                    await sendToWhatsApp(from, "❌ Invalid email address, please enter a valid one.");
+                    return res.sendStatus(200);
+                }
+                session.data.email = textRaw;
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
+                break;
+
+            case "ASK_ADDRESS":
+                session.data.address = textRaw;
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
+                break;
+
+            case "ASK_CITY":
+                await sendCitySelection(from, session.language);
+                session.step = STATES.CONFIRMATION;
+                break;
+
+            case "ASK_STREET":
+                session.data.street = textRaw;
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
+                break;
+
+            case "ASK_BUILDING_NAME":
+                session.data.building_name = textRaw;
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
+                break;
+
+            case "ASK_FLAT_NO":
+                session.data.flat_no = textRaw;
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
+                break;
+
+            case "ASK_LOCATION":
+                if (message.location) {
+                    session.data.latitude = message.location.latitude;
+                    session.data.longitude = message.location.longitude;
+                    session.step = STATES.CONFIRMATION;
+                    await sendUpdatedSummary(from, session);
+                } else {
+                    await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
+                }
+                break;
+
+            case "ASK_QUANTITY":
+                if (isNaN(textRaw) || textRaw.trim() === "") {
+                    await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
+                    return res.sendStatus(200);
+                }
+                session.data.quantity = textRaw;
+                session.step = STATES.CONFIRMATION;
+                await sendUpdatedSummary(from, session);
                 break;
 
             case STATES.CONFIRMATION:
