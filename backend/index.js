@@ -805,6 +805,7 @@ function getInvalidUAERegionMessage(language) {
         '❌ الموقع الذي أرسلته خارج الإمارات. يرجى إرسال موقع داخل الإمارات.' :
         '❌ The location you shared is outside the UAE. Please send a location within the Emirates.';
 }
+//
 const sendLocationButton = async (to, language) => {
     try {
         const locationPrompt = language === 'ar'
