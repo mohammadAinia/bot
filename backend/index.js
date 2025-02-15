@@ -405,22 +405,32 @@ const sendUpdatedSummary = async (to, session) => {
 };
 
 const sendInteractiveButtons = async (to, message, buttons) => {
-    await axios.post(process.env.WHATSAPP_API_URL, {
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to: to,
-        type: "interactive",
-        interactive: {
-            type: "button",
-            body: { text: message },
-            action: { buttons }
-        }
-    }, {
-        headers: {
-            "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-            "Content-Type": "application/json"
-        }
-    });
+    try {
+        const payload = {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: to,
+            type: "interactive",
+            interactive: {
+                type: "button",
+                body: { text: message },
+                action: { buttons }
+            }
+        };
+
+        console.log("Sending Interactive Buttons Payload:", JSON.stringify(payload, null, 2));
+
+        const response = await axios.post(process.env.WHATSAPP_API_URL, payload, {
+            headers: {
+                "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                "Content-Type": "application/json"
+            }
+        });
+
+        console.log("Interactive Buttons Response:", response.data);
+    } catch (error) {
+        console.error("❌ Failed to send interactive buttons:", error.response?.data || error.message);
+    }
 };
 const sendLocationRequest = async (to, message) => {
     await axios.post(process.env.WHATSAPP_API_URL, {
@@ -665,6 +675,17 @@ function getButtonTitle(buttonId, language) {
 function getContactMessage(language) {
     return language === 'ar' ? '📞 يمكنك الاتصال بنا على support@example.com أو الاتصال على +1234567890.' : '📞 You can contact us at support@example.com or call +1234567890.';
 }
+function getNameMessage(language) {
+    return language === 'ar' ? '🔹 يرجى تقديم اسمك الكامل.' : '🔹 Please provide your full name.';
+}
+
+function getEmailMessage(language) {
+    return language === 'ar' ? '📧 يرجى تقديم عنوان بريدك الإلكتروني.' : '📧 Please provide your email address.';
+}
+
+function getInvalidOptionMessage(language) {
+    return language === 'ar' ? '❌ خيار غير صالح، يرجى تحديد زر صالح.' : '❌ Invalid option, please select a valid button.';
+}
 
 app.post('/webhook', async (req, res) => {
     try {
@@ -724,7 +745,15 @@ app.post('/webhook', async (req, res) => {
         // Handle messages based on the current state
         switch (session.step) {
             case STATES.WELCOME:
-                if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+                if (message.type === "text") {
+                    const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+                    const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+
+                    await sendInteractiveButtons(from, reply, [
+                        { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+                        { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+                    ]);
+                } else if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                     const buttonId = message.interactive.button_reply.id;
 
                     if (buttonId === "contact_us") {
@@ -732,19 +761,23 @@ app.post('/webhook', async (req, res) => {
                     } else if (buttonId === "new_request") {
                         session.step = STATES.NAME;
                         await sendToWhatsApp(from, getNameMessage(session.language));
-                        return res.sendStatus(200);  // ✅ Stops execution so it waits for user's response
                     } else {
                         await sendToWhatsApp(from, getInvalidOptionMessage(session.language));
                     }
                 }
                 break;
 
-
             case STATES.NAME:
-                session.data.name = textRaw;
-                session.data.phone = formatPhoneNumber(from); // Automatically store the sender's number
-                session.step = STATES.EMAIL;
-                await sendToWhatsApp(from, "📧 Please provide your email address.");
+                if (!textRaw) {
+                    // If no name is provided, ask for the name again
+                    await sendToWhatsApp(from, getNameMessage(session.language));
+                } else {
+                    // Store the name and move to the next step
+                    session.data.name = textRaw;
+                    session.data.phone = formatPhoneNumber(from); // Automatically store the sender's number
+                    session.step = STATES.EMAIL;
+                    await sendToWhatsApp(from, getEmailMessage(session.language)); // Ask for email
+                }
                 break;
 
             case STATES.PHONE_INPUT:
