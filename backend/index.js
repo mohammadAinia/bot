@@ -508,7 +508,8 @@ function extractQuantity(text) {
 
 async function extractInformationFromText(text) {
     const extractedData = {
-        quantity: extractQuantity(text) // Use extractQuantity function
+        quantity: extractQuantity(text), // Use extractQuantity function
+        city: extractCity(text) // New function to extract city
     };
 
     const prompt = `
@@ -540,6 +541,16 @@ async function extractInformationFromText(text) {
         console.error("❌ Failed to parse AI response as JSON:", aiResponse);
         return extractedData; // Return at least the manually extracted data
     }
+}
+
+function extractCity(text) {
+    const cities = ["Dubai", "Abu Dhabi", "Sharjah"];
+    for (const city of cities) {
+        if (text.includes(city)) {
+            return city;
+        }
+    }
+    return null;
 }
 
 
@@ -917,7 +928,7 @@ app.post('/webhook', async (req, res) => {
                     if (isRequestStart) {
                         const extractedData = await extractInformationFromText(textRaw);
                         session.data = { ...session.data, ...extractedData };
-
+            
                         const missingFields = getMissingFields(session.data);
                         if (missingFields.length > 0) {
                             session.step = `ASK_${missingFields[0].toUpperCase()}`;
@@ -929,7 +940,7 @@ app.post('/webhook', async (req, res) => {
                     } else {
                         const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
                         const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-
+            
                         await sendInteractiveButtons(from, reply, [
                             { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
                             { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
@@ -937,7 +948,7 @@ app.post('/webhook', async (req, res) => {
                     }
                 } else if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                     const buttonId = message.interactive.button_reply.id;
-
+            
                     if (buttonId === "contact_us") {
                         await sendToWhatsApp(from, getContactMessage(session.language));
                     } else if (buttonId === "new_request") {
