@@ -768,11 +768,14 @@ function getFlatMessage(language) {
     return language === 'ar' ? '🚪 يرجى تقديم رقم الشقة.' : '🚪 Please provide the flat number.';
 }
 
-function getLocationMessage(language) {
-    return language === 'ar'
-        ? '📍 يرجى مشاركة موقعك باستخدام خاصية الموقع في واتساب. اضغط على 📎 ثم اختر "موقع".'
-        : '📍 Please share your location using WhatsApp’s location feature. Tap the 📎 icon and select "Location".';
-}
+const getLocationMessage = (language) => {
+    if (language === 'ar') {
+        return '🚗 لفضلك شارك موقعك الحالي عبر الزر المخصص للموقع. 😊';
+    } else {
+        return '🚗 Please share your current location using the location button. 😊';
+    }
+};
+
 
 function getQuantityMessage(language) {
     return language === 'ar' ? '📦 يرجى إدخال الكمية (باللترات).' : '📦 Please provide the quantity (in liters).';
@@ -798,24 +801,38 @@ function getInvalidUAERegionMessage(language) {
 const sendLocationButton = async (to, language) => {
     try {
         const locationPrompt = language === 'ar'
-            ? '📍 يرجى النقر على الزر أدناه لمشاركة موقعك عبر واتساب.'
-            : '📍 Please tap the button below to share your location via WhatsApp.';
+            ? 'يرجى مشاركة موقعك الحالي باستخدام زر الموقع.'
+            : 'Please share your current location using the location button.';
 
         const locationButton = [
-            {
-                type: "reply",
-                reply: {
-                    id: "share_location",
-                    title: language === 'ar' ? '📍 أرسل الموقع' : '📍 Send Location'
-                }
-            }
+            { type: "reply", reply: { id: "share_location", title: language === 'ar' ? 'مشاركة الموقع' : 'Share Location' } }
         ];
 
-        await sendInteractiveButtons(to, locationPrompt, locationButton);
+        const payload = {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: to,
+            type: "interactive",
+            interactive: {
+                type: "button",
+                body: { text: locationPrompt },
+                action: { buttons: locationButton }
+            }
+        };
+
+        const response = await axios.post(process.env.WHATSAPP_API_URL, payload, {
+            headers: {
+                Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                "Content-Type": "application/json"
+            }
+        });
+
+        console.log("Location Button Response:", response.data);
     } catch (error) {
         console.error("Error sending location button:", error.response?.data || error.message);
     }
 };
+
 
 
 //
@@ -936,39 +953,40 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, getLocationMessage(session.language)); // Ask for location
                 break;
 
-            case STATES.LONGITUDE:
-                if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-                    const buttonId = message.interactive.button_reply.id;
-
-                    if (buttonId === "share_location") {
-                        // Send instructions to share location via WhatsApp
-                        await sendToWhatsApp(from, getLocationMessage(session.language));
-                    }
-                } else if (message.location) {
-                    const { latitude, longitude } = message.location;
-
-                    // Validate UAE location
-                    const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
-                    if (
-                        latitude >= UAE_BOUNDS.minLat &&
-                        latitude <= UAE_BOUNDS.maxLat &&
-                        longitude >= UAE_BOUNDS.minLng &&
-                        longitude <= UAE_BOUNDS.maxLng
-                    ) {
-                        session.data.latitude = latitude;
-                        session.data.longitude = longitude;
-                        session.step = STATES.ADDRESS;
-                        await sendToWhatsApp(from, getAddressMessage(session.language));
+                case STATES.LONGITUDE:
+                    if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+                        const buttonId = message.interactive.button_reply.id;
+                
+                        if (buttonId === "share_location") {
+                            // Send instructions to share location via WhatsApp
+                            await sendToWhatsApp(from, getLocationMessage(session.language));
+                        }
+                    } else if (message.location) {
+                        const { latitude, longitude } = message.location;
+                
+                        // Validate UAE location
+                        const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
+                        if (
+                            latitude >= UAE_BOUNDS.minLat &&
+                            latitude <= UAE_BOUNDS.maxLat &&
+                            longitude >= UAE_BOUNDS.minLng &&
+                            longitude <= UAE_BOUNDS.maxLng
+                        ) {
+                            session.data.latitude = latitude;
+                            session.data.longitude = longitude;
+                            session.step = STATES.ADDRESS;
+                            await sendToWhatsApp(from, getAddressMessage(session.language));
+                        } else {
+                            await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
+                        }
                     } else {
-                        await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
+                        if (!session.locationPromptSent) {
+                            await sendLocationButton(from, session.language); // Send location button
+                            session.locationPromptSent = true;
+                        }
                     }
-                } else {
-                    if (!session.locationPromptSent) {
-                        await sendLocationButton(from, session.language); // Send location button
-                        session.locationPromptSent = true;
-                    }
-                }
-                break;
+                    break;
+                
 
 
             //
