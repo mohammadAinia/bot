@@ -281,39 +281,29 @@ const sendCitySelection = async (to, language) => {
 
 const sendOrderSummary = async (to, session) => {
     try {
-        const summaryText = await getOpenAIResponse(
-            `Generate an order summary in a user-friendly way, including the following details:
-            Name: ${session.data.name},
-            Phone: ${session.data.phone},
-            Email: ${session.data.email},
-            Address: ${session.data.address},
-            City: ${session.data.city},
-            Street: ${session.data.street},
-            Building Name: ${session.data.building_name},
-            Flat Number: ${session.data.flat_no},
-            Location: (Latitude: ${session.data.latitude}, Longitude: ${session.data.longitude}),
-            Quantity: ${session.data.quantity}.
-            Also, ask the user to confirm if the details are correct.`,
-            session.language
-        );
+        const summaryText = `
+📝 *Order Summary* 📝
+
+🔹 *Name:* ${session.data.name || "Not provided"}
+📞 *Phone Number:* ${session.data.phone || "Not provided"}
+📧 *Email:* ${session.data.email || "Not provided"}
+📍 *Address:* ${session.data.address || "Not provided"}
+🌆 *City:* ${session.data.city || "Not provided"}
+🏠 *Street:* ${session.data.street || "Not provided"}
+🏢 *Building Name:* ${session.data.building_name || "Not provided"}
+🚪 *Flat Number:* ${session.data.flat_no || "Not provided"}
+📍 *Location:* Latitude: ${session.data.latitude || "Not provided"}, Longitude: ${session.data.longitude || "Not provided"}
+📦 *Quantity:* ${session.data.quantity || "Not provided"}
+
+Please review the details above. If there is any information that needs to be corrected, kindly let us know. Thank you! 😊
+        `;
 
         await axios.post(process.env.WHATSAPP_API_URL, {
             messaging_product: "whatsapp",
             recipient_type: "individual",
             to: to,
-            type: "interactive",
-            interactive: {
-                type: "button",
-                body: {
-                    text: summaryText
-                },
-                action: {
-                    buttons: [
-                        { type: "reply", reply: { id: "yes_confirm", title: session.language === 'ar' ? '✅ نعم' : '✅ Yes' } },
-                        { type: "reply", reply: { id: "no_correct", title: session.language === 'ar' ? '❌ لا' : '❌ No' } }
-                    ]
-                }
-            }
+            type: "text",
+            text: { body: summaryText }
         }, {
             headers: {
                 "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
@@ -607,9 +597,6 @@ async function askForNextMissingField(session, from) {
                 break;
             case "name":
                 await sendToWhatsApp(from, "👤 Please provide your full name.");
-                break;
-            case "phone":
-                await sendToWhatsApp(from, "📞 Please provide your phone number.");
                 break;
             case "address":
                 await sendToWhatsApp(from, "🏠 Please provide your address.");
@@ -932,7 +919,11 @@ app.post('/webhook', async (req, res) => {
         }
 
         if (!userSessions[from]) {
-            userSessions[from] = { step: STATES.WELCOME, data: {}, language: detectedLanguage };
+            userSessions[from] = {
+                step: STATES.WELCOME,
+                data: { phone: from }, // Auto-capture phone number
+                language: detectedLanguage
+            };
             const welcomeMessage = await getOpenAIResponse("Generate a WhatsApp welcome message for Lootah Biofuels.", "", detectedLanguage);
             await sendInteractiveButtons(from, welcomeMessage, [
                 { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
@@ -1364,40 +1355,40 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-                case "ASK_LOCATION":
-                    // If the user hasn't shared their location yet, ask for it
-                    if (!message.location) {
-                        await sendToWhatsApp(from, getLocationMessage(session.language));
-                        return res.sendStatus(200); // Exit and wait for the user's response
-                    }
-                
-                    // If the location is shared, store it and proceed to the next step
-                    const { latitude, longitude } = message.location;
-                
-                    // Validate UAE location
-                    const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
-                    if (
-                        latitude >= UAE_BOUNDS.minLat &&
-                        latitude <= UAE_BOUNDS.maxLat &&
-                        longitude >= UAE_BOUNDS.minLng &&
-                        longitude <= UAE_BOUNDS.maxLng
-                    ) {
-                        session.data.latitude = latitude;
-                        session.data.longitude = longitude;
-                
-                        // Check for other missing fields
-                        const missingFields = getMissingFields(session.data);
-                        if (missingFields.length === 0) {
-                            session.step = STATES.CONFIRMATION;
-                            await sendOrderSummary(from, session);
-                        } else {
-                            session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                            await askForNextMissingField(session, from);
-                        }
+            case "ASK_LOCATION":
+                // If the user hasn't shared their location yet, ask for it
+                if (!message.location) {
+                    await sendToWhatsApp(from, getLocationMessage(session.language));
+                    return res.sendStatus(200); // Exit and wait for the user's response
+                }
+
+                // If the location is shared, store it and proceed to the next step
+                const { latitude, longitude } = message.location;
+
+                // Validate UAE location
+                const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
+                if (
+                    latitude >= UAE_BOUNDS.minLat &&
+                    latitude <= UAE_BOUNDS.maxLat &&
+                    longitude >= UAE_BOUNDS.minLng &&
+                    longitude <= UAE_BOUNDS.maxLng
+                ) {
+                    session.data.latitude = latitude;
+                    session.data.longitude = longitude;
+
+                    // Check for other missing fields
+                    const missingFields = getMissingFields(session.data);
+                    if (missingFields.length === 0) {
+                        session.step = STATES.CONFIRMATION;
+                        await sendOrderSummary(from, session);
                     } else {
-                        await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
+                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                        await askForNextMissingField(session, from);
                     }
-                    break;
+                } else {
+                    await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
+                }
+                break;
 
             case "ASK_QUANTITY":
                 // If the user hasn't provided a quantity yet, ask for it
