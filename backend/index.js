@@ -688,28 +688,24 @@ const generateMissingFieldPrompt = async (field) => {
 };
 const analyzeInput = async (input, expectedField) => {
     const prompt = `
-        You are a helpful assistant for Lootah Biofuels. Your task is to analyze the user's input and determine if it matches the expected field.
-
-        - The user was asked to provide their "${expectedField}".
-        - They responded with: "${input}".
+        Determine if the user's input matches the requested field ("${expectedField}").
 
         Rules:
-        1. If the input matches the expected field, return "valid".
-        2. If the input does not match the expected field but matches another valid field (e.g., phone number, email, address, etc.), return "alternative:<field_name>".
-        3. If the input is completely invalid, return "invalid:<correction_message>".
+        1. For names: Accept both single-word (e.g., "Ahmed") and multi-word names (e.g., "John Doe").
+        2. Return "valid" if the input is appropriate for ${expectedField}.
+        3. Return "invalid:<message>" only if the input is clearly unrelated (e.g., numbers for a name).
 
-        Examples:
-        - If the expected field is "name" and the user provides "John Doe", return "valid".
-        - If the expected field is "phone number" and the user provides "john@example.com", return "alternative:email".
-        - If the expected field is "email" and the user provides "123", return "invalid:Please provide a valid email address. 😊".
+        Examples of valid names:
+        - "Ahmed"
+        - "John Doe"
+        - "Maria"
 
-        Important:
-        - Do not respond as if you are the user. Your task is to analyze the input and provide a response based on the rules above.
+        User Input: "${input}"
+        Your response (ONLY "valid" or "invalid:<reason>"):
     `;
 
     const response = await getOpenAIResponse(prompt, ``);
-    console.log(`Analyze Input Response: ${response}`); // Debugging
-    return response;
+    return response.trim();
 };
 const shouldEndRequest = (text) => {
     const endPhrases = [
@@ -962,21 +958,24 @@ app.post('/webhook', async (req, res) => {
 
                 case STATES.NAME:
                     if (!textRaw) {
-                        await sendToWhatsApp(from, getNameMessage(session.language)); // Ask for name again
+                        await sendToWhatsApp(from, getNameMessage(session.language));
                     } else {
-                        // Validate the name using analyzeInput
-                        const validationResult = await analyzeInput(textRaw, "name");
-                        if (validationResult === "valid") {
-                            session.data.name = textRaw;
-                
-                            // Automatically detect the user's phone number
-                            session.data.phone = from;
-                
-                            // Transition to the next step (email)
-                            session.step = STATES.EMAIL;
-                            await sendToWhatsApp(from, getEmailMessage(session.language)); // Ask for email
-                        } else {
-                            await sendToWhatsApp(from, "❌ Please provide a valid name. 😊");
+                        try {
+                            const validationResult = await analyzeInput(textRaw, "name");
+                            console.log(`Name Validation Result: ${validationResult}`); // Debugging
+                            
+                            // Make the check case-insensitive and trim whitespace
+                            if (validationResult.trim().toLowerCase() === "valid") {
+                                session.data.name = textRaw;
+                                session.data.phone = from; // Auto-capture phone from WhatsApp
+                                session.step = STATES.EMAIL;
+                                await sendToWhatsApp(from, getEmailMessage(session.language));
+                            } else {
+                                await sendToWhatsApp(from, "❌ Please provide a valid full name. 😊");
+                            }
+                        } catch (error) {
+                            console.error("Error validating name:", error);
+                            await sendToWhatsApp(from, "❌ Oops! Something went wrong. Please try again.");
                         }
                     }
                     break;
