@@ -955,30 +955,7 @@ app.post('/webhook', async (req, res) => {
         const session = userSessions[from];
         const classification = await isQuestionOrRequest(textRaw);
 
-        if (classification === "request") {
-            // Extract and store information
-            const extractedData = await extractInformationFromText(textRaw);
-            console.log("Extracted Data:", extractedData); // Debugging
-
-            // Preserve the phone number if it's already set in the session
-            if (session.data.phone) {
-                extractedData.phone = session.data.phone;
-            }
-
-            session.data = { ...session.data, ...extractedData };
-
-            // Check for missing fields
-            const missingFields = getMissingFields(session.data);
-            console.log("Missing Fields:", missingFields); // Debugging
-
-            if (missingFields.length === 0) {
-                session.step = STATES.CONFIRMATION;
-                await sendOrderSummary(from, session);
-            } else {
-                session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                await askForNextMissingField(session, from);
-            }
-        } else if (classification === "question") {
+        if (classification === "question") {
             // Handle questions
             const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
             const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
@@ -987,6 +964,7 @@ app.post('/webhook', async (req, res) => {
                 { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
                 { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
             ]);
+            return res.sendStatus(200); // Exit after handling the question
         }
 
         // Handle messages based on the current state
