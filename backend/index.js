@@ -618,6 +618,9 @@ async function askForNextMissingField(session, from) {
             case "phone":
                 await sendToWhatsApp(from, "📞 Please provide your phone number.");
                 break;
+            case "location":
+                await sendToWhatsApp(from, getLocationMessage(session.language));
+                break;
             case "address":
                 await sendToWhatsApp(from, "🏠 Please provide your address.");
                 break;
@@ -633,9 +636,7 @@ async function askForNextMissingField(session, from) {
             case "flat_no":
                 await sendToWhatsApp(from, "🏠 Please provide your flat number.");
                 break;
-            case "location":
-                await sendToWhatsApp(from, getLocationMessage(session.language));
-                break;
+
             case "quantity":
                 await sendToWhatsApp(from, "🔢 Please provide the quantity (in liters).");
                 break;
