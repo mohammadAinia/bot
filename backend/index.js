@@ -828,13 +828,19 @@ function getFlatMessage(language) {
 }
 
 const getLocationMessage = (language) => {
-    if (language === 'ar') {
-        return '📍 يرجى مشاركة موقعك الحالي باستخدام زر الموقع.';
-    } else {
-        return '📍 Please share your current location using the location button.';
-    }
+    return language === 'ar'
+        ? "📍 يرجى مشاركة موقعك الحالي لتحديد موقعك."
+        : "📍 Please share your current location to determine your site.";
 };
-//
+const getButtonTitle = (buttonId, language) => {
+    const buttonTitles = {
+        "contact_us": { en: "Contact Us", ar: "اتصل بنا" },
+        "new_request": { en: "New Request", ar: "طلب جديد" },
+        "send_site": { en: "Send Site", ar: "إرسال الموقع" }
+    };
+
+    return buttonTitles[buttonId]?.[language] || buttonTitles[buttonId]?.en || buttonId;
+};
 
 function getQuantityMessage(language) {
     return language === 'ar' ? '📦 يرجى إدخال الكمية (باللترات).' : '📦 Please provide the quantity (in liters).';
@@ -1072,14 +1078,21 @@ app.post('/webhook', async (req, res) => {
                 session.step = STATES.LONGITUDE;
                 await sendToWhatsApp(from, getLocationMessage(session.language)); // Ask for location
                 break;
-
             case STATES.LONGITUDE:
                 if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                     const buttonId = message.interactive.button_reply.id;
 
-                    if (buttonId === "share_location") {
-                        // Send instructions to share location via WhatsApp
-                        await sendToWhatsApp(from, getLocationMessage(session.language));
+                    if (buttonId === "send_site") {
+                        // Send a message with a button to share location
+                        await sendInteractiveButtons(from, getLocationMessage(session.language), [
+                            {
+                                type: "reply",
+                                reply: {
+                                    id: "send_site",
+                                    title: getButtonTitle("send_site", session.language) // "Send Site" button
+                                }
+                            }
+                        ]);
                     }
                 } else if (message.location) {
                     const { latitude, longitude } = message.location;
@@ -1101,7 +1114,16 @@ app.post('/webhook', async (req, res) => {
                     }
                 } else {
                     if (!session.locationPromptSent) {
-                        await sendLocationButton(from, session.language); // Send location button
+                        // Send a message with a button to share location
+                        await sendInteractiveButtons(from, getLocationMessage(session.language), [
+                            {
+                                type: "reply",
+                                reply: {
+                                    id: "send_site",
+                                    title: getButtonTitle("send_site", session.language) // "Send Site" button
+                                }
+                            }
+                        ]);
                         session.locationPromptSent = true;
                     }
                 }
