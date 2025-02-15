@@ -676,14 +676,20 @@ app.post('/webhook', async (req, res) => {
         const entry = req.body.entry?.[0];
         const changes = entry?.changes?.[0];
         const value = changes?.value;
-        const messages = value?.messages;
+        const messages = value?.messages || [];
 
-        if (!messages || messages.length === 0) {
-            console.log('No messages received, returning early.');
+        if (messages.length > 0) {
+            const message = messages[0]; // Regular text message
+            handleIncomingMessage(message, from);
+        } else if (value?.interactive) {
+            // Handle button clicks (interactive messages)
+            const interactiveMessage = value.interactive;
+            handleInteractiveMessage(interactiveMessage, from);
+        } else {
+            console.log('No valid messages or interactions found, returning early.');
             return res.sendStatus(200);
         }
 
-        const message = messages[0];
         const from = message.from;
         const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
