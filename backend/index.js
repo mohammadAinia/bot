@@ -585,32 +585,32 @@ function getMissingFields(sessionData) {
     return missingFields;
 }
 
-const askForNextMissingField = async (session, from) => {
+async function askForNextMissingField(session, from) {
     const missingFields = getMissingFields(session.data);
-
     if (missingFields.length === 0) {
         session.step = STATES.CONFIRMATION;
-        return await sendOrderSummary(from, session);
-    }
-
-    const nextMissingField = missingFields[0];
-
-    // Special handling for city
-    if (nextMissingField === 'city') {
-        session.step = STATES.CITY_SELECTION;
-        return await sendCitySelection(from);
-    }
-
-    session.step = `ASK_${nextMissingField.toUpperCase()}`;
-
-    const fieldPrompt = await generateMissingFieldPrompt(nextMissingField);
-    if (fieldPrompt) {
-        await sendToWhatsApp(from, fieldPrompt);
+        await sendOrderSummary(from, session);
     } else {
-        console.error(`No prompt found for field: ${nextMissingField}`);
-        await sendToWhatsApp(from, `Please provide your ${nextMissingField}. 😊`);
+        const nextField = missingFields[0];
+        session.step = `ASK_${nextField.toUpperCase()}`;
+
+        switch (nextField) {
+            case "email":
+                await sendToWhatsApp(from, "✉️ Could you please share your email address? We'll use it for sending updates on your order.");
+                break;
+            case "name":
+                await sendToWhatsApp(from, "👤 Please provide your full name.");
+                break;
+            case "phone":
+                await sendToWhatsApp(from, "📞 Please provide your phone number.");
+                break;
+            // Add cases for other fields as needed
+            default:
+                await sendToWhatsApp(from, `🔹 Please provide your ${nextField.replace(/_/g, " ")}.`);
+                break;
+        }
     }
-};
+}
 async function isQuestionOrRequest(text) {
     const prompt = `
     Classify the user's input into one of the following categories:
@@ -1154,13 +1154,30 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case "ASK_EMAIL":
-                if (!isValidEmail(textRaw)) {
-                    await sendToWhatsApp(from, "❌ Invalid email address, please enter a valid one.");
-                    return res.sendStatus(200);
+                // If the user hasn't provided an email yet, ask for it
+                if (!textRaw) {
+                    await sendToWhatsApp(from, "✉️ Could you please share your email address? We'll use it for sending updates on your order.");
+                    return res.sendStatus(200); // Exit and wait for the user's response
                 }
+
+                // Validate the email after the user provides it
+                if (!isValidEmail(textRaw)) {
+                    await sendToWhatsApp(from, "❌ Invalid email address, please enter a valid one (e.g., example@domain.com).");
+                    return res.sendStatus(200); // Exit and wait for the user to correct their input
+                }
+
+                // If the email is valid, store it and proceed to the next step
                 session.data.email = textRaw;
-                session.step = STATES.CONFIRMATION;
-                await sendUpdatedSummary(from, session);
+
+                // Check for other missing fields
+                const missingFields = getMissingFields(session.data);
+                if (missingFields.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                    await askForNextMissingField(session, from);
+                }
                 break;
 
             case "ASK_ADDRESS":
