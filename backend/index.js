@@ -276,6 +276,7 @@ const sendCitySelection = async (to, language) => {
         console.error("Error sending city selection:", error.response?.data || error.message);
     }
 };
+//
 
 
 const sendOrderSummary = async (to, session) => {
