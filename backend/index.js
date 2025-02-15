@@ -802,6 +802,48 @@ function getInvalidUAERegionMessage(language) {
         '❌ الموقع الذي أرسلته خارج الإمارات. يرجى إرسال موقع داخل الإمارات.' :
         '❌ The location you shared is outside the UAE. Please send a location within the Emirates.';
 }
+const sendLocationButton = async (to, language) => {
+    try {
+        const locationPrompt = language === 'ar'
+            ? '📍 يرجى النقر على الزر أدناه لمشاركة موقعك عبر واتساب.'
+            : '📍 Please tap the button below to share your location via WhatsApp.';
+
+        // Create a button to inform users about sending location
+        const locationButton = [
+            { 
+                type: "reply", 
+                reply: { 
+                    id: "send_location", 
+                    title: language === 'ar' ? '📍 أرسل الموقع' : '📍 Send Location' 
+                }
+            }
+        ];
+
+        const payload = {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: to,
+            type: "interactive",
+            interactive: {
+                type: "button",
+                body: { text: locationPrompt },
+                action: { buttons: locationButton }
+            }
+        };
+
+        const response = await axios.post(process.env.WHATSAPP_API_URL, payload, {
+            headers: {
+                Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                "Content-Type": "application/json"
+            }
+        });
+
+        console.log("Location Button Response:", response.data);
+    } catch (error) {
+        console.error("Error sending location button:", error.response?.data || error.message);
+    }
+};
+
 
 
 app.post('/webhook', async (req, res) => {
@@ -939,7 +981,6 @@ app.post('/webhook', async (req, res) => {
                             session.data.latitude = latitude;
                             session.data.longitude = longitude;
                             session.step = STATES.ADDRESS;
-                
                             await sendToWhatsApp(from, getAddressMessage(session.language)); // Ask for address
                         } else {
                             await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language)); // Location outside UAE
@@ -947,22 +988,14 @@ app.post('/webhook', async (req, res) => {
                         }
                     } else {
                         if (!session.locationPromptSent) {
-                            const locationMessage = getLocationMessage(session.language);
-                
-                            // "Send Location" button
-                            const locationButton = [
-                                {
-                                    type: "location_request",
-                                    title: session.language === 'ar' ? '📍 أرسل الموقع' : '📍 Send Location'
-                                }
-                            ];
-                
-                            await sendInteractiveButtons(from, locationMessage, locationButton);
+                            // Send a location button that instructs the user to share their location via WhatsApp
+                            await sendLocationButton(from, session.language);
                             session.locationPromptSent = true;
                         }
                         console.error("Invalid input received in LONGITUDE state:", textRaw);
                     }
                     break;
+                
 
 
 
