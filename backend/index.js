@@ -622,7 +622,7 @@ async function askForNextMissingField(session, from) {
                 await sendToWhatsApp(from, "🏠 Please provide your flat number.");
                 break;
             case "location":
-                await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
+                await sendToWhatsApp(from, getLocationMessage(session.language));
                 break;
             case "quantity":
                 await sendToWhatsApp(from, "🔢 Please provide the quantity (in liters).");
@@ -811,9 +811,9 @@ function getFlatMessage(language) {
 
 const getLocationMessage = (language) => {
     if (language === 'ar') {
-        return '🚗 لفضلك شارك موقعك الحالي عبر الزر المخصص للموقع. 😊';
+        return '📍 يرجى مشاركة موقعك الحالي باستخدام زر الموقع.';
     } else {
-        return '🚗 Please share your current location using the location button. 😊';
+        return '📍 Please share your current location using the location button.';
     }
 };
 //
@@ -1358,27 +1358,40 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-            case "ASK_LOCATION":
-                // If the user hasn't shared their location yet, ask for it
-                if (!message.location) {
-                    await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
-                    return res.sendStatus(200); // Exit and wait for the user's response
-                }
-
-                // If the location is shared, store it and proceed to the next step
-                session.data.latitude = message.location.latitude;
-                session.data.longitude = message.location.longitude;
-
-                // Check for other missing fields
-                const missingFieldsLocation = getMissingFields(session.data);
-                if (missingFieldsLocation.length === 0) {
-                    session.step = STATES.CONFIRMATION;
-                    await sendOrderSummary(from, session);
-                } else {
-                    session.step = `ASK_${missingFieldsLocation[0].toUpperCase()}`;
-                    await askForNextMissingField(session, from);
-                }
-                break;
+                case "ASK_LOCATION":
+                    // If the user hasn't shared their location yet, ask for it
+                    if (!message.location) {
+                        await sendToWhatsApp(from, getLocationMessage(session.language));
+                        return res.sendStatus(200); // Exit and wait for the user's response
+                    }
+                
+                    // If the location is shared, store it and proceed to the next step
+                    const { latitude, longitude } = message.location;
+                
+                    // Validate UAE location
+                    const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
+                    if (
+                        latitude >= UAE_BOUNDS.minLat &&
+                        latitude <= UAE_BOUNDS.maxLat &&
+                        longitude >= UAE_BOUNDS.minLng &&
+                        longitude <= UAE_BOUNDS.maxLng
+                    ) {
+                        session.data.latitude = latitude;
+                        session.data.longitude = longitude;
+                
+                        // Check for other missing fields
+                        const missingFields = getMissingFields(session.data);
+                        if (missingFields.length === 0) {
+                            session.step = STATES.CONFIRMATION;
+                            await sendOrderSummary(from, session);
+                        } else {
+                            session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                            await askForNextMissingField(session, from);
+                        }
+                    } else {
+                        await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
+                    }
+                    break;
 
             case "ASK_QUANTITY":
                 // If the user hasn't provided a quantity yet, ask for it
