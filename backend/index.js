@@ -808,14 +808,11 @@ const sendLocationButton = async (to, language) => {
             ? '📍 يرجى النقر على الزر أدناه لمشاركة موقعك عبر واتساب.'
             : '📍 Please tap the button below to share your location via WhatsApp.';
 
-        // Use a reply button to prompt the user to share their location
+        // Define the location button
         const locationButton = [
             {
-                type: "reply",
-                reply: {
-                    id: "share_location",
-                    title: language === 'ar' ? '📍 أرسل الموقع' : '📍 Send Location'
-                }
+                type: "location_request",
+                title: language === 'ar' ? '📍 أرسل الموقع' : '📍 Send Location'
             }
         ];
 
@@ -843,6 +840,7 @@ const sendLocationButton = async (to, language) => {
         console.error("Error sending location button:", error.response?.data || error.message);
     }
 };
+
 
 
 //
@@ -963,48 +961,48 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, getLocationMessage(session.language)); // Ask for location
                 break;
 
-            case STATES.LONGITUDE:
-                if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-                    const buttonId = message.interactive.button_reply.id;
-
-                    if (buttonId === "share_location") {
-                        // Prompt the user to share their location manually
-                        await sendToWhatsApp(from, getLocationMessage(session.language));
-                    }
-                } else if (message.location) {
-                    const { latitude, longitude } = message.location;
-
-                    const UAE_BOUNDS = {
-                        minLat: 22.5,
-                        maxLat: 26.5,
-                        minLng: 51.6,
-                        maxLng: 56.5
-                    };
-
-                    if (
-                        latitude >= UAE_BOUNDS.minLat &&
-                        latitude <= UAE_BOUNDS.maxLat &&
-                        longitude >= UAE_BOUNDS.minLng &&
-                        longitude <= UAE_BOUNDS.maxLng
-                    ) {
-                        session.data.latitude = latitude;
-                        session.data.longitude = longitude;
-                        session.step = STATES.ADDRESS;
-
-                        await sendToWhatsApp(from, getAddressMessage(session.language)); // Ask for address
+                case STATES.LONGITUDE:
+                    if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+                        const buttonId = message.interactive.button_reply.id;
+                
+                        if (buttonId === "share_location") {
+                            // Prompt the user to share their location manually, this seems to already be done with the button
+                            await sendToWhatsApp(from, getLocationMessage(session.language));
+                        }
+                    } else if (message.location) {
+                        const { latitude, longitude } = message.location;
+                
+                        const UAE_BOUNDS = {
+                            minLat: 22.5,
+                            maxLat: 26.5,
+                            minLng: 51.6,
+                            maxLng: 56.5
+                        };
+                
+                        if (
+                            latitude >= UAE_BOUNDS.minLat &&
+                            latitude <= UAE_BOUNDS.maxLat &&
+                            longitude >= UAE_BOUNDS.minLng &&
+                            longitude <= UAE_BOUNDS.maxLng
+                        ) {
+                            session.data.latitude = latitude;
+                            session.data.longitude = longitude;
+                            session.step = STATES.ADDRESS;
+                
+                            await sendToWhatsApp(from, getAddressMessage(session.language)); // Ask for address
+                        } else {
+                            await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language)); // Location outside UAE
+                            console.error("Location outside UAE received:", { latitude, longitude });
+                        }
                     } else {
-                        await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language)); // Location outside UAE
-                        console.error("Location outside UAE received:", { latitude, longitude });
+                        if (!session.locationPromptSent) {
+                            // Send a location button that instructs the user to share their location via WhatsApp
+                            await sendLocationButton(from, session.language);
+                            session.locationPromptSent = true;
+                        }
+                        console.error("Invalid input received in LONGITUDE state:", textRaw);
                     }
-                } else {
-                    if (!session.locationPromptSent) {
-                        // Send a location button that instructs the user to share their location via WhatsApp
-                        await sendLocationButton(from, session.language);
-                        session.locationPromptSent = true;
-                    }
-                    console.error("Invalid input received in LONGITUDE state:", textRaw);
-                }
-                break;
+                
 
 
 //
