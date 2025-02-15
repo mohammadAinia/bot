@@ -508,8 +508,8 @@ function extractQuantity(text) {
 
 async function extractInformationFromText(text) {
     const extractedData = {
-        quantity: extractQuantity(text), // Use extractQuantity function
-        city: extractCity(text) // New function to extract city
+        quantity: extractQuantity(text), // Extract quantity
+        city: extractCity(text) // Extract city
     };
 
     const prompt = `
@@ -692,13 +692,18 @@ const analyzeInput = async (input, expectedField) => {
 
         Rules:
         1. For names: Accept both single-word (e.g., "Ahmed") and multi-word names (e.g., "John Doe").
-        2. Return "valid" if the input is appropriate for ${expectedField}.
-        3. Return "invalid:<message>" only if the input is clearly unrelated (e.g., numbers for a name).
+        2. For addresses: Accept partial addresses (e.g., "Jazeer") and validate them later.
+        3. Return "valid" if the input is appropriate for ${expectedField}.
+        4. Return "invalid:<message>" only if the input is clearly unrelated (e.g., numbers for a name).
 
         Examples of valid names:
         - "Ahmed"
         - "John Doe"
         - "Maria"
+
+        Examples of valid addresses:
+        - "Jazeer"
+        - "123 Main Street"
 
         User Input: "${input}"
         Your response (ONLY "valid" or "invalid:<reason>"):
@@ -1011,15 +1016,15 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, getEmailMessage(session.language)); // Ask for email
                 break;
 
-            case STATES.EMAIL:
-                if (!isValidEmail(textRaw)) {
-                    await sendToWhatsApp(from, getInvalidEmailMessage(session.language)); // Ensure email validation message supports Arabic
-                    return res.sendStatus(200);
-                }
-                session.data.email = textRaw;
-                session.step = STATES.LONGITUDE;
-                await sendToWhatsApp(from, getLocationMessage(session.language)); // Ask for location
-                break;
+                case STATES.EMAIL:
+                    if (!isValidEmail(textRaw)) {
+                        await sendToWhatsApp(from, "❌ Please provide a valid email address (e.g., example@domain.com).");
+                        return res.sendStatus(200);
+                    }
+                    session.data.email = textRaw;
+                    session.step = STATES.LONGITUDE;
+                    await sendToWhatsApp(from, getLocationMessage(session.language)); // Ask for location
+                    break;
 
             case STATES.LONGITUDE:
                 if (message.type === "interactive" && message.interactive?.type === "button_reply") {
