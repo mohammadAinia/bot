@@ -893,7 +893,7 @@ app.post('/webhook', async (req, res) => {
 
         const session = userSessions[from];
 
-        // Handle messages based on the current state
+        // Handle messages based on the current step (state)
         switch (session.step) {
             case STATES.WELCOME:
                 if (message.type === "text") {
@@ -953,40 +953,40 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, getLocationMessage(session.language)); // Ask for location
                 break;
 
-                case STATES.LONGITUDE:
-                    if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-                        const buttonId = message.interactive.button_reply.id;
-                
-                        if (buttonId === "share_location") {
-                            // Send instructions to share location via WhatsApp
-                            await sendToWhatsApp(from, getLocationMessage(session.language));
-                        }
-                    } else if (message.location) {
-                        const { latitude, longitude } = message.location;
-                
-                        // Validate UAE location
-                        const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
-                        if (
-                            latitude >= UAE_BOUNDS.minLat &&
-                            latitude <= UAE_BOUNDS.maxLat &&
-                            longitude >= UAE_BOUNDS.minLng &&
-                            longitude <= UAE_BOUNDS.maxLng
-                        ) {
-                            session.data.latitude = latitude;
-                            session.data.longitude = longitude;
-                            session.step = STATES.ADDRESS;
-                            await sendToWhatsApp(from, getAddressMessage(session.language));
-                        } else {
-                            await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
-                        }
-                    } else {
-                        if (!session.locationPromptSent) {
-                            await sendLocationButton(from, session.language); // Send location button
-                            session.locationPromptSent = true;
-                        }
+            case STATES.LONGITUDE:
+                if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+                    const buttonId = message.interactive.button_reply.id;
+
+                    if (buttonId === "share_location") {
+                        // Send instructions to share location via WhatsApp
+                        await sendToWhatsApp(from, getLocationMessage(session.language));
                     }
-                    break;
-                
+                } else if (message.location) {
+                    const { latitude, longitude } = message.location;
+
+                    // Validate UAE location
+                    const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
+                    if (
+                        latitude >= UAE_BOUNDS.minLat &&
+                        latitude <= UAE_BOUNDS.maxLat &&
+                        longitude >= UAE_BOUNDS.minLng &&
+                        longitude <= UAE_BOUNDS.maxLng
+                    ) {
+                        session.data.latitude = latitude;
+                        session.data.longitude = longitude;
+                        session.step = STATES.ADDRESS;
+                        await sendToWhatsApp(from, getAddressMessage(session.language));
+                    } else {
+                        await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
+                    }
+                } else {
+                    if (!session.locationPromptSent) {
+                        await sendLocationButton(from, session.language); // Send location button
+                        session.locationPromptSent = true;
+                    }
+                }
+                break;
+
 
 
             //
