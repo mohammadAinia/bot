@@ -723,11 +723,12 @@ function getFlatMessage(language) {
     return language === 'ar' ? '🚪 يرجى تقديم رقم الشقة.' : '🚪 Please provide the flat number.';
 }
 
-function getLocationMessage(language) {
+function getLocationMessage(language) { 
     return language === 'ar' ?
-        '📍 يرجى مشاركة موقعك باستخدام خاصية الموقع في واتساب. اضغط على 📎 ثم اختر "موقع".' :
-        '📍 Please share your location using WhatsApp’s location feature. Tap the 📎 icon and select "Location".';
+        '📍 يرجى مشاركة موقعك باستخدام زر "أرسل الموقع" أدناه أو من خلال واتساب. اضغط على 📎 ثم اختر "موقع".' :
+        '📍 Please share your location using the "Send Location" button below or via WhatsApp. Tap the 📎 icon and select "Location".';
 }
+
 
 function getInvalidLocationMessage(language) {
     return language === 'ar' ?
@@ -898,11 +899,10 @@ app.post('/webhook', async (req, res) => {
                     if (!session.locationPromptSent) {
                         const locationMessage = getLocationMessage(session.language);
 
-                        // Add the "Send Location" button
+                        // "Send Location" button
                         const locationButton = [
                             {
-                                type: "quick_reply",
-                                reply: { id: "send_location", title: session.language === "ar" ? "📍 أرسل الموقع" : "📍 Send Location" }
+                                type: "location_request"
                             }
                         ];
 
@@ -912,6 +912,7 @@ app.post('/webhook', async (req, res) => {
                     console.error("Invalid input received in LONGITUDE state:", textRaw);
                 }
                 break;
+
 
 
             case STATES.ADDRESS:
