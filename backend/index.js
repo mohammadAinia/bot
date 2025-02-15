@@ -506,14 +506,14 @@ function extractQuantity(text) {
     return match ? match[0] : null; // Returns the number or null if not found
 }
 
-async function extractInformationFromText(text) {
+async function extractInformationFromText(text, language = "en") {
     const extractedData = {
         quantity: extractQuantity(text), // Extract quantity
-        city: extractCity(text) // Extract city
+        city: extractCity(text, language) // Extract city
     };
 
     // Extract name using regex or simple logic
-    const nameMatch = text.match(/(?:i am|my name is|name is)\s+([a-zA-Z]+)/i);
+    const nameMatch = text.match(/(?:انا|اسمي|my name is|name is)\s+([\u0600-\u06FF\s]+|[a-zA-Z\s]+)/i);
     if (nameMatch && nameMatch[1]) {
         extractedData.name = nameMatch[1].trim();
     }
@@ -546,7 +546,7 @@ async function extractInformationFromText(text) {
         Text: ${text}
     `;
 
-    const aiResponse = await getOpenAIResponse(prompt); // Pass prompt, not textRaw
+    const aiResponse = await getOpenAIResponse(prompt, ``, language); // Pass prompt, not textRaw
 
     try {
         const aiExtractedData = JSON.parse(aiResponse);
@@ -557,13 +557,17 @@ async function extractInformationFromText(text) {
     }
 }
 
-function extractCity(text) {
-    const cities = ["Dubai", "Abu Dhabi", "Sharjah"];
-    const cityPatterns = cities.map(city => new RegExp(`\\b${city}\\b`, 'i')); // Case-insensitive matching
+function extractCity(text, language = "en") {
+    const cities = {
+        en: ["Dubai", "Abu Dhabi", "Sharjah"],
+        ar: ["دبي", "أبو ظبي", "الشارقة"]
+    };
+
+    const cityPatterns = cities[language].map(city => new RegExp(`\\b${city}\\b`, 'i')); // Case-insensitive matching
 
     for (let i = 0; i < cityPatterns.length; i++) {
         if (cityPatterns[i].test(text)) {
-            return cities[i]; // Return the matched city
+            return cities[language][i]; // Return the matched city
         }
     }
     return null; // Return null if no city is found
@@ -994,7 +998,7 @@ app.post('/webhook', async (req, res) => {
                     const isRequestStart = await detectRequestStart(textRaw);
                     if (isRequestStart) {
                         session.inRequest = true; // Set inRequest to true
-                        const extractedData = await extractInformationFromText(textRaw);
+                        const extractedData = await extractInformationFromText(textRaw, session.language);
                         console.log("Extracted Data:", extractedData); // Debugging
                         session.data = { ...session.data, ...extractedData };
 
