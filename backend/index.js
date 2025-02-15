@@ -436,6 +436,7 @@ const sendInteractiveButtons = async (to, message, buttons) => {
         console.error("❌ Failed to send interactive buttons:", error.response?.data || error.message);
     }
 };
+
 const sendLocationRequest = async (to, message) => {
     await axios.post(process.env.WHATSAPP_API_URL, {
         messaging_product: "whatsapp",
@@ -890,12 +891,23 @@ app.post('/webhook', async (req, res) => {
                     }
                 } else {
                     if (!session.locationPromptSent) {
-                        await sendToWhatsApp(from, getInvalidLocationMessage(session.language));
+                        const locationMessage = getLocationMessage(session.language);
+
+                        // Add the "Send Location" button
+                        const locationButton = [
+                            {
+                                type: "quick_reply",
+                                reply: { id: "send_location", title: session.language === "ar" ? "📍 أرسل الموقع" : "📍 Send Location" }
+                            }
+                        ];
+
+                        await sendInteractiveButtons(from, locationMessage, locationButton);
                         session.locationPromptSent = true;
                     }
                     console.error("Invalid input received in LONGITUDE state:", textRaw);
                 }
                 break;
+
 
             case STATES.ADDRESS:
                 session.data.address = textRaw;
