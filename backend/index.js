@@ -665,9 +665,6 @@ function getButtonTitle(buttonId, language) {
 function getContactMessage(language) {
     return language === 'ar' ? '📞 يمكنك الاتصال بنا على support@example.com أو الاتصال على +1234567890.' : '📞 You can contact us at support@example.com or call +1234567890.';
 }
-function getContinueMessage(language) {
-    return language === 'ar' ? 'لإكمال الاستفسار، يمكنك طرح أسئلة أخرى. إذا كنت ترغب في تقديم طلب أو الاتصال بنا، اختر من الخيارات التالية:' : 'To complete the inquiry, you can ask other questions. If you want to submit a request or contact us, choose from the following options:';
-}
 
 app.post('/webhook', async (req, res) => {
     try {
@@ -676,20 +673,14 @@ app.post('/webhook', async (req, res) => {
         const entry = req.body.entry?.[0];
         const changes = entry?.changes?.[0];
         const value = changes?.value;
-        const messages = value?.messages || [];
+        const messages = value?.messages;
 
-        if (messages.length > 0) {
-            const message = messages[0]; // Regular text message
-            handleIncomingMessage(message, from);
-        } else if (value?.interactive) {
-            // Handle button clicks (interactive messages)
-            const interactiveMessage = value.interactive;
-            handleInteractiveMessage(interactiveMessage, from);
-        } else {
-            console.log('No valid messages or interactions found, returning early.');
+        if (!messages || messages.length === 0) {
+            console.log('No messages received, returning early.');
             return res.sendStatus(200);
         }
 
+        const message = messages[0];
         const from = message.from;
         const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
