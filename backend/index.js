@@ -774,13 +774,15 @@ const shouldEndRequest = (text) => {
 
     return endPhrases.some(phrase => text.includes(phrase));
 };
-function getButtonTitle(buttonId, language) {
-    const buttons = {
-        contact_us: { en: '📞 Contact Us', ar: '📞 اتصل بنا' },
-        new_request: { en: '📝 New Request', ar: '📝 طلب جديد' }
+const getButtonTitle = (buttonId, language) => {
+    const buttonTitles = {
+        "contact_us": { en: "Contact Us", ar: "اتصل بنا" },
+        "new_request": { en: "New Request", ar: "طلب جديد" },
+        "send_site": { en: "Send Site", ar: "إرسال الموقع" }
     };
-    return buttons[buttonId][language === 'ar' ? 'ar' : 'en'];
-}
+
+    return buttonTitles[buttonId]?.[language] || buttonTitles[buttonId]?.en || buttonId;
+};
 function getContactMessage(language) {
     return language === 'ar' ? '📞 يمكنك الاتصال بنا على support@example.com أو الاتصال على +1234567890.' : '📞 You can contact us at support@example.com or call +1234567890.';
 }
@@ -832,15 +834,7 @@ const getLocationMessage = (language) => {
         ? "📍 يرجى مشاركة موقعك الحالي لتحديد موقعك."
         : "📍 Please share your current location to determine your site.";
 };
-const getButtonTitle = (buttonId, language) => {
-    const buttonTitles = {
-        "contact_us": { en: "Contact Us", ar: "اتصل بنا" },
-        "new_request": { en: "New Request", ar: "طلب جديد" },
-        "send_site": { en: "Send Site", ar: "إرسال الموقع" }
-    };
 
-    return buttonTitles[buttonId]?.[language] || buttonTitles[buttonId]?.en || buttonId;
-};
 
 function getQuantityMessage(language) {
     return language === 'ar' ? '📦 يرجى إدخال الكمية (باللترات).' : '📦 Please provide the quantity (in liters).';
