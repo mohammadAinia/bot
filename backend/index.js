@@ -668,39 +668,53 @@ function getContactMessage(language) {
 
 app.post('/webhook', async (req, res) => {
     try {
-        console.log('Incoming Webhook Data:', req.body);
+        console.log('Incoming Webhook Data:', JSON.stringify(req.body, null, 2));
 
         const entry = req.body.entry?.[0];
         const changes = entry?.changes?.[0];
         const value = changes?.value;
         const messages = value?.messages;
 
-        if (!messages || messages.length === 0) {
-            console.log('No messages received, returning early.');
+        if (!messages || !Array.isArray(messages) || messages.length === 0) {
+            console.log('⚠️ No messages received, returning early.');
             return res.sendStatus(200);
         }
 
         const message = messages[0];
+
+        if (!message?.from) {
+            console.log("⚠️ No sender information found.");
+            return res.sendStatus(400);
+        }
+
         const from = message.from;
         const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
 
-        // Detect the language of the incoming message
-        const language = langdetect.detect(textRaw)[0].lang;
+        // Detect the language safely
+        let detectedLanguage = "en"; // Default to English
+        try {
+            const detected = langdetect.detect(textRaw);
+            if (Array.isArray(detected) && detected.length > 0) {
+                detectedLanguage = detected[0].lang;
+            }
+        } catch (error) {
+            console.log("⚠️ Language detection failed. Using default 'en'.", error);
+        }
 
-        console.log(`📩 New message from ${from}: ${text} (Language: ${language})`);
+        console.log(`📩 New message from ${from}: ${text} (Language: ${detectedLanguage})`);
 
         // Initialize user session if it doesn't exist
         if (!userSessions[from]) {
-            userSessions[from] = { step: STATES.WELCOME, data: {}, language: language };
+            userSessions[from] = { step: STATES.WELCOME, data: {}, language: detectedLanguage };
 
             // Get dynamic welcome message from OpenAI
-            const welcomeMessage = await getOpenAIResponse("Generate a WhatsApp welcome message for Lootah Biofuels.", "", language);
+            const welcomeMessage = await getOpenAIResponse("Generate a WhatsApp welcome message for Lootah Biofuels.", "", detectedLanguage);
 
-            // Send welcome message with options
+            // Send welcome message with buttons
             await sendInteractiveButtons(from, welcomeMessage, [
-                { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", language) } },
-                { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", language) } }
+                { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
+                { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
             ]);
             return res.sendStatus(200);
         }
@@ -718,7 +732,7 @@ app.post('/webhook', async (req, res) => {
                         { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
                         { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
                     ]);
-                } else if (message.type === "interactive" && message.interactive.type === "button_reply") {
+                } else if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                     const buttonId = message.interactive.button_reply.id;
 
                     if (buttonId === "contact_us") {
@@ -732,7 +746,6 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-            //----------------------------------------------------------------------
             case STATES.NAME:
                 session.data.name = textRaw;
                 session.data.phone = formatPhoneNumber(from); // Automatically store the sender's number
