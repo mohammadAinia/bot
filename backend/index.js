@@ -926,13 +926,17 @@ app.post('/webhook', async (req, res) => {
                         const extractedData = await extractInformationFromText(textRaw);
                         session.data = { ...session.data, ...extractedData };
             
+                        console.log(`Extracted Data: ${JSON.stringify(extractedData, null, 2)}`); // Debugging
+            
                         const missingFields = getMissingFields(session.data);
-                        if (missingFields.length > 0) {
-                            session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                            await askForNextMissingField(session, from);
-                        } else {
+                        console.log(`Missing Fields: ${missingFields}`); // Debugging
+            
+                        if (missingFields.length === 0) {
                             session.step = STATES.CONFIRMATION;
                             await sendOrderSummary(from, session);
+                        } else {
+                            session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                            await askForNextMissingField(session, from);
                         }
                     } else {
                         const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
