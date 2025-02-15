@@ -243,7 +243,6 @@ const isValidPhone = (phone) => {
 const sendCitySelection = async (to, language) => {
     try {
         const cityPrompt = language === 'ar' ? 'يرجى اختيار المدينة من الخيارات المتاحة:' : 'Please select your city from the available options:';
-
         const cityButtons = [
             { type: "reply", reply: { id: "abu_dhabi", title: language === 'ar' ? 'أبو ظبي' : 'Abu Dhabi' } },
             { type: "reply", reply: { id: "dubai", title: language === 'ar' ? 'دبي' : 'Dubai' } },
@@ -268,7 +267,6 @@ const sendCitySelection = async (to, language) => {
                 "Content-Type": "application/json"
             }
         });
-
         console.log("City Selection Response:", response.data);
     } catch (error) {
         console.error("Error sending city selection:", error.response?.data || error.message);
@@ -686,6 +684,62 @@ function getEmailMessage(language) {
 function getInvalidOptionMessage(language) {
     return language === 'ar' ? '❌ خيار غير صالح، يرجى تحديد زر صالح.' : '❌ Invalid option, please select a valid button.';
 }
+function getPhoneMessage(language) {
+    return language === 'ar' ? '📱 يرجى تقديم رقم هاتفك (يجب أن يكون رقم إماراتي).' : '📱 Please provide your phone number (must be a valid Emirati number).';
+}
+
+function getInvalidPhoneMessage(language) {
+    return language === 'ar' ? '❌ رقم الهاتف غير صالح، يرجى إدخال رقم إماراتي صالح.' : '❌ Invalid phone number, please enter a valid Emirati number.';
+}
+
+function getAddressMessage(language) {
+    return language === 'ar' ? '📍 يرجى تقديم عنوانك الكامل.' : '📍 Please provide your full address.';
+}
+
+function getCitySelectionMessage(language) {
+    return language === 'ar' ? '🏙️ يرجى اختيار مدينتك من الخيارات أدناه.' : '🏙️ Please select your city from the options below.';
+}
+
+function getInvalidCityMessage(language) {
+    return language === 'ar' ? '❌ خيار غير صالح، يرجى اختيار مدينة من الخيارات المتاحة.' : '❌ Invalid selection, please choose from the provided options.';
+}
+
+function getStreetMessage(language) {
+    return language === 'ar' ? '🏠 يرجى تقديم اسم الشارع.' : '🏠 Please provide the street name.';
+}
+
+function getBuildingMessage(language) {
+    return language === 'ar' ? '🏢 يرجى تقديم اسم المبنى.' : '🏢 Please provide the building name.';
+}
+
+function getFlatMessage(language) {
+    return language === 'ar' ? '🚪 يرجى تقديم رقم الشقة.' : '🚪 Please provide the flat number.';
+}
+
+function getLocationMessage(language) {
+    return language === 'ar' ? 
+        '📍 يرجى مشاركة موقعك باستخدام خاصية الموقع في واتساب. اضغط على 📎 ثم اختر "موقع".' : 
+        '📍 Please share your location using WhatsApp’s location feature. Tap the 📎 icon and select "Location".';
+}
+
+function getInvalidLocationMessage(language) {
+    return language === 'ar' ? 
+        '❌ الموقع الذي أرسلته غير صالح أو خارج الإمارات. يرجى إرسال موقع داخل الإمارات.' : 
+        '❌ The location you shared is invalid or outside the UAE. Please send a valid location within the Emirates.';
+}
+
+function getQuantityMessage(language) {
+    return language === 'ar' ? '📦 يرجى إدخال الكمية (باللترات).' : '📦 Please provide the quantity (in liters).';
+}
+
+function getInvalidQuantityMessage(language) {
+    return language === 'ar' ? '❌ يرجى إدخال كمية صالحة (أرقام فقط).' : '❌ Please enter a valid quantity (numeric values only).';
+}
+
+function getConfirmationMessage(language) {
+    return language === 'ar' ? '✅ يرجى التأكيد على صحة التفاصيل قبل الإرسال.' : '✅ Please confirm that the details are correct before submission.';
+}
+
 
 app.post('/webhook', async (req, res) => {
     try {
@@ -748,14 +802,14 @@ app.post('/webhook', async (req, res) => {
                 if (message.type === "text") {
                     const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
                     const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-
+            
                     await sendInteractiveButtons(from, reply, [
                         { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
                         { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
                     ]);
                 } else if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                     const buttonId = message.interactive.button_reply.id;
-
+            
                     if (buttonId === "contact_us") {
                         await sendToWhatsApp(from, getContactMessage(session.language));
                     } else if (buttonId === "new_request") {
@@ -766,6 +820,7 @@ app.post('/webhook', async (req, res) => {
                     }
                 }
                 break;
+            
 
             case STATES.NAME:
                 if (!textRaw) {
@@ -780,15 +835,16 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-            case STATES.PHONE_INPUT:
-                if (!isValidPhone(textRaw)) {
-                    await sendToWhatsApp(from, "❌ Invalid phone number. Please enter a valid Emirati phone number.");
-                    return res.sendStatus(200);
-                }
-                session.data.phone = formatPhoneNumber(textRaw);
-                session.step = STATES.EMAIL;
-                await sendToWhatsApp(from, "📧 Please provide your email address.");
-                break;
+                case STATES.PHONE_INPUT:
+                    if (!isValidPhone(textRaw)) {
+                        await sendToWhatsApp(from, getInvalidPhoneMessage(session.language));
+                        return res.sendStatus(200);
+                    }
+                    session.data.phone = formatPhoneNumber(textRaw);
+                    session.step = STATES.EMAIL;
+                    await sendToWhatsApp(from, getEmailMessage(session.language));
+                    break;
+                
 
 
 
@@ -802,34 +858,35 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, "📍 Please provide your full address.");
                 break;
 
-            case STATES.ADDRESS:
-                session.data.address = textRaw;
-                session.step = STATES.CITY_SELECTION;  // ✅ Move directly to CITY_SELECTION
-                return await sendCitySelection(from);   // ✅ Immediately send the city selection and return
+                case STATES.ADDRESS:
+                    session.data.address = textRaw;
+                    session.step = STATES.CITY_SELECTION;  // ✅ Move directly to CITY_SELECTION
+                    return await sendCitySelection(from);   // ✅ Immediately send the city selection and return
+                  // ✅ Immediately send the city selection and return
 
-            case STATES.CITY_SELECTION:
-                if (message.interactive && message.interactive.button_reply) {  // ✅ Handle button replies
-                    const citySelection = message.interactive.button_reply.id;  // ✅ Get selected city ID
-
-                    const cityMap = {
-                        "abu_dhabi": "Abu Dhabi",
-                        "dubai": "Dubai",
-                        "sharjah": "Sharjah"
-                    };
-
-                    if (cityMap[citySelection]) {
-                        session.data.city = cityMap[citySelection];
-                        session.step = STATES.STREET;
-                        await sendToWhatsApp(from, `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`);
+                  case STATES.CITY_SELECTION:
+                    if (message.interactive && message.interactive.button_reply) {
+                        const citySelection = message.interactive.button_reply.id;
+                        const cityMap = {
+                            "abu_dhabi": "Abu Dhabi",
+                            "dubai": "Dubai",
+                            "sharjah": "Sharjah"
+                        };
+                
+                        if (cityMap[citySelection]) {
+                            session.data.city = cityMap[citySelection];
+                            session.step = STATES.STREET;
+                            await sendToWhatsApp(from, `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`);
+                        } else {
+                            await sendToWhatsApp(from, getInvalidCityMessage(session.language));
+                            await sendCitySelection(from); // Re-send city selection if invalid
+                        }
                     } else {
-                        await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided options.");
-                        await sendCitySelection(from); // Re-send city selection if invalid
+                        await sendToWhatsApp(from, getInvalidCityMessage(session.language));
+                        await sendCitySelection(from); // Re-send the city selection buttons
                     }
-                } else {
-                    await sendToWhatsApp(from, "❌ Please select a city from the provided options.");
-                    await sendCitySelection(from); // Re-send the city selection buttons
-                }
-                break;
+                    break;
+                
 
             case STATES.STREET:
                 session.data.street = textRaw;
@@ -854,65 +911,49 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-            case STATES.LONGITUDE:
-                if (message.location) {
-                    const { latitude, longitude } = message.location;
-
-                    // UAE geographical boundaries
-                    const UAE_BOUNDS = {
-                        minLat: 22.5,
-                        maxLat: 26.5,
-                        minLng: 51.6,
-                        maxLng: 56.5
-                    };
-
-                    // Validate if the location is within UAE
-                    if (
-                        latitude >= UAE_BOUNDS.minLat &&
-                        latitude <= UAE_BOUNDS.maxLat &&
-                        longitude >= UAE_BOUNDS.minLng &&
-                        longitude <= UAE_BOUNDS.maxLng
-                    ) {
-                        session.data.latitude = latitude;
-                        session.data.longitude = longitude;
-                        session.step = STATES.QUANTITY;
-                        session.awaitingQuantityInput = true; // Set flag to wait for input
-
-                        await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
-                    } else {
-                        await sendToWhatsApp(from, "❌ The location you shared is outside the UAE. Please send a valid location within the Emirates.");
-                        console.error("Location outside UAE received:", { latitude, longitude });
+                case STATES.LONGITUDE:
+                    if (message.location) {
+                        const { latitude, longitude } = message.location;
+                
+                        // Validate location within UAE
+                        if (
+                            latitude >= UAE_BOUNDS.minLat &&
+                            latitude <= UAE_BOUNDS.maxLat &&
+                            longitude >= UAE_BOUNDS.minLng &&
+                            longitude <= UAE_BOUNDS.maxLng
+                        ) {
+                            session.data.latitude = latitude;
+                            session.data.longitude = longitude;
+                            session.step = STATES.QUANTITY;
+                            session.awaitingQuantityInput = true; // Set flag to wait for input
+                
+                            await sendToWhatsApp(from, getQuantityMessage(session.language));
+                        } else {
+                            await sendToWhatsApp(from, getInvalidLocationMessage(session.language));
+                            console.error("Location outside UAE received:", { latitude, longitude });
+                        }
                     }
-                } else {
-                    // Only send an error message if the location prompt hasn't been sent before
-                    if (!session.locationPromptSent) {
-                        await sendToWhatsApp(from, "❌ Invalid input. Please share your location using WhatsApp's location feature. Tap the 📎 icon and select 'Location'.");
-                        session.locationPromptSent = true; // Ensure it’s only sent once
-                    }
+                    break;
+                
 
-                    console.error("Invalid input received in LONGITUDE state:", textRaw);
-                }
-                break;
-
-            case STATES.QUANTITY:
-                // If the system is already waiting for quantity input
-                if (session.awaitingQuantityInput) {
-                    if (textRaw.trim() === "" || isNaN(textRaw)) {
-                        await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
-                        return res.sendStatus(200);
-                    }
-
-                    // If valid, store the quantity and move to the next step
-                    session.data.quantity = textRaw;
-                    session.awaitingQuantityInput = false; // Reset flag
-                    session.step = STATES.CONFIRMATION;
-                    sendOrderSummary(from, session);
-                } else {
-                    // If the system is not awaiting input, set the flag and ask for quantity
-                    session.awaitingQuantityInput = true;
-                    await sendToWhatsApp(from, "📦 Please enter the quantity (in liters) of the product.");
-                }
-                break;
+                    case STATES.QUANTITY:
+                        if (session.awaitingQuantityInput) {
+                            if (textRaw.trim() === "" || isNaN(textRaw)) {
+                                await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
+                                return res.sendStatus(200);
+                            }
+                    
+                            session.data.quantity = textRaw;
+                            session.awaitingQuantityInput = false;
+                            session.step = STATES.CONFIRMATION;
+                            sendOrderSummary(from, session);
+                        } else {
+                            session.awaitingQuantityInput = true;
+                            await sendToWhatsApp(from, getQuantityMessage(session.language));
+                        }
+                        break;
+                    
+                
 
             case STATES.CONFIRMATION:
                 if (message.type === "interactive" && message.interactive.type === "button_reply") {
