@@ -906,8 +906,11 @@ app.post('/webhook', async (req, res) => {
         const classification = await isQuestionOrRequest(textRaw);
 
         if (classification === "request") {
+            // Extract and store information
             const extractedData = await extractInformationFromText(textRaw);
             session.data = { ...session.data, ...extractedData };
+
+            // Check for missing fields
             const missingFields = getMissingFields(session.data);
 
             if (missingFields.length === 0) {
@@ -918,6 +921,7 @@ app.post('/webhook', async (req, res) => {
                 await askForNextMissingField(session, from);
             }
         } else if (classification === "question") {
+            // Handle questions
             const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
             const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
 
