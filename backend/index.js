@@ -509,7 +509,7 @@ function extractQuantity(text) {
 async function extractInformationFromText(text) {
     const extractedData = {
         quantity: extractQuantity(text), // Extract quantity
-        city: extractCity(text) // Extract city
+        city: extractCity(text) // Extract city using the updated function
     };
 
     // Extract name using regex or simple logic
@@ -552,12 +552,14 @@ async function extractInformationFromText(text) {
 
 function extractCity(text) {
     const cities = ["Dubai", "Abu Dhabi", "Sharjah"];
-    for (const city of cities) {
-        if (text.includes(city)) {
-            return city;
+    const cityPatterns = cities.map(city => new RegExp(`\\b${city}\\b`, 'i')); // Case-insensitive matching
+
+    for (let i = 0; i < cityPatterns.length; i++) {
+        if (cityPatterns[i].test(text)) {
+            return cities[i]; // Return the matched city
         }
     }
-    return null;
+    return null; // Return null if no city is found
 }
 
 
@@ -1254,6 +1256,19 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case "ASK_CITY":
+                // If the city is already provided, skip this step
+                if (session.data.city) {
+                    const missingFields = getMissingFields(session.data);
+                    if (missingFields.length === 0) {
+                        session.step = STATES.CONFIRMATION;
+                        await sendOrderSummary(from, session);
+                    } else {
+                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                        await askForNextMissingField(session, from);
+                    }
+                    return res.sendStatus(200);
+                }
+
                 // If the user hasn't selected a city yet, ask for it
                 if (!textRaw) {
                     await sendCitySelection(from, session.language);
@@ -1261,16 +1276,22 @@ app.post('/webhook', async (req, res) => {
                 }
 
                 // If the city is selected, store it and proceed to the next step
-                session.data.city = textRaw;
+                const selectedCity = extractCity(textRaw);
+                if (selectedCity) {
+                    session.data.city = selectedCity;
 
-                // Check for other missing fields
-                const missingFieldsCity = getMissingFields(session.data);
-                if (missingFieldsCity.length === 0) {
-                    session.step = STATES.CONFIRMATION;
-                    await sendOrderSummary(from, session);
+                    // Check for other missing fields
+                    const missingFields = getMissingFields(session.data);
+                    if (missingFields.length === 0) {
+                        session.step = STATES.CONFIRMATION;
+                        await sendOrderSummary(from, session);
+                    } else {
+                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                        await askForNextMissingField(session, from);
+                    }
                 } else {
-                    session.step = `ASK_${missingFieldsCity[0].toUpperCase()}`;
-                    await askForNextMissingField(session, from);
+                    await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
+                    await sendCitySelection(from, session.language);
                 }
                 break;
 
