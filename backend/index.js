@@ -915,23 +915,22 @@ app.post('/webhook', async (req, res) => {
             case STATES.STREET:
                 session.data.street = textRaw;
                 session.step = STATES.BUILDING_NAME;
-                await sendToWhatsApp(from, "🏢 Please provide the building name.");
+                await sendToWhatsApp(from, getBuildingMessage(session.language)); // ✅ Send message in correct language
                 break;
 
             case STATES.BUILDING_NAME:
                 session.data.building_name = textRaw;
                 session.step = STATES.FLAT_NO;
-                await sendToWhatsApp(from, "🏠 Please provide the flat number.");
+                await sendToWhatsApp(from, getFlatMessage(session.language)); // ✅ Use dynamic language support
                 break;
 
             case STATES.FLAT_NO:
                 session.data.flat_no = textRaw;
                 session.step = STATES.LONGITUDE;
 
-                // Only send the location prompt if it hasn't been sent already
                 if (!session.locationPromptSent) {
-                    await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature. Tap the 📎 icon and select 'Location'.");
-                    session.locationPromptSent = true; // Mark the prompt as sent
+                    await sendToWhatsApp(from, getLocationMessage(session.language)); // ✅ Send location message dynamically
+                    session.locationPromptSent = true;
                 }
                 break;
 
@@ -947,7 +946,6 @@ app.post('/webhook', async (req, res) => {
                         maxLng: 56.5
                     };
 
-                    // Validate if the location is within UAE
                     if (
                         latitude >= UAE_BOUNDS.minLat &&
                         latitude <= UAE_BOUNDS.maxLat &&
@@ -957,20 +955,18 @@ app.post('/webhook', async (req, res) => {
                         session.data.latitude = latitude;
                         session.data.longitude = longitude;
                         session.step = STATES.QUANTITY;
-                        session.awaitingQuantityInput = true; // Set flag to wait for input
+                        session.awaitingQuantityInput = true;
 
-                        await sendToWhatsApp(from, "📦 Please provide the quantity (in liters) of the product.");
+                        await sendToWhatsApp(from, getQuantityMessage(session.language)); // ✅ Send dynamic quantity message
                     } else {
-                        await sendToWhatsApp(from, "❌ The location you shared is outside the UAE. Please send a valid location within the Emirates.");
+                        await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language)); // ❌ Location outside UAE
                         console.error("Location outside UAE received:", { latitude, longitude });
                     }
                 } else {
-                    // Only send an error message if the location prompt hasn't been sent before
                     if (!session.locationPromptSent) {
-                        await sendToWhatsApp(from, "❌ Invalid input. Please share your location using WhatsApp's location feature. Tap the 📎 icon and select 'Location'.");
-                        session.locationPromptSent = true; // Ensure it’s only sent once
+                        await sendToWhatsApp(from, getInvalidLocationMessage(session.language)); // ❌ Invalid input message
+                        session.locationPromptSent = true;
                     }
-
                     console.error("Invalid input received in LONGITUDE state:", textRaw);
                 }
                 break;
@@ -978,7 +974,7 @@ app.post('/webhook', async (req, res) => {
             case STATES.QUANTITY:
                 if (session.awaitingQuantityInput) {
                     if (textRaw.trim() === "" || isNaN(textRaw)) {
-                        await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
+                        await sendToWhatsApp(from, getInvalidQuantityMessage(session.language)); // ❌ Invalid quantity message
                         return res.sendStatus(200);
                     }
 
@@ -988,9 +984,10 @@ app.post('/webhook', async (req, res) => {
                     sendOrderSummary(from, session);
                 } else {
                     session.awaitingQuantityInput = true;
-                    await sendToWhatsApp(from, getQuantityMessage(session.language));
+                    await sendToWhatsApp(from, getQuantityMessage(session.language)); // ✅ Ask for quantity dynamically
                 }
                 break;
+
 
 
             case STATES.CONFIRMATION:
