@@ -563,7 +563,7 @@ function extractCity(text, language = "en") {
         ar: ["دبي", "أبو ظبي", "الشارقة"]
     };
 
-    const cityPatterns = cities[language].map(city => new RegExp(`\\b${city}\\b`, 'i')); // Case-insensitive matching
+    const cityPatterns = cities[language].map(city => new RegExp(city, 'i')); // Case-insensitive matching
 
     for (let i = 0; i < cityPatterns.length; i++) {
         if (cityPatterns[i].test(text)) {
@@ -1140,12 +1140,25 @@ app.post('/webhook', async (req, res) => {
                         await sendCitySelection(from, session.language);
                     }
                 } else {
-                    const selectCityMessage = session.language === 'ar'
-                        ? "❌ يرجى اختيار مدينة من الخيارات المتاحة."
-                        : "❌ Please select a city from the provided options.";
+                    // If the user sends a text message instead of selecting a city button
+                    const selectedCity = extractCity(textRaw, session.language);
+                    if (selectedCity) {
+                        session.data.city = selectedCity;
+                        session.step = STATES.STREET;
 
-                    await sendToWhatsApp(from, selectCityMessage);
-                    await sendCitySelection(from, session.language);
+                        const streetPrompt = session.language === 'ar'
+                            ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
+                            : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
+
+                        await sendToWhatsApp(from, streetPrompt);
+                    } else {
+                        const selectCityMessage = session.language === 'ar'
+                            ? "❌ يرجى اختيار مدينة من الخيارات المتاحة."
+                            : "❌ Please select a city from the provided options.";
+
+                        await sendToWhatsApp(from, selectCityMessage);
+                        await sendCitySelection(from, session.language);
+                    }
                 }
                 break;
 
