@@ -808,14 +808,11 @@ const sendLocationButton = async (to, language) => {
             ? '📍 يرجى النقر على الزر أدناه لمشاركة موقعك عبر واتساب.'
             : '📍 Please tap the button below to share your location via WhatsApp.';
 
-        // Create a button to inform users about sending location
+        // Use "location_request" to open the WhatsApp location picker
         const locationButton = [
             { 
-                type: "reply", 
-                reply: { 
-                    id: "send_location", 
-                    title: language === 'ar' ? '📍 أرسل الموقع' : '📍 Send Location' 
-                }
+                type: "location_request", 
+                title: language === 'ar' ? '📍 أرسل الموقع' : '📍 Send Location' 
             }
         ];
 
@@ -843,6 +840,7 @@ const sendLocationButton = async (to, language) => {
         console.error("Error sending location button:", error.response?.data || error.message);
     }
 };
+
 
 
 
