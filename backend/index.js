@@ -242,7 +242,10 @@ const isValidPhone = (phone) => {
 
 const sendCitySelection = async (to, language) => {
     try {
-        const cityPrompt = language === 'ar' ? 'يرجى اختيار المدينة من الخيارات المتاحة:' : 'Please select your city from the available options:';
+        const cityPrompt = language === 'ar'
+            ? 'يرجى اختيار المدينة من الخيارات المتاحة:'
+            : 'Please select your city from the available options:';
+
         const cityButtons = [
             { type: "reply", reply: { id: "abu_dhabi", title: language === 'ar' ? 'أبو ظبي' : 'Abu Dhabi' } },
             { type: "reply", reply: { id: "dubai", title: language === 'ar' ? 'دبي' : 'Dubai' } },
@@ -267,11 +270,13 @@ const sendCitySelection = async (to, language) => {
                 "Content-Type": "application/json"
             }
         });
+
         console.log("City Selection Response:", response.data);
     } catch (error) {
         console.error("Error sending city selection:", error.response?.data || error.message);
     }
 };
+
 
 const sendOrderSummary = async (to, session) => {
     try {
@@ -865,32 +870,46 @@ app.post('/webhook', async (req, res) => {
             case STATES.ADDRESS:
                 session.data.address = textRaw;
                 session.step = STATES.CITY_SELECTION;
-                return await sendCitySelection(from);
-            // ✅ Immediately send the city selection and return
+                return await sendCitySelection(from, session.language); // ✅ Pass language
+
 
             case STATES.CITY_SELECTION:
-                if (message.interactive && message.interactive.button_reply) {  // ✅ Handle button replies
-                    const citySelection = message.interactive.button_reply.id;  // ✅ Get selected city ID
+                if (message.interactive && message.interactive.button_reply) {
+                    const citySelection = message.interactive.button_reply.id;
 
                     const cityMap = {
-                        "abu_dhabi": "Abu Dhabi",
-                        "dubai": "Dubai",
-                        "sharjah": "Sharjah"
+                        "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
+                        "dubai": { en: "Dubai", ar: "دبي" },
+                        "sharjah": { en: "Sharjah", ar: "الشارقة" }
                     };
 
                     if (cityMap[citySelection]) {
-                        session.data.city = cityMap[citySelection];
+                        session.data.city = cityMap[citySelection][session.language] || cityMap[citySelection].en;
                         session.step = STATES.STREET;
-                        await sendToWhatsApp(from, `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`);
+
+                        const streetPrompt = session.language === 'ar'
+                            ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
+                            : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
+
+                        await sendToWhatsApp(from, streetPrompt);
                     } else {
-                        await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided options.");
-                        await sendCitySelection(from); // Re-send city selection if invalid
+                        const invalidSelectionMessage = session.language === 'ar'
+                            ? "❌ اختيار غير صالح. يرجى الاختيار من الخيارات المتاحة."
+                            : "❌ Invalid selection. Please choose from the provided options.";
+
+                        await sendToWhatsApp(from, invalidSelectionMessage);
+                        await sendCitySelection(from, session.language);
                     }
                 } else {
-                    await sendToWhatsApp(from, "❌ Please select a city from the provided options.");
-                    await sendCitySelection(from); // Re-send the city selection buttons
+                    const selectCityMessage = session.language === 'ar'
+                        ? "❌ يرجى اختيار مدينة من الخيارات المتاحة."
+                        : "❌ Please select a city from the provided options.";
+
+                    await sendToWhatsApp(from, selectCityMessage);
+                    await sendCitySelection(from, session.language);
                 }
                 break;
+
 
             case STATES.STREET:
                 session.data.street = textRaw;
