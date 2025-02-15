@@ -942,7 +942,8 @@ app.post('/webhook', async (req, res) => {
             userSessions[from] = {
                 step: STATES.WELCOME,
                 data: { phone: from }, // Auto-capture phone number
-                language: detectedLanguage
+                language: detectedLanguage,
+                inRequest: false // Track if the user is in a request
             };
             const welcomeMessage = await getOpenAIResponse("Generate a WhatsApp welcome message for Lootah Biofuels.", "", detectedLanguage);
             await sendInteractiveButtons(from, welcomeMessage, [
@@ -958,12 +959,17 @@ app.post('/webhook', async (req, res) => {
         if (classification === "question") {
             // Handle questions
             const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-            const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-
-            await sendInteractiveButtons(from, reply, [
-                { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-                { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-            ]);
+            if (session.inRequest) {
+                // If in a request, just send the answer and prompt to complete the request
+                await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
+            } else {
+                // If not in a request, send the answer with buttons
+                const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+                await sendInteractiveButtons(from, reply, [
+                    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+                    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+                ]);
+            }
             return res.sendStatus(200); // Exit after handling the question
         }
 
@@ -973,6 +979,7 @@ app.post('/webhook', async (req, res) => {
                 if (message.type === "text") {
                     const isRequestStart = await detectRequestStart(textRaw);
                     if (isRequestStart) {
+                        session.inRequest = true; // Set inRequest to true
                         const extractedData = await extractInformationFromText(textRaw);
                         console.log("Extracted Data:", extractedData); // Debugging
                         session.data = { ...session.data, ...extractedData };
@@ -1003,6 +1010,7 @@ app.post('/webhook', async (req, res) => {
                     if (buttonId === "contact_us") {
                         await sendToWhatsApp(from, getContactMessage(session.language));
                     } else if (buttonId === "new_request") {
+                        session.inRequest = true; // Set inRequest to true
                         session.step = STATES.NAME;
                         await sendToWhatsApp(from, getNameMessage(session.language));
                     } else {
