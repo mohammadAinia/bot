@@ -581,10 +581,15 @@ function getMissingFields(sessionData) {
                 missingFields.push(field);
             }
         }
-        // For non-string values (like numbers), assume they are valid if they are not null or undefined.
     });
 
-    return missingFields;
+    // If either latitude or longitude is missing, ask for location
+    if (missingFields.includes('latitude') || missingFields.includes('longitude')) {
+        missingFields.push('location');
+    }
+
+    // Remove latitude and longitude from missingFields since we're asking for location
+    return missingFields.filter(field => field !== 'latitude' && field !== 'longitude');
 }
 
 async function askForNextMissingField(session, from) {
@@ -633,6 +638,7 @@ async function askForNextMissingField(session, from) {
         }
     }
 }
+//
 async function isQuestionOrRequest(text) {
     const prompt = `
     Classify the user's input into one of the following categories:
