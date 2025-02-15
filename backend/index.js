@@ -775,7 +775,7 @@ const getLocationMessage = (language) => {
         return '🚗 Please share your current location using the location button. 😊';
     }
 };
-
+//
 
 function getQuantityMessage(language) {
     return language === 'ar' ? '📦 يرجى إدخال الكمية (باللترات).' : '📦 Please provide the quantity (in liters).';
