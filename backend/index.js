@@ -834,9 +834,25 @@ const sendLocationButton = async (to, language) => {
 };
 
 
+const detectRequestStart = async (text) => {
+    const prompt = `
+        Determine if the user's message indicates the start of a request for Lootah Biofuels. 
+        Respond with "true" if the message indicates a request start, otherwise respond with "false".
 
-//
+        Examples of request start:
+        - "I want to create a request"
+        - "I have oil I want to get rid of"
+        - "Please collect oil from my location"
+        - "I need a pickup for used oil"
+        - "New order request"
+        - "I am Mohammad and I have 50 liters in Sharjah"
 
+        User Input: "${text}"
+    `;
+
+    const response = await getOpenAIResponse(prompt);
+    return response.trim().toLowerCase() === "true";
+};
 
 app.post('/webhook', async (req, res) => {
     try {
@@ -893,17 +909,32 @@ app.post('/webhook', async (req, res) => {
 
         const session = userSessions[from];
 
-        // Handle messages based on the current step (state)
+        // Handle messages based on the current state
         switch (session.step) {
             case STATES.WELCOME:
                 if (message.type === "text") {
-                    const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-                    const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+                    const isRequestStart = await detectRequestStart(textRaw);
+                    if (isRequestStart) {
+                        const extractedData = await extractInformationFromText(textRaw);
+                        session.data = { ...session.data, ...extractedData };
 
-                    await sendInteractiveButtons(from, reply, [
-                        { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-                        { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-                    ]);
+                        const missingFields = getMissingFields(session.data);
+                        if (missingFields.length > 0) {
+                            session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                            await askForNextMissingField(session, from);
+                        } else {
+                            session.step = STATES.CONFIRMATION;
+                            await sendOrderSummary(from, session);
+                        }
+                    } else {
+                        const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+                        const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+
+                        await sendInteractiveButtons(from, reply, [
+                            { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+                            { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+                        ]);
+                    }
                 } else if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                     const buttonId = message.interactive.button_reply.id;
 
@@ -1301,74 +1332,74 @@ app.post('/webhook', async (req, res) => {
 
 
 // app.post('/webhook', async (req, res) => {
-//     try {
-//         console.log('Incoming Webhook Data:', req.body);
+// try {
+//     console.log('Incoming Webhook Data:', req.body);
 
-//         const entry = req.body.entry?.[0];
-//         const changes = entry?.changes?.[0];
-//         const value = changes?.value;
-//         const messages = value?.messages;
+//     const entry = req.body.entry?.[0];
+//     const changes = entry?.changes?.[0];
+//     const value = changes?.value;
+//     const messages = value?.messages;
 
-//         if (!messages || messages.length === 0) {
-//             console.log('No messages received, returning early.');
+//     if (!messages || messages.length === 0) {
+//         console.log('No messages received, returning early.');
+//         return res.sendStatus(200);
+//     }
+
+//     const message = messages[0];
+//     const from = message.from;
+//     const textRaw = message.text?.body || "";
+//     const text = textRaw.toLowerCase().trim();
+
+//     // 1. Check if the user wants to end the request
+//     if (shouldEndRequest(text)) {
+//         delete userSessions[from]; // Reset the session
+//         const welcomeMessage = await generateWelcomeMessage();
+//         await sendInteractiveButtons(from, welcomeMessage, [
+//             { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
+//             { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
+//         ]);
+//         return res.sendStatus(200);
+//     }
+
+//     // 2. Initialize user session if it doesn't exist
+//     if (!userSessions[from]) {
+//         userSessions[from] = {
+//             step: STATES.WELCOME,
+//             data: { phone: formatPhoneNumber(from) },
+//         };
+
+//         const welcomeMessage = await generateWelcomeMessage();
+//         await sendInteractiveButtons(from, welcomeMessage, [
+//             { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
+//             { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
+//         ]);
+//         return res.sendStatus(200);
+//     }
+
+//     const session = userSessions[from];
+
+//     if (!session.data.phone) {
+//         session.data.phone = formatPhoneNumber(from);
+//     }
+
+//     // 3. Handle interactive button replies (e.g., new request, contact us)
+//     if (message.interactive && message.interactive.button_reply) {
+//         const buttonId = message.interactive.button_reply.id;
+
+//         if (buttonId === "new_request") {
+//             // Reset session data for a new request
+//             session.data = { phone: formatPhoneNumber(from) };
+//             session.step = STATES.NAME;
+
+//             // Ask for the user's name
+//             const namePrompt = await generateMissingFieldPrompt("name");
+//             await sendToWhatsApp(from, namePrompt);
+//             return res.sendStatus(200);
+//         } else if (buttonId === "contact_us") {
+//             await sendToWhatsApp(from, "You can reach us at support@example.com. 📞");
 //             return res.sendStatus(200);
 //         }
-
-//         const message = messages[0];
-//         const from = message.from;
-//         const textRaw = message.text?.body || "";
-//         const text = textRaw.toLowerCase().trim();
-
-//         // 1. Check if the user wants to end the request
-//         if (shouldEndRequest(text)) {
-//             delete userSessions[from]; // Reset the session
-//             const welcomeMessage = await generateWelcomeMessage();
-//             await sendInteractiveButtons(from, welcomeMessage, [
-//                 { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
-//                 { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
-//             ]);
-//             return res.sendStatus(200);
-//         }
-
-//         // 2. Initialize user session if it doesn't exist
-//         if (!userSessions[from]) {
-//             userSessions[from] = {
-//                 step: STATES.WELCOME,
-//                 data: { phone: formatPhoneNumber(from) },
-//             };
-
-//             const welcomeMessage = await generateWelcomeMessage();
-//             await sendInteractiveButtons(from, welcomeMessage, [
-//                 { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
-//                 { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
-//             ]);
-//             return res.sendStatus(200);
-//         }
-
-//         const session = userSessions[from];
-
-//         if (!session.data.phone) {
-//             session.data.phone = formatPhoneNumber(from);
-//         }
-
-//         // 3. Handle interactive button replies (e.g., new request, contact us)
-//         if (message.interactive && message.interactive.button_reply) {
-//             const buttonId = message.interactive.button_reply.id;
-
-//             if (buttonId === "new_request") {
-//                 // Reset session data for a new request
-//                 session.data = { phone: formatPhoneNumber(from) };
-//                 session.step = STATES.NAME;
-
-//                 // Ask for the user's name
-//                 const namePrompt = await generateMissingFieldPrompt("name");
-//                 await sendToWhatsApp(from, namePrompt);
-//                 return res.sendStatus(200);
-//             } else if (buttonId === "contact_us") {
-//                 await sendToWhatsApp(from, "You can reach us at support@example.com. 📞");
-//                 return res.sendStatus(200);
-//             }
-//         }
+//     }
 
 //         // 4. Process message based on current step FIRST
 //         switch (session.step) {
