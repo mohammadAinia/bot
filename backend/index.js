@@ -665,6 +665,9 @@ function getButtonTitle(buttonId, language) {
 function getContactMessage(language) {
     return language === 'ar' ? '📞 يمكنك الاتصال بنا على support@example.com أو الاتصال على +1234567890.' : '📞 You can contact us at support@example.com or call +1234567890.';
 }
+function getContinueMessage(language) {
+    return language === 'ar' ? 'لإكمال الاستفسار، يمكنك طرح أسئلة أخرى. إذا كنت ترغب في تقديم طلب أو الاتصال بنا، اختر من الخيارات التالية:' : 'To complete the inquiry, you can ask other questions. If you want to submit a request or contact us, choose from the following options:';
+}
 
 app.post('/webhook', async (req, res) => {
     try {
