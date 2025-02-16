@@ -1016,22 +1016,22 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-                case STATES.NAME:
-                    if (!textRaw) {
-                        await sendToWhatsApp(from, getNameMessage(session.language));
+            case STATES.NAME:
+                if (!textRaw) {
+                    await sendToWhatsApp(from, getNameMessage(session.language));
+                } else {
+                    if (textRaw.trim().length > 0) {
+                        session.data.name = textRaw;
+                        session.step = STATES.EMAIL;
+                        await sendToWhatsApp(from, getEmailMessage(session.language));
                     } else {
-                        if (textRaw.trim().length > 0) {
-                            session.data.name = textRaw;
-                            session.step = STATES.EMAIL;
-                            await sendToWhatsApp(from, getEmailMessage(session.language));
-                        } else {
-                            const errorMsg = session.language === 'ar' 
-                                ? "❌ يرجى تقديم اسم صحيح"
-                                : "❌ Please provide a valid full name";
-                            await sendToWhatsApp(from, errorMsg);
-                        }
+                        const errorMsg = session.language === 'ar'
+                            ? "❌ يرجى تقديم اسم صحيح"
+                            : "❌ Please provide a valid full name";
+                        await sendToWhatsApp(from, errorMsg);
                     }
-                    break;
+                }
+                break;
 
             case STATES.PHONE_INPUT:
                 if (!isValidPhone(textRaw)) {
@@ -1060,11 +1060,8 @@ app.post('/webhook', async (req, res) => {
                         // Send a message with a button to share location
                         await sendInteractiveButtons(from, getLocationMessage(session.language), [
                             {
-                                type: "reply",
-                                reply: {
-                                    id: "send_site",
-                                    title: getButtonTitle("send_site", session.language) // "Send Site" button
-                                }
+                                type: "location_request",
+                                title: getButtonTitle("send_site", session.language) // "Send Location" button
                             }
                         ]);
                     }
@@ -1091,11 +1088,8 @@ app.post('/webhook', async (req, res) => {
                         // Send a message with a button to share location
                         await sendInteractiveButtons(from, getLocationMessage(session.language), [
                             {
-                                type: "reply",
-                                reply: {
-                                    id: "send_site",
-                                    title: getButtonTitle("send_site", session.language) // "Send Site" button
-                                }
+                                type: "location_request",
+                                title: getButtonTitle("send_site", session.language) // "Send Location" button
                             }
                         ]);
                         session.locationPromptSent = true;
@@ -1273,7 +1267,13 @@ app.post('/webhook', async (req, res) => {
             case "ASK_LOCATION":
                 // If the user hasn't shared their location yet, ask for it
                 if (!message.location) {
-                    await sendToWhatsApp(from, getLocationMessage(session.language));
+                    // Send a message with a button to share location
+                    await sendInteractiveButtons(from, getLocationMessage(session.language), [
+                        {
+                            type: "location_request",
+                            title: getButtonTitle("send_site", session.language) // "Send Location" button
+                        }
+                    ]);
                     return res.sendStatus(200); // Exit and wait for the user's response
                 }
 
