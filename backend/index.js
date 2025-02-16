@@ -1207,19 +1207,27 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case STATES.QUANTITY:
-                if (!textRaw) {
+                console.log("🔹 Entered QUANTITY state for user:", from);
+                console.log("🔹 textRaw:", textRaw);
+
+                if (!textRaw || textRaw.trim() === "") {
+                    console.log("🔹 No quantity provided. Asking for quantity.");
                     await sendToWhatsApp(from, getQuantityMessage(session.language));
                     return res.sendStatus(200);
                 }
 
-                if (isNaN(textRaw) || textRaw.trim() === "") {
+                if (isNaN(textRaw)) {
+                    console.log("🔹 Invalid quantity provided. Asking for valid quantity.");
                     await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
                     return res.sendStatus(200);
                 }
 
+                console.log("🔹 Valid quantity provided:", textRaw);
                 session.data.quantity = textRaw;
 
-                missingFields = getMissingFields(session.data); // Reuse the variable
+                const missingFields = getMissingFields(session.data);
+                console.log("🔹 Missing fields after quantity:", missingFields);
+
                 if (missingFields.length === 0) {
                     session.step = STATES.CONFIRMATION;
                     await sendOrderSummary(from, session);
