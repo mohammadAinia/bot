@@ -556,7 +556,6 @@ async function extractInformationFromText(text, language = "en") {
         return extractedData; // Return at least the manually extracted data
     }
 }
-
 function extractCity(text, language = "en") {
     const cities = {
         en: ["Dubai", "Abu Dhabi", "Sharjah"],
@@ -906,6 +905,12 @@ const detectRequestStart = async (text) => {
         - "I need a pickup for used oil"
         - "New order request"
         - "I am Mohammad and I have 50 liters in Sharjah"
+        - "أريد إنشاء طلب جديد"
+        - "لدي زيت أريد التخلص منه"
+        - "الرجاء جمع الزيت من موقعي"
+        - "أحتاج إلى استلام الزيت المستعمل"
+        - "طلب جديد"
+        - "أنا محمد ولدي 50 لتر في الشارقة"
 
         User Input: "${text}"
     `;
