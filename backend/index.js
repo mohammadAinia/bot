@@ -236,42 +236,7 @@ const isValidPhone = (phone) => {
     return regex.test(phone);
 };
 
-const sendCitySelection = async (to, language) => {
-    try {
-        const cityPrompt = language === 'ar'
-            ? 'يرجى اختيار المدينة من الخيارات المتاحة:'
-            : 'Please select your city from the available options:';
 
-        const cityButtons = [
-            { type: "reply", reply: { id: "abu_dhabi", title: language === 'ar' ? 'أبو ظبي' : 'Abu Dhabi' } },
-            { type: "reply", reply: { id: "dubai", title: language === 'ar' ? 'دبي' : 'Dubai' } },
-            { type: "reply", reply: { id: "sharjah", title: language === 'ar' ? 'الشارقة' : 'Sharjah' } }
-        ];
-
-        const payload = {
-            messaging_product: "whatsapp",
-            recipient_type: "individual",
-            to: to,
-            type: "interactive",
-            interactive: {
-                type: "button",
-                body: { text: cityPrompt },
-                action: { buttons: cityButtons }
-            }
-        };
-
-        const response = await axios.post(process.env.WHATSAPP_API_URL, payload, {
-            headers: {
-                Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-                "Content-Type": "application/json"
-            }
-        });
-
-        console.log("City Selection Response:", response.data);
-    } catch (error) {
-        console.error("Error sending city selection:", error.response?.data || error.message);
-    }
-};
 //
 
 
@@ -495,7 +460,42 @@ function convertArabicNumbers(arabicNumber) {
     return arabicNumber.replace(/[\u0660-\u0669]/g, d => arabicToWestern[d] || d);
 }
 
+const sendCitySelection = async (to, language) => {
+    try {
+        const cityPrompt = language === 'ar'
+            ? 'يرجى اختيار المدينة من الخيارات المتاحة:'
+            : 'Please select your city from the available options:';
 
+        const cityButtons = [
+            { type: "reply", reply: { id: "abu_dhabi", title: language === 'ar' ? 'أبو ظبي' : 'Abu Dhabi' } },
+            { type: "reply", reply: { id: "dubai", title: language === 'ar' ? 'دبي' : 'Dubai' } },
+            { type: "reply", reply: { id: "sharjah", title: language === 'ar' ? 'الشارقة' : 'Sharjah' } }
+        ];
+
+        const payload = {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: to,
+            type: "interactive",
+            interactive: {
+                type: "button",
+                body: { text: cityPrompt },
+                action: { buttons: cityButtons }
+            }
+        };
+
+        const response = await axios.post(process.env.WHATSAPP_API_URL, payload, {
+            headers: {
+                Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                "Content-Type": "application/json"
+            }
+        });
+
+        console.log("City Selection Response:", response.data);
+    } catch (error) {
+        console.error("Error sending city selection:", error.response?.data || error.message);
+    }
+};
 async function extractInformationFromText(text, language = "en") {
     const extractedData = {
         quantity: extractQuantity(text), // Extract quantity
@@ -802,7 +802,7 @@ const detectRequestStart = async (text) => {
     const response = await getOpenAIResponse(prompt);
     return response.trim().toLowerCase() === "true";
 };
-function moveToNextStep() {
+function moveToNextStep(session, from) {  // ✅ Add parameters
     const missingFields = getMissingFields(session.data);
     if (missingFields.length === 0) {
         session.step = STATES.CONFIRMATION;
@@ -1282,7 +1282,7 @@ app.post('/webhook', async (req, res) => {
                     if (cityMap[citySelection]) {
                         session.data.city = cityMap[citySelection][session.language] || cityMap[citySelection].en;
                         console.log("City set to:", session.data.city);
-                        moveToNextStep();
+                        moveToNextStep(session, from);  // ✅ Pass parameters
                     } else {
                         await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
                         await sendCitySelection(from, session.language);
@@ -1296,7 +1296,7 @@ app.post('/webhook', async (req, res) => {
                     if (selectedCity) {
                         session.data.city = selectedCity;
                         console.log("City set to:", selectedCity);
-                        moveToNextStep();
+                        moveToNextStep(session, from);  // ✅ Pass parameters
                     } else {
                         await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
                         await sendCitySelection(from, session.language);
