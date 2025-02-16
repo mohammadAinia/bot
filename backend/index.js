@@ -458,9 +458,13 @@ const sendInteractiveButtons = async (to, message, buttons) => {
                 action: {
                     buttons: buttons.map(button => {
                         if (button.type === "location_request") {
+                            // Use a reply button instead of location_request
                             return {
-                                type: "location_request",
-                                title: button.title || "📍 Send Location" // CORRECTED: Use title instead of name
+                                type: "reply",
+                                reply: {
+                                    id: "share_location", // Unique ID for the location request
+                                    title: button.title || "📍 Send Location"
+                                }
                             };
                         } else {
                             return {
@@ -692,8 +696,11 @@ async function askForNextMissingField(session, from) {
             case "location":
                 await sendInteractiveButtons(from, getLocationMessage(lang), [
                     {
-                        type: "location_request",
-                        title: lang === 'ar' ? '📍 إرسال الموقع' : '📍 Send Location' // CORRECTED: Use title
+                        type: "reply", // Use "reply" type
+                        reply: {
+                            id: "share_location", // Unique ID for the location request
+                            title: lang === 'ar' ? '📍 إرسال الموقع' : '📍 Send Location'
+                        }
                     }
                 ]);
                 break;
