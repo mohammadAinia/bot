@@ -901,7 +901,7 @@ app.post('/webhook', async (req, res) => {
             }
             return res.sendStatus(200);
         }
-//
+        //
         // Handle messages based on the current state
         switch (session.step) {
             case STATES.WELCOME:
@@ -1269,19 +1269,45 @@ app.post('/webhook', async (req, res) => {
                     return res.sendStatus(200);
                 }
 
-                console.log("Checking user response for city:", textRaw);
-                const selectedCity = extractCity(textRaw, session.language);
+                // Handle button replies
+                if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+                    const citySelection = message.interactive.button_reply.id;
 
-                if (selectedCity) {
-                    session.data.city = selectedCity;
-                    console.log("City set to:", selectedCity);
-                    moveToNextStep();
-                } else {
-                    await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
+                    const cityMap = {
+                        "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
+                        "dubai": { en: "Dubai", ar: "دبي" },
+                        "sharjah": { en: "Sharjah", ar: "الشارقة" }
+                    };
+
+                    if (cityMap[citySelection]) {
+                        session.data.city = cityMap[citySelection][session.language] || cityMap[citySelection].en;
+                        console.log("City set to:", session.data.city);
+                        moveToNextStep();
+                    } else {
+                        await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
+                        await sendCitySelection(from, session.language);
+                    }
+                }
+                // Handle text input
+                else if (message.type === "text") {
+                    console.log("Checking user response for city:", textRaw);
+                    const selectedCity = extractCity(textRaw, session.language);
+
+                    if (selectedCity) {
+                        session.data.city = selectedCity;
+                        console.log("City set to:", selectedCity);
+                        moveToNextStep();
+                    } else {
+                        await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
+                        await sendCitySelection(from, session.language);
+                    }
+                }
+                // Handle invalid input
+                else {
+                    await sendToWhatsApp(from, "❌ Invalid input. Please select a city from the options.");
                     await sendCitySelection(from, session.language);
                 }
                 break;
-
 
 
             case "ASK_STREET":
