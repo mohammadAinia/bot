@@ -1183,6 +1183,13 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case STATES.BUILDING_NAME:
+                if (!textRaw || textRaw.trim() === "") {
+                    // If no building name is provided, ask for it again
+                    await sendToWhatsApp(from, getBuildingMessage(session.language));
+                    return res.sendStatus(200); // Exit and wait for the user's response
+                }
+
+                // If the building name is provided, store it and proceed to the next step
                 session.data.building_name = textRaw;
                 session.step = STATES.FLAT_NO;
                 await sendToWhatsApp(from, getFlatMessage(session.language)); // Ask for flat number
