@@ -240,51 +240,99 @@ const isValidPhone = (phone) => {
 //
 
 
-const sendOrderSummary = async (to, session) => {
-    try {
-        const summaryText = await getOpenAIResponse(
-            `Generate an order summary in a user-friendly way, including the following details:
-            Name: ${session.data.name},
-            Phone: ${session.data.phone},
-            Email: ${session.data.email},
-            Address: ${session.data.address},
-            City: ${session.data.city},
-            Street: ${session.data.street},
-            Building Name: ${session.data.building_name},
-            Flat Number: ${session.data.flat_no},
-            Location: (Latitude: ${session.data.latitude}, Longitude: ${session.data.longitude}),
-            Quantity: ${session.data.quantity}.
-            Also, ask the user to confirm if the details are correct.`,
-            session.language
-        );
+// const sendOrderSummary = async (to, session) => {
+//     try {
+//         const summaryText = await getOpenAIResponse(
+//             `Generate an order summary in a user-friendly way, including the following details:
+//             Name: ${session.data.name},
+//             Phone: ${session.data.phone},
+//             Email: ${session.data.email},
+//             Address: ${session.data.address},
+//             City: ${session.data.city},
+//             Street: ${session.data.street},
+//             Building Name: ${session.data.building_name},
+//             Flat Number: ${session.data.flat_no},
+//             Location: (Latitude: ${session.data.latitude}, Longitude: ${session.data.longitude}),
+//             Quantity: ${session.data.quantity}.
+//             Also, ask the user to confirm if the details are correct.`,
+//             session.language
+//         );
 
-        await axios.post(process.env.WHATSAPP_API_URL, {
-            messaging_product: "whatsapp",
-            recipient_type: "individual",
-            to: to,
-            type: "interactive",
-            interactive: {
-                type: "button",
-                body: {
-                    text: summaryText
-                },
-                action: {
-                    buttons: [
-                        { type: "reply", reply: { id: "yes_confirm", title: session.language === 'ar' ? '✅ نعم' : '✅ Yes' } },
-                        { type: "reply", reply: { id: "no_correct", title: session.language === 'ar' ? '❌ لا' : '❌ No' } }
-                    ]
+//         await axios.post(process.env.WHATSAPP_API_URL, {
+//             messaging_product: "whatsapp",
+//             recipient_type: "individual",
+//             to: to,
+//             type: "interactive",
+//             interactive: {
+//                 type: "button",
+//                 body: {
+//                     text: summaryText
+//                 },
+//                 action: {
+//                     buttons: [
+//                         { type: "reply", reply: { id: "yes_confirm", title: session.language === 'ar' ? '✅ نعم' : '✅ Yes' } },
+//                         { type: "reply", reply: { id: "no_correct", title: session.language === 'ar' ? '❌ لا' : '❌ No' } }
+//                     ]
+//                 }
+//             }
+//         }, {
+//             headers: {
+//                 "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+//                 "Content-Type": "application/json"
+//             }
+//         });
+//     } catch (error) {
+//         console.error("❌ Failed to send order summary:", error.response?.data || error.message);
+//     }
+// };
+async function sendOrderSummary(to, session) {
+    try {
+        const orderSummary = session.language === 'ar'
+            ? `📝 *ملخص الطلب*\n
+الاسم: ${session.data.name || 'غير متوفر'}
+الهاتف: ${session.data.phone || 'غير متوفر'} 
+البريد الإلكتروني: ${session.data.email || 'غير متوفر'}
+المدينة: ${session.data.city || 'غير متوفر'}
+العنوان: ${session.data.address || 'غير متوفر'}
+الشارع: ${session.data.street || 'غير متوفر'}
+اسم المبنى: ${session.data.building_name || 'غير متوفر'}
+رقم الشقة: ${session.data.flat_no || 'غير متوفر'}
+الكمية: ${session.data.quantity || 'غير متوفر'} لتر`
+
+            : `📝 *Order Summary*\n
+Name: ${session.data.name || 'Not provided'}
+Phone: ${session.data.phone || 'Not provided'}
+Email: ${session.data.email || 'Not provided'}
+City: ${session.data.city || 'Not provided'}
+Address: ${session.data.address || 'Not provided'}
+Street: ${session.data.street || 'Not provided'}
+Building: ${session.data.building_name || 'Not provided'}
+Flat: ${session.data.flat_no || 'Not provided'}
+Quantity: ${session.data.quantity || 'Not provided'} liters`;
+
+        const confirmationButtons = [
+            {
+                type: "reply",
+                reply: {
+                    id: "yes_confirm",
+                    title: session.language === 'ar' ? "تأكيد ✅" : "Confirm ✅"
+                }
+            },
+            {
+                type: "reply",
+                reply: {
+                    id: "no_correct",
+                    title: session.language === 'ar' ? "تعديل ❌" : "Modify ❌"
                 }
             }
-        }, {
-            headers: {
-                "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-                "Content-Type": "application/json"
-            }
-        });
+        ];
+
+        await sendInteractiveButtons(to, orderSummary, confirmationButtons);
+
     } catch (error) {
-        console.error("❌ Failed to send order summary:", error.response?.data || error.message);
+        console.error("Error sending order summary:", error);
     }
-};
+}
 
 
 let dataStore = [];  // Array to temporarily store data
