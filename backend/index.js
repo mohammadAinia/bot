@@ -458,13 +458,9 @@ const sendInteractiveButtons = async (to, message, buttons) => {
                 action: {
                     buttons: buttons.map(button => {
                         if (button.type === "location_request") {
-                            // Use a reply button instead of location_request
                             return {
-                                type: "reply",
-                                reply: {
-                                    id: "share_location", // Unique ID for the location request
-                                    title: button.title || "📍 Send Location"
-                                }
+                                type: "location_request",
+                                title: button.title || "📍 Send Location"
                             };
                         } else {
                             return {
@@ -694,15 +690,7 @@ async function askForNextMissingField(session, from) {
                 await sendToWhatsApp(from, getPhoneMessage(lang));
                 break;
             case "location":
-                await sendInteractiveButtons(from, getLocationMessage(lang), [
-                    {
-                        type: "reply", // Use "reply" type
-                        reply: {
-                            id: "share_location", // Unique ID for the location request
-                            title: lang === 'ar' ? '📍 إرسال الموقع' : '📍 Send Location'
-                        }
-                    }
-                ]);
+                await sendToWhatsApp(from, getLocationMessage(lang));
                 break;
             case "address":
                 await sendToWhatsApp(from, getAddressMessage(lang));
@@ -962,41 +950,6 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(200);
         }
 
-        // ========== LOCATION HANDLING ==========
-        if (message.type === "location") {
-            const location = message.location;
-            session.data.latitude = location.latitude;
-            session.data.longitude = location.longitude;
-
-            // Validate UAE coordinates
-            const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
-            if (
-                location.latitude >= UAE_BOUNDS.minLat &&
-                location.latitude <= UAE_BOUNDS.maxLat &&
-                location.longitude >= UAE_BOUNDS.minLng &&
-                location.longitude <= UAE_BOUNDS.maxLng
-            ) {
-                switch (session.step) {
-                    case STATES.LONGITUDE:
-                    case "ASK_LOCATION":
-                        session.step = STATES.ADDRESS;
-                        await sendToWhatsApp(from, getAddressMessage(session.language));
-                        break;
-                    case "MODIFY_LOCATION":
-                        session.step = STATES.CONFIRMATION;
-                        await sendUpdatedSummary(from, session);
-                        break;
-                    default:
-                        await sendToWhatsApp(from, session.language === 'ar' ?
-                            "✅ تم استلام موقعك بنجاح. الرجاء متابعة الطلب." :
-                            "✅ Location received successfully. Please continue with your request.");
-                }
-            } else {
-                await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
-            }
-            return res.sendStatus(200);
-        }
-
         const classification = await isQuestionOrRequest(textRaw);
 
         if (classification === "question") {
@@ -1099,65 +1052,48 @@ app.post('/webhook', async (req, res) => {
                 session.step = STATES.LONGITUDE;
                 await sendToWhatsApp(from, getLocationMessage(session.language)); // Ask for location
                 break;
-            // case STATES.LONGITUDE:
-            //     if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-            //         const buttonId = message.interactive.button_reply.id;
-
-            //         if (buttonId === "share_location") { // Updated button ID
-            //             // Send a message with a button to share location
-            //             await sendInteractiveButtons(from, getLocationMessage(session.language), [
-            //                 {
-            //                     type: "reply", // Use "reply" type
-            //                     reply: {
-            //                         id: "share_location", // Unique ID for the location request
-            //                         title: getButtonTitle("send_site", session.language) // "Send Location" button
-            //                     }
-            //                 }
-            //             ]);
-            //         }
-            //     } else if (message.location) {
-            //         const { latitude, longitude } = message.location;
-
-            //         // Validate UAE location
-            //         const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
-            //         if (
-            //             latitude >= UAE_BOUNDS.minLat &&
-            //             latitude <= UAE_BOUNDS.maxLat &&
-            //             longitude >= UAE_BOUNDS.minLng &&
-            //             longitude <= UAE_BOUNDS.maxLng
-            //         ) {
-            //             session.data.latitude = latitude;
-            //             session.data.longitude = longitude;
-            //             session.step = STATES.ADDRESS;
-            //             await sendToWhatsApp(from, getAddressMessage(session.language));
-            //         } else {
-            //             await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
-            //         }
-            //     } else {
-            //         if (!session.locationPromptSent) {
-            //             // Send a message with a button to share location
-            //             await sendInteractiveButtons(from, getLocationMessage(session.language), [
-            //                 {
-            //                     type: "reply", // Use "reply" type
-            //                     reply: {
-            //                         id: "share_location", // Unique ID for the location request
-            //                         title: getButtonTitle("send_site", session.language) // "Send Location" button
-            //                     }
-            //                 }
-            //             ]);
-            //             session.locationPromptSent = true;
-            //         }
-            //     }
-            //     break;
             case STATES.LONGITUDE:
-                if (!session.locationPromptSent) {
-                    await sendInteractiveButtons(from, getLocationMessage(session.language), [
-                        {
-                            type: "location_request",
-                            title: session.language === 'ar' ? '📍 إرسال الموقع' : '📍 Send Location'
-                        }
-                    ]);
-                    session.locationPromptSent = true;
+                if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+                    const buttonId = message.interactive.button_reply.id;
+
+                    if (buttonId === "send_site") {
+                        // Send a message with a button to share location
+                        await sendInteractiveButtons(from, getLocationMessage(session.language), [
+                            {
+                                type: "location_request",
+                                title: getButtonTitle("send_site", session.language) // "Send Location" button
+                            }
+                        ]);
+                    }
+                } else if (message.location) {
+                    const { latitude, longitude } = message.location;
+
+                    // Validate UAE location
+                    const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
+                    if (
+                        latitude >= UAE_BOUNDS.minLat &&
+                        latitude <= UAE_BOUNDS.maxLat &&
+                        longitude >= UAE_BOUNDS.minLng &&
+                        longitude <= UAE_BOUNDS.maxLng
+                    ) {
+                        session.data.latitude = latitude;
+                        session.data.longitude = longitude;
+                        session.step = STATES.ADDRESS;
+                        await sendToWhatsApp(from, getAddressMessage(session.language));
+                    } else {
+                        await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
+                    }
+                } else {
+                    if (!session.locationPromptSent) {
+                        // Send a message with a button to share location
+                        await sendInteractiveButtons(from, getLocationMessage(session.language), [
+                            {
+                                type: "location_request",
+                                title: getButtonTitle("send_site", session.language) // "Send Location" button
+                            }
+                        ]);
+                        session.locationPromptSent = true;
+                    }
                 }
                 break;
 
@@ -1328,57 +1264,45 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-            // case "ASK_LOCATION":
-            //     // If the user hasn't shared their location yet, ask for it
-            //     if (!message.location) {
-            //         // Send a message with a button to share location
-            //         await sendInteractiveButtons(from, getLocationMessage(session.language), [
-            //             {
-            //                 type: "reply", // Use "reply" type
-            //                 reply: {
-            //                     id: "share_location", // Unique ID for the location request
-            //                     title: getButtonTitle("send_site", session.language) // "Send Location" button
-            //                 }
-            //             }
-            //         ]);
-            //         return res.sendStatus(200); // Exit and wait for the user's response
-            //     }
-
-            //     // If the location is shared, store it and proceed to the next step
-            //     const { latitude, longitude } = message.location;
-
-            //     // Validate UAE location
-            //     const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
-            //     if (
-            //         latitude >= UAE_BOUNDS.minLat &&
-            //         latitude <= UAE_BOUNDS.maxLat &&
-            //         longitude >= UAE_BOUNDS.minLng &&
-            //         longitude <= UAE_BOUNDS.maxLng
-            //     ) {
-            //         session.data.latitude = latitude;
-            //         session.data.longitude = longitude;
-
-            //         // Check for other missing fields
-            //         const missingFields = getMissingFields(session.data);
-            //         if (missingFields.length === 0) {
-            //             session.step = STATES.CONFIRMATION;
-            //             await sendOrderSummary(from, session);
-            //         } else {
-            //             session.step = `ASK_${missingFields[0].toUpperCase()}`;
-            //             await askForNextMissingField(session, from);
-            //         }
-            //     } else {
-            //         await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
-            //     }
-            //     break;
             case "ASK_LOCATION":
-                await sendInteractiveButtons(from, getLocationMessage(session.language), [
-                    {
-                        type: "location_request",
-                        name: "share_location",
-                        title: session.language === 'ar' ? '📍 إرسال الموقع' : '📍 Send Location'
+                // If the user hasn't shared their location yet, ask for it
+                if (!message.location) {
+                    // Send a message with a button to share location
+                    await sendInteractiveButtons(from, getLocationMessage(session.language), [
+                        {
+                            type: "location_request",
+                            title: getButtonTitle("send_site", session.language) // "Send Location" button
+                        }
+                    ]);
+                    return res.sendStatus(200); // Exit and wait for the user's response
+                }
+
+                // If the location is shared, store it and proceed to the next step
+                const { latitude, longitude } = message.location;
+
+                // Validate UAE location
+                const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
+                if (
+                    latitude >= UAE_BOUNDS.minLat &&
+                    latitude <= UAE_BOUNDS.maxLat &&
+                    longitude >= UAE_BOUNDS.minLng &&
+                    longitude <= UAE_BOUNDS.maxLng
+                ) {
+                    session.data.latitude = latitude;
+                    session.data.longitude = longitude;
+
+                    // Check for other missing fields
+                    const missingFields = getMissingFields(session.data);
+                    if (missingFields.length === 0) {
+                        session.step = STATES.CONFIRMATION;
+                        await sendOrderSummary(from, session);
+                    } else {
+                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                        await askForNextMissingField(session, from);
                     }
-                ]);
+                } else {
+                    await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
+                }
                 break;
 
             case "ASK_ADDRESS":
