@@ -458,13 +458,9 @@ const sendInteractiveButtons = async (to, message, buttons) => {
                 action: {
                     buttons: buttons.map(button => {
                         if (button.type === "location_request") {
-                            // Use a reply button instead of location_request
                             return {
-                                type: "reply",
-                                reply: {
-                                    id: "share_location", // Unique ID for the location request
-                                    title: button.title || "📍 Send Location"
-                                }
+                                type: "location_request",
+                                title: button.title || "📍 Send Location"
                             };
                         } else {
                             return {
