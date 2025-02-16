@@ -984,6 +984,7 @@ app.post('/webhook', async (req, res) => {
             }
             return res.sendStatus(200);
         }
+        let missingFields; // Declare the variable outside the switch statement
 
         // Handle messages based on the current state
         switch (session.step) {
@@ -1188,26 +1189,43 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case STATES.FLAT_NO:
-                session.data.flat_no = textRaw;
-                session.step = STATES.QUANTITY;
+                if (!textRaw) {
+                    await sendToWhatsApp(from, getFlatMessage(session.language));
+                    return res.sendStatus(200);
+                }
 
-                await sendToWhatsApp(from, getQuantityMessage(session.language)); // Ask for quantity
+                session.data.flat_no = textRaw;
+
+                missingFields = getMissingFields(session.data); // Reuse the variable
+                if (missingFields.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                    await askForNextMissingField(session, from);
+                }
                 break;
 
             case STATES.QUANTITY:
-                if (session.awaitingQuantityInput) {
-                    if (textRaw.trim() === "" || isNaN(textRaw)) {
-                        await sendToWhatsApp(from, getInvalidQuantityMessage(session.language)); // ❌ Invalid quantity message
-                        return res.sendStatus(200);
-                    }
+                if (!textRaw) {
+                    await sendToWhatsApp(from, getQuantityMessage(session.language));
+                    return res.sendStatus(200);
+                }
 
-                    session.data.quantity = textRaw;
-                    session.awaitingQuantityInput = false;
+                if (isNaN(textRaw) || textRaw.trim() === "") {
+                    await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
+                    return res.sendStatus(200);
+                }
+
+                session.data.quantity = textRaw;
+
+                missingFields = getMissingFields(session.data); // Reuse the variable
+                if (missingFields.length === 0) {
                     session.step = STATES.CONFIRMATION;
-                    sendOrderSummary(from, session);
+                    await sendOrderSummary(from, session);
                 } else {
-                    session.awaitingQuantityInput = true;
-                    await sendToWhatsApp(from, getQuantityMessage(session.language)); // ✅ Ask for quantity dynamically
+                    session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                    await askForNextMissingField(session, from);
                 }
                 break;
 
