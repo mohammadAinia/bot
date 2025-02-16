@@ -667,6 +667,8 @@ function getMissingFields(sessionData) {
 
 async function askForNextMissingField(session, from) {
     const missingFields = getMissingFields(session.data);
+    const lang = session.language; // Get current session language
+
     if (missingFields.length === 0) {
         session.step = STATES.CONFIRMATION;
         await sendOrderSummary(from, session);
@@ -676,38 +678,39 @@ async function askForNextMissingField(session, from) {
 
         switch (nextField) {
             case "city":
-                // If the city is missing, send the city selection buttons
-                await sendCitySelection(from, session.language);
+                await sendCitySelection(from, lang);
                 break;
             case "email":
-                await sendToWhatsApp(from, "✉️ Could you please share your email address? We'll use it for sending updates on your order.");
+                await sendToWhatsApp(from, getEmailMessage(lang));
                 break;
             case "name":
-                await sendToWhatsApp(from, "👤 Please provide your full name.");
+                await sendToWhatsApp(from, getNameMessage(lang));
                 break;
             case "phone":
-                await sendToWhatsApp(from, "📞 Please provide your phone number.");
+                await sendToWhatsApp(from, getPhoneMessage(lang));
                 break;
             case "location":
-                await sendToWhatsApp(from, getLocationMessage(session.language));
+                await sendToWhatsApp(from, getLocationMessage(lang));
                 break;
             case "address":
-                await sendToWhatsApp(from, "🏠 Please provide your address.");
+                await sendToWhatsApp(from, getAddressMessage(lang));
                 break;
             case "street":
-                await sendToWhatsApp(from, "🛣️ Please provide your street name.");
+                await sendToWhatsApp(from, getStreetMessage(lang));
                 break;
             case "building_name":
-                await sendToWhatsApp(from, "🏢 Please provide your building name.");
+                await sendToWhatsApp(from, getBuildingMessage(lang));
                 break;
             case "flat_no":
-                await sendToWhatsApp(from, "🏠 Please provide your flat number.");
+                await sendToWhatsApp(from, getFlatMessage(lang));
                 break;
             case "quantity":
-                await sendToWhatsApp(from, "🔢 Please provide the quantity (in liters).");
+                await sendToWhatsApp(from, getQuantityMessage(lang));
                 break;
             default:
-                await sendToWhatsApp(from, `🔹 Please provide your ${nextField.replace(/_/g, " ")}.`);
+                await sendToWhatsApp(from, lang === 'ar'
+                    ? `🔹 يرجى تقديم ${nextField.replace(/_/g, " ")}`
+                    : `🔹 Please provide your ${nextField.replace(/_/g, " ")}`);
                 break;
         }
     }
@@ -1013,21 +1016,22 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-            case STATES.NAME:
-                if (!textRaw) {
-                    await sendToWhatsApp(from, getNameMessage(session.language));
-                } else {
-                    // Direct validation for name
-                    if (textRaw.trim().length > 0) {
-                        session.data.name = textRaw;
-                        session.data.phone = from; // Auto-capture phone from WhatsApp
-                        session.step = STATES.EMAIL;
-                        await sendToWhatsApp(from, getEmailMessage(session.language));
+                case STATES.NAME:
+                    if (!textRaw) {
+                        await sendToWhatsApp(from, getNameMessage(session.language));
                     } else {
-                        await sendToWhatsApp(from, "❌ Please provide a valid full name. 😊");
+                        if (textRaw.trim().length > 0) {
+                            session.data.name = textRaw;
+                            session.step = STATES.EMAIL;
+                            await sendToWhatsApp(from, getEmailMessage(session.language));
+                        } else {
+                            const errorMsg = session.language === 'ar' 
+                                ? "❌ يرجى تقديم اسم صحيح"
+                                : "❌ Please provide a valid full name";
+                            await sendToWhatsApp(from, errorMsg);
+                        }
                     }
-                }
-                break;
+                    break;
 
             case STATES.PHONE_INPUT:
                 if (!isValidPhone(textRaw)) {
