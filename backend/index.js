@@ -817,21 +817,37 @@ app.post('/webhook', async (req, res) => {
     try {
         console.log('Incoming Webhook Data:', JSON.stringify(req.body, null, 2));
 
-        const entry = req.body.entry?.[0];
-        const changes = entry?.changes?.[0];
-        const value = changes?.value;
-        const messages = value?.messages;
-
-        const message = messages[0];
-        const from = message.from;
-        const session = userSessions[from];
-
-
-        if (!messages || !Array.isArray(messages) || messages.length === 0) {
-            return res.sendStatus(200);
+        if (!req.body.entry || !Array.isArray(req.body.entry) || req.body.entry.length === 0) {
+            console.error("❌ Error: Missing or invalid 'entry' in webhook payload.");
+            return res.sendStatus(400);
         }
 
-        if (!message?.from) return res.sendStatus(400);
+        const entry = req.body.entry[0];
+
+        if (!entry.changes || !Array.isArray(entry.changes) || entry.changes.length === 0) {
+            console.error("❌ Error: Missing or invalid 'changes' in webhook payload.");
+            return res.sendStatus(400);
+        }
+
+        const changes = entry.changes[0];
+
+        if (!changes.value || !changes.value.messages || !Array.isArray(changes.value.messages) || changes.value.messages.length === 0) {
+            console.error("❌ Error: Missing or invalid 'messages' in webhook payload.");
+            return res.sendStatus(400);
+        }
+
+        const value = changes.value;
+        const messages = value.messages;
+
+        const message = messages[0];
+
+        if (!message || !message.from) {
+            console.error("❌ Error: Missing 'from' field in message.");
+            return res.sendStatus(400);
+        }
+
+        const from = message.from;
+        const session = userSessions[from];
 
         const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
@@ -842,7 +858,6 @@ app.post('/webhook', async (req, res) => {
             if (Array.isArray(detected) && detected.length > 0) {
                 detectedLanguage = detected[0].lang;
             }
-            // Ensure the detected language is either Arabic or English
             if (detectedLanguage !== "ar" && detectedLanguage !== "en") {
                 detectedLanguage = "en"; // Default to English if not Arabic or English
             }
@@ -853,19 +868,17 @@ app.post('/webhook', async (req, res) => {
         if (!userSessions[from]) {
             userSessions[from] = {
                 step: STATES.WELCOME,
-                data: { phone: from }, // Auto-capture phone number
+                data: { phone: from },
                 language: detectedLanguage,
-                inRequest: false // Track if the user is in a request
+                inRequest: false
             };
 
-            // Generate the welcome message in the detected or default language
             const welcomeMessage = await getOpenAIResponse(
                 "Generate a WhatsApp welcome message for Lootah Biofuels.",
                 "",
-                detectedLanguage // Use the detected or default language
+                detectedLanguage
             );
 
-            // Send the welcome message with buttons
             await sendInteractiveButtons(from, welcomeMessage, [
                 { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
                 { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
@@ -877,20 +890,17 @@ app.post('/webhook', async (req, res) => {
         const classification = await isQuestionOrRequest(textRaw);
 
         if (classification === "question") {
-            // Handle questions
             const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
             if (session.inRequest) {
-                // If in a request, just send the answer and prompt to complete the request
                 await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
             } else {
-                // If not in a request, send the answer with buttons
                 const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
                 await sendInteractiveButtons(from, reply, [
                     { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
                     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
                 ]);
             }
-            return res.sendStatus(200); // Exit after handling the question
+            return res.sendStatus(200);
         }
 
         // Handle messages based on the current state
