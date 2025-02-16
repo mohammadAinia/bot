@@ -226,10 +226,6 @@ const sendToWhatsApp = async (to, message) => {
     }
 };
 
-function convertArabicNumbers(input) {
-    return input.replace(/[٠١٢٣٤٥٦٧٨٩]/g, d => "0123456789"["٠١٢٣٤٥٦٧٨٩".indexOf(d)]);
-}
-
 const isValidEmail = (email) => {
     const regex = /^\S+@\S+\.\S+$/;
     return regex.test(email);
