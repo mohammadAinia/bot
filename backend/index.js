@@ -815,7 +815,7 @@ function moveToNextStep() {
 
 app.post('/webhook', async (req, res) => {
     try {
-        console.log('Incoming Webhook Data:', JSON.stringify(req.body, null, 2));
+        console.log("🔹 Incoming Webhook Data:", JSON.stringify(req.body, null, 2));
 
         if (!req.body.entry || !Array.isArray(req.body.entry) || req.body.entry.length === 0) {
             console.error("❌ Error: Missing or invalid 'entry' in webhook payload.");
@@ -830,18 +830,17 @@ app.post('/webhook', async (req, res) => {
         }
 
         const changes = entry.changes[0];
+        const value = changes.value;
 
-        if (!changes.value || !changes.value.messages || !Array.isArray(changes.value.messages) || changes.value.messages.length === 0) {
-            console.error("❌ Error: Missing or invalid 'messages' in webhook payload.");
-            return res.sendStatus(400);
+        // 🛑 Ignore non-message events (e.g., status updates, reactions)
+        if (!value?.messages || !Array.isArray(value.messages) || value.messages.length === 0) {
+            console.warn("⚠️ No messages found in webhook payload. Ignoring event.");
+            return res.sendStatus(200); // Acknowledge the webhook without error
         }
 
-        const value = changes.value;
-        const messages = value.messages;
+        const message = value.messages[0];
 
-        const message = messages[0];
-
-        if (!message || !message.from) {
+        if (!message?.from) {
             console.error("❌ Error: Missing 'from' field in message.");
             return res.sendStatus(400);
         }
