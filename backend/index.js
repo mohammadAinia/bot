@@ -1290,6 +1290,41 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
+            case "ASK_LOCATION":
+                // If the user hasn't shared their location yet, ask for it
+                if (!message.location) {
+                    await sendToWhatsApp(from, getLocationMessage(session.language));
+                    return res.sendStatus(200); // Exit and wait for the user's response
+                }
+
+                // If the location is shared, store it and proceed to the next step
+                const { latitude, longitude } = message.location;
+
+                // Validate UAE location
+                const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
+                if (
+                    latitude >= UAE_BOUNDS.minLat &&
+                    latitude <= UAE_BOUNDS.maxLat &&
+                    longitude >= UAE_BOUNDS.minLng &&
+                    longitude <= UAE_BOUNDS.maxLng
+                ) {
+                    session.data.latitude = latitude;
+                    session.data.longitude = longitude;
+
+                    // Check for other missing fields
+                    const missingFields = getMissingFields(session.data);
+                    if (missingFields.length === 0) {
+                        session.step = STATES.CONFIRMATION;
+                        await sendOrderSummary(from, session);
+                    } else {
+                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                        await askForNextMissingField(session, from);
+                    }
+                } else {
+                    await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
+                }
+                break;
+
             case "ASK_ADDRESS":
                 // If the user hasn't provided an address yet, ask for it
                 if (!textRaw) {
@@ -1411,41 +1446,6 @@ app.post('/webhook', async (req, res) => {
                 } else {
                     session.step = `ASK_${missingFieldsFlat[0].toUpperCase()}`;
                     await askForNextMissingField(session, from);
-                }
-                break;
-
-            case "ASK_LOCATION":
-                // If the user hasn't shared their location yet, ask for it
-                if (!message.location) {
-                    await sendToWhatsApp(from, getLocationMessage(session.language));
-                    return res.sendStatus(200); // Exit and wait for the user's response
-                }
-
-                // If the location is shared, store it and proceed to the next step
-                const { latitude, longitude } = message.location;
-
-                // Validate UAE location
-                const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
-                if (
-                    latitude >= UAE_BOUNDS.minLat &&
-                    latitude <= UAE_BOUNDS.maxLat &&
-                    longitude >= UAE_BOUNDS.minLng &&
-                    longitude <= UAE_BOUNDS.maxLng
-                ) {
-                    session.data.latitude = latitude;
-                    session.data.longitude = longitude;
-
-                    // Check for other missing fields
-                    const missingFields = getMissingFields(session.data);
-                    if (missingFields.length === 0) {
-                        session.step = STATES.CONFIRMATION;
-                        await sendOrderSummary(from, session);
-                    } else {
-                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                        await askForNextMissingField(session, from);
-                    }
-                } else {
-                    await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
                 }
                 break;
 
