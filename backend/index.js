@@ -502,9 +502,23 @@ const sendLocationRequest = async (to, message) => {
 
 
 function extractQuantity(text) {
-    const match = text.match(/\b\d+\b/); // Extracts only the first numeric value
-    return match ? match[0] : null; // Returns the number or null if not found
+    // Match both Western Arabic (0-9) and Eastern Arabic (٠-٩) numerals
+    const match = text.match(/[\d\u0660-\u0669]+/);
+    if (match) {
+        // Convert Eastern Arabic numerals to Western Arabic numerals
+        return convertArabicNumbers(match[0]);
+    }
+    return null;
 }
+
+function convertArabicNumbers(arabicNumber) {
+    const arabicToWestern = {
+        "٠": "0", "١": "1", "٢": "2", "٣": "3", "٤": "4",
+        "٥": "5", "٦": "6", "٧": "7", "٨": "8", "٩": "9"
+    };
+    return arabicNumber.replace(/[\u0660-\u0669]/g, d => arabicToWestern[d] || d);
+}
+
 
 async function extractInformationFromText(text, language = "en") {
     const extractedData = {
