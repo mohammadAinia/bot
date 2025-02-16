@@ -459,8 +459,7 @@ const sendInteractiveButtons = async (to, message, buttons) => {
                     buttons: buttons.map(button => {
                         if (button.type === "location_request") {
                             return {
-                                type: "location_request",
-                                title: button.title || "📍 Send Location"
+                                type: "location_request" // No title here
                             };
                         } else {
                             return {
@@ -689,11 +688,13 @@ async function askForNextMissingField(session, from) {
             case "phone":
                 await sendToWhatsApp(from, getPhoneMessage(lang));
                 break;
+            // case "location":
+            //     await sendToWhatsApp(from, getLocationMessage(lang));
+            //     break;
             case "location":
                 await sendInteractiveButtons(from, getLocationMessage(lang), [
                     {
-                        type: "location_request",
-                        title: lang === 'ar' ? '📍 إرسال الموقع' : '📍 Send Location'
+                        type: "location_request" // No title property
                     }
                 ]);
                 break;
