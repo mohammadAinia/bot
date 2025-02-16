@@ -821,6 +821,8 @@ app.post('/webhook', async (req, res) => {
         const changes = entry?.changes?.[0];
         const value = changes?.value;
         const messages = value?.messages;
+        
+        const from = message.from;
         const session = userSessions[from];
 
 
@@ -831,7 +833,6 @@ app.post('/webhook', async (req, res) => {
         const message = messages[0];
         if (!message?.from) return res.sendStatus(400);
 
-        const from = message.from;
         const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
 
@@ -856,23 +857,23 @@ app.post('/webhook', async (req, res) => {
                 language: detectedLanguage,
                 inRequest: false // Track if the user is in a request
             };
-        
+
             // Generate the welcome message in the detected or default language
             const welcomeMessage = await getOpenAIResponse(
                 "Generate a WhatsApp welcome message for Lootah Biofuels.",
                 "",
                 detectedLanguage // Use the detected or default language
             );
-        
+
             // Send the welcome message with buttons
             await sendInteractiveButtons(from, welcomeMessage, [
                 { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
                 { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
             ]);
-        
+
             return res.sendStatus(200);
         }
-        
+
         const classification = await isQuestionOrRequest(textRaw);
 
         if (classification === "question") {
@@ -1247,31 +1248,31 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-                case "ASK_CITY":
-                    if (!session) {
-                        console.error("❌ Session is not defined.");
-                        await sendToWhatsApp(from, "❌ An error occurred. Please try again.");
-                        return res.sendStatus(200);
-                    }
-                
-                    if (session.data.city) {
-                        moveToNextStep();
-                        return res.sendStatus(200);
-                    }
-                
-                    console.log("Checking user response for city:", textRaw);
-                    const selectedCity = extractCity(textRaw, session.language);
-                
-                    if (selectedCity) {
-                        session.data.city = selectedCity;
-                        console.log("City set to:", selectedCity);
-                        moveToNextStep();
-                    } else {
-                        await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
-                        await sendCitySelection(from, session.language);
-                    }
-                    break;
-                
+            case "ASK_CITY":
+                if (!session) {
+                    console.error("❌ Session is not defined.");
+                    await sendToWhatsApp(from, "❌ An error occurred. Please try again.");
+                    return res.sendStatus(200);
+                }
+
+                if (session.data.city) {
+                    moveToNextStep();
+                    return res.sendStatus(200);
+                }
+
+                console.log("Checking user response for city:", textRaw);
+                const selectedCity = extractCity(textRaw, session.language);
+
+                if (selectedCity) {
+                    session.data.city = selectedCity;
+                    console.log("City set to:", selectedCity);
+                    moveToNextStep();
+                } else {
+                    await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
+                    await sendCitySelection(from, session.language);
+                }
+                break;
+
 
 
             case "ASK_STREET":
