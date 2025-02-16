@@ -511,49 +511,54 @@ function convertArabicNumbers(arabicNumber) {
 const sendCitySelection = async (to, language) => {
     try {
         const cityPrompt = language === 'ar'
-            ? 'يرجى اختيار المدينة من الخيارات المتاحة:'
-            : 'Please select your city from the available options:';
+            ? 'يرجى اختيار المدينة من القائمة:'
+            : 'Please select your city from the list:';
 
-        // Split cities into groups of 3 buttons each
-        const cityGroups = [
-            [
-                { type: "reply", reply: { id: "abu_dhabi", title: language === 'ar' ? 'أبو ظبي' : 'Abu Dhabi' } },
-                { type: "reply", reply: { id: "dubai", title: language === 'ar' ? 'دبي' : 'Dubai' } },
-                { type: "reply", reply: { id: "sharjah", title: language === 'ar' ? 'الشارقة' : 'Sharjah' } }
-            ],
-            [
-                { type: "reply", reply: { id: "ajman", title: language === 'ar' ? 'عجمان' : 'Ajman' } },
-                { type: "reply", reply: { id: "umm_al_quwain", title: language === 'ar' ? 'أم القيوين' : 'Umm Al Quwain' } },
-                { type: "reply", reply: { id: "ras_al_khaimah", title: language === 'ar' ? 'رأس الخيمة' : 'Ras Al Khaimah' } }
-            ],
-            [
-                { type: "reply", reply: { id: "fujairah", title: language === 'ar' ? 'الفجيرة' : 'Fujairah' } }
-            ]
+        const cityOptions = [
+            { id: "abu_dhabi", title: language === 'ar' ? 'أبو ظبي' : 'Abu Dhabi' },
+            { id: "dubai", title: language === 'ar' ? 'دبي' : 'Dubai' },
+            { id: "sharjah", title: language === 'ar' ? 'الشارقة' : 'Sharjah' },
+            { id: "ajman", title: language === 'ar' ? 'عجمان' : 'Ajman' },
+            { id: "umm_al_quwain", title: language === 'ar' ? 'أم القيوين' : 'Umm Al Quwain' },
+            { id: "ras_al_khaimah", title: language === 'ar' ? 'رأس الخيمة' : 'Ras Al Khaimah' },
+            { id: "fujairah", title: language === 'ar' ? 'الفجيرة' : 'Fujairah' }
         ];
 
-        // Send each group of buttons as a separate interactive message
-        for (const cityButtons of cityGroups) {
-            const payload = {
-                messaging_product: "whatsapp",
-                recipient_type: "individual",
-                to: to,
-                type: "interactive",
-                interactive: {
-                    type: "button",
-                    body: { text: cityPrompt },
-                    action: { buttons: cityButtons }
+        const payload = {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: to,
+            type: "interactive",
+            interactive: {
+                type: "list",
+                body: {
+                    text: cityPrompt
+                },
+                action: {
+                    button: language === 'ar' ? 'اختر المدينة' : 'Select City', // Button text
+                    sections: [
+                        {
+                            title: language === 'ar' ? 'المدن' : 'Cities', // Section title
+                            rows: cityOptions.map(city => ({
+                                id: city.id,
+                                title: city.title
+                            }))
+                        }
+                    ]
                 }
-            };
+            }
+        };
 
-            const response = await axios.post(process.env.WHATSAPP_API_URL, payload, {
-                headers: {
-                    Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-                    "Content-Type": "application/json"
-                }
-            });
+        console.log("Sending City Selection Payload:", JSON.stringify(payload, null, 2));
 
-            console.log("City Selection Response:", response.data);
-        }
+        const response = await axios.post(process.env.WHATSAPP_API_URL, payload, {
+            headers: {
+                Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                "Content-Type": "application/json"
+            }
+        });
+
+        console.log("City Selection Response:", response.data);
     } catch (error) {
         console.error("Error sending city selection:", error.response?.data || error.message);
     }
@@ -1117,8 +1122,8 @@ app.post('/webhook', async (req, res) => {
                 return await sendCitySelection(from, session.language); // ✅ Ask user to select city
 
             case STATES.CITY_SELECTION:
-                if (message.interactive && message.interactive.button_reply) {
-                    const citySelection = message.interactive.button_reply.id;
+                if (message.interactive && message.interactive.type === "list_reply") {
+                    const citySelection = message.interactive.list_reply.id; // Get the selected city ID
 
                     const cityMap = {
                         "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
@@ -1148,7 +1153,7 @@ app.post('/webhook', async (req, res) => {
                         await sendCitySelection(from, session.language);
                     }
                 } else {
-                    // If the user sends a text message instead of selecting a city button
+                    // If the user sends a text message instead of selecting from the list
                     const selectedCity = extractCity(textRaw, session.language);
                     if (selectedCity) {
                         session.data.city = selectedCity;
