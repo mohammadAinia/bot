@@ -1225,7 +1225,8 @@ app.post('/webhook', async (req, res) => {
                 console.log("🔹 Valid quantity provided:", textRaw);
                 session.data.quantity = textRaw;
 
-                const missingFields = getMissingFields(session.data);
+                // Reuse the `missingFields` variable declared outside the switch statement
+                missingFields = getMissingFields(session.data);
                 console.log("🔹 Missing fields after quantity:", missingFields);
 
                 if (missingFields.length === 0) {
