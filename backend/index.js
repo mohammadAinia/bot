@@ -625,31 +625,44 @@ function extractCity(text, language = "en") {
 
 
 function getMissingFields(sessionData) {
-    const requiredFields = [
-        'name', 'email', 'address', 'city',
-        'street', 'building_name', 'flat_no', 'latitude',
-        'longitude', 'quantity'
+    // Define fields in the desired sequence
+    const orderedFields = [
+        'name',
+        'phone',
+        'email',
+        'latitude',
+        'longitude',
+        'address',
+        'city',
+        'street',
+        'building_name',
+        'flat_no',
+        'quantity'
     ];
+
     const missingFields = [];
 
-    requiredFields.forEach(field => {
+    // Check fields in specified order
+    orderedFields.forEach(field => {
         const value = sessionData[field];
-        if (value === null || value === undefined) {
+        if (value === null ||
+            value === undefined ||
+            (typeof value === "string" &&
+                (value.trim() === "" || value.trim().toLowerCase() === "null"))
+        ) {
             missingFields.push(field);
-        } else if (typeof value === "string") {
-            if (value.trim() === "" || value.trim().toLowerCase() === "null") {
-                missingFields.push(field);
-            }
         }
     });
 
-    // If either latitude or longitude is missing, ask for location
+    // Handle location fields
     if (missingFields.includes('latitude') || missingFields.includes('longitude')) {
         missingFields.push('location');
     }
 
-    // Remove latitude and longitude from missingFields since we're asking for location
-    return missingFields.filter(field => field !== 'latitude' && field !== 'longitude');
+    // Remove technical fields and preserve order
+    return missingFields
+        .filter(field => !['latitude', 'longitude'].includes(field))
+        .sort((a, b) => orderedFields.indexOf(a) - orderedFields.indexOf(b));
 }
 
 async function askForNextMissingField(session, from) {
@@ -949,7 +962,7 @@ app.post('/webhook', async (req, res) => {
             }
             return res.sendStatus(200);
         }
-        
+
         // Handle messages based on the current state
         switch (session.step) {
             case STATES.WELCOME:
