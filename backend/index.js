@@ -477,26 +477,6 @@ const sendInteractiveButtons = async (to, message, buttons) => {
         console.error("❌ Failed to send interactive buttons:", error.response?.data || error.message);
     }
 };
-
-const sendLocationRequest = async (to, message) => {
-    await axios.post(process.env.WHATSAPP_API_URL, {
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to: to,
-        type: "text",
-        text: {
-            body: message + "\n\n📍 *Click here to send your location:*",
-            preview_url: false
-        }
-    }, {
-        headers: {
-            "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-            "Content-Type": "application/json"
-        }
-    });
-};
-
-
 function extractQuantity(text) {
     // Match both Western Arabic (0-9) and Eastern Arabic (٠-٩) numerals
     const match = text.match(/[\d\u0660-\u0669]+/);
@@ -582,6 +562,7 @@ function extractCity(text, language = "en") {
 
     for (const city of cities[language]) {
         const normalizedCity = city.normalize("NFKC").toLowerCase();
+        console.log("Checking city:", normalizedCity);
         if (normalizedText.includes(normalizedCity) || normalizedText.includes(normalizedCity.replace(/\s/g, ""))) {
             console.log("Matched city:", city);
             return city;
@@ -709,91 +690,6 @@ async function isQuestionOrRequest(text) {
     return response;
 }
 
-
-const generateWelcomeMessage = async () => {
-    const systemPrompt = `
-        You are a friendly WhatsApp assistant for Lootah Biofuels. 
-        Generate a concise and engaging welcome message that:
-        - Introduces the company in a warm and professional tone.
-        - Encourages users to ask questions or start a new request.
-        - Uses emojis sparingly to make the message lively but not overwhelming.
-    `;
-
-    return await getOpenAIResponse("Generate a welcome message.", systemPrompt);
-};
-
-
-
-const generateMissingFieldPrompt = async (field) => {
-    const fieldPromptMap = {
-        name: "Ask the user to provide their full name in a friendly and casual tone. Example: 'May I have your full name, please? 😊'",
-        phone: "Ask the user for their phone number in a casual and friendly way. Example: 'Could you share your phone number with us? 📱'",
-        email: "Ask the user for their email address politely. Example: 'What’s your email address? We’ll use it to keep you updated! ✉️'",
-        address: "Ask the user for their full address in a simple and friendly way. Example: 'Could you provide your complete address? 🏠'",
-        street: "Ask the user for their street name in a cheerful tone. Example: 'What’s the name of your street? 🛣️'",
-        building_name: "Ask the user for their building name in a friendly way. Example: 'Could you tell us the name of your building? 🏢'",
-        flat_no: "Ask the user for their flat number politely. Example: 'What’s your flat number? 🏠'",
-        latitude: "Ask the user to share their live location via WhatsApp. Example: 'Please share your live location to help us serve you better! 📍'",
-        longitude: "Ask the user to share their live location via WhatsApp. Example: 'Please share your live location to help us serve you better! 📍'",
-        quantity: "Ask the user how many liters they want in a friendly tone. Example: 'How many liters would you like to order? ⛽'",
-        // Add city with null to prevent text prompt
-        city: null
-    };
-
-    if (!fieldPromptMap[field]) return null;
-
-    const prompt = `
-        The user is filling out a form. They need to provide their "${field}".
-        Ensure your response is **ONLY** a polite request for the missing field, without any unrelated information.
-        Do **not** mention AI, email, or apologies.
-        Do **not** generate anything except the request prompt.
-        
-        ${fieldPromptMap[field]}
-    `;
-
-    return await getOpenAIResponse(prompt, ``);
-};
-const analyzeInput = async (input, expectedField) => {
-    const prompt = `
-        Determine if the user's input matches the requested field ("${expectedField}").
-
-        Rules:
-        1. For names: Accept both single-word (e.g., "Ahmed") and multi-word names (e.g., "John Doe").
-        2. For addresses: Accept partial addresses (e.g., "Jazeer") and validate them later.
-        3. Return "valid" if the input is appropriate for ${expectedField}.
-        4. Return "invalid:<message>" only if the input is clearly unrelated (e.g., numbers for a name).
-
-        Examples of valid names:
-        - "Ahmed"
-        - "John Doe"
-        - "Maria"
-
-        Examples of valid addresses:
-        - "Jazeer"
-        - "123 Main Street"
-
-        User Input: "${input}"
-        Your response (ONLY "valid" or "invalid:<reason>"):
-    `;
-
-    const response = await getOpenAIResponse(prompt, ``);
-    return response.trim();
-};
-const shouldEndRequest = (text) => {
-    const endPhrases = [
-        "end the request",
-        "cancel the request",
-        "i do not want the request",
-        "close",
-        "end",
-        "stop",
-        "cancel",
-        "i want to end the request",
-        "i want to cancel the request"
-    ];
-
-    return endPhrases.some(phrase => text.includes(phrase));
-};
 const getButtonTitle = (buttonId, language) => {
     const buttonTitles = {
         "contact_us": { en: "Contact Us", ar: "اتصل بنا" },
@@ -878,40 +774,7 @@ function getInvalidUAERegionMessage(language) {
         '❌ The location you shared is outside the UAE. Please send a location within the Emirates.';
 }
 //
-const sendLocationButton = async (to, language) => {
-    try {
-        const locationPrompt = language === 'ar'
-            ? 'يرجى مشاركة موقعك الحالي باستخدام زر الموقع.'
-            : 'Please share your current location using the location button.';
 
-        const locationButton = [
-            { type: "reply", reply: { id: "share_location", title: language === 'ar' ? 'مشاركة الموقع' : 'Share Location' } }
-        ];
-
-        const payload = {
-            messaging_product: "whatsapp",
-            recipient_type: "individual",
-            to: to,
-            type: "interactive",
-            interactive: {
-                type: "button",
-                body: { text: locationPrompt },
-                action: { buttons: locationButton }
-            }
-        };
-
-        const response = await axios.post(process.env.WHATSAPP_API_URL, payload, {
-            headers: {
-                Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-                "Content-Type": "application/json"
-            }
-        });
-
-        console.log("Location Button Response:", response.data);
-    } catch (error) {
-        console.error("Error sending location button:", error.response?.data || error.message);
-    }
-};
 
 //
 const detectRequestStart = async (text) => {
@@ -1702,6 +1565,170 @@ app.post('/webhook', async (req, res) => {
         res.sendStatus(500);
     }
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const sendLocationButton = async (to, language) => {
+    try {
+        const locationPrompt = language === 'ar'
+            ? 'يرجى مشاركة موقعك الحالي باستخدام زر الموقع.'
+            : 'Please share your current location using the location button.';
+
+        const locationButton = [
+            { type: "reply", reply: { id: "share_location", title: language === 'ar' ? 'مشاركة الموقع' : 'Share Location' } }
+        ];
+
+        const payload = {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: to,
+            type: "interactive",
+            interactive: {
+                type: "button",
+                body: { text: locationPrompt },
+                action: { buttons: locationButton }
+            }
+        };
+
+        const response = await axios.post(process.env.WHATSAPP_API_URL, payload, {
+            headers: {
+                Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                "Content-Type": "application/json"
+            }
+        });
+
+        console.log("Location Button Response:", response.data);
+    } catch (error) {
+        console.error("Error sending location button:", error.response?.data || error.message);
+    }
+};
+
+const generateWelcomeMessage = async () => {
+    const systemPrompt = `
+        You are a friendly WhatsApp assistant for Lootah Biofuels. 
+        Generate a concise and engaging welcome message that:
+        - Introduces the company in a warm and professional tone.
+        - Encourages users to ask questions or start a new request.
+        - Uses emojis sparingly to make the message lively but not overwhelming.
+    `;
+
+    return await getOpenAIResponse("Generate a welcome message.", systemPrompt);
+};
+
+
+
+const generateMissingFieldPrompt = async (field) => {
+    const fieldPromptMap = {
+        name: "Ask the user to provide their full name in a friendly and casual tone. Example: 'May I have your full name, please? 😊'",
+        phone: "Ask the user for their phone number in a casual and friendly way. Example: 'Could you share your phone number with us? 📱'",
+        email: "Ask the user for their email address politely. Example: 'What’s your email address? We’ll use it to keep you updated! ✉️'",
+        address: "Ask the user for their full address in a simple and friendly way. Example: 'Could you provide your complete address? 🏠'",
+        street: "Ask the user for their street name in a cheerful tone. Example: 'What’s the name of your street? 🛣️'",
+        building_name: "Ask the user for their building name in a friendly way. Example: 'Could you tell us the name of your building? 🏢'",
+        flat_no: "Ask the user for their flat number politely. Example: 'What’s your flat number? 🏠'",
+        latitude: "Ask the user to share their live location via WhatsApp. Example: 'Please share your live location to help us serve you better! 📍'",
+        longitude: "Ask the user to share their live location via WhatsApp. Example: 'Please share your live location to help us serve you better! 📍'",
+        quantity: "Ask the user how many liters they want in a friendly tone. Example: 'How many liters would you like to order? ⛽'",
+        // Add city with null to prevent text prompt
+        city: null
+    };
+
+    if (!fieldPromptMap[field]) return null;
+
+    const prompt = `
+        The user is filling out a form. They need to provide their "${field}".
+        Ensure your response is **ONLY** a polite request for the missing field, without any unrelated information.
+        Do **not** mention AI, email, or apologies.
+        Do **not** generate anything except the request prompt.
+        
+        ${fieldPromptMap[field]}
+    `;
+
+    return await getOpenAIResponse(prompt, ``);
+};
+const analyzeInput = async (input, expectedField) => {
+    const prompt = `
+        Determine if the user's input matches the requested field ("${expectedField}").
+
+        Rules:
+        1. For names: Accept both single-word (e.g., "Ahmed") and multi-word names (e.g., "John Doe").
+        2. For addresses: Accept partial addresses (e.g., "Jazeer") and validate them later.
+        3. Return "valid" if the input is appropriate for ${expectedField}.
+        4. Return "invalid:<message>" only if the input is clearly unrelated (e.g., numbers for a name).
+
+        Examples of valid names:
+        - "Ahmed"
+        - "John Doe"
+        - "Maria"
+
+        Examples of valid addresses:
+        - "Jazeer"
+        - "123 Main Street"
+
+        User Input: "${input}"
+        Your response (ONLY "valid" or "invalid:<reason>"):
+    `;
+
+    const response = await getOpenAIResponse(prompt, ``);
+    return response.trim();
+};
+const shouldEndRequest = (text) => {
+    const endPhrases = [
+        "end the request",
+        "cancel the request",
+        "i do not want the request",
+        "close",
+        "end",
+        "stop",
+        "cancel",
+        "i want to end the request",
+        "i want to cancel the request"
+    ];
+
+    return endPhrases.some(phrase => text.includes(phrase));
+};
+const sendLocationRequest = async (to, message) => {
+    await axios.post(process.env.WHATSAPP_API_URL, {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: to,
+        type: "text",
+        text: {
+            body: message + "\n\n📍 *Click here to send your location:*",
+            preview_url: false
+        }
+    }, {
+        headers: {
+            "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+            "Content-Type": "application/json"
+        }
+    });
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // app.post('/webhook', async (req, res) => {
 //     try {
