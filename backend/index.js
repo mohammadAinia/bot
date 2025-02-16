@@ -459,7 +459,11 @@ const sendInteractiveButtons = async (to, message, buttons) => {
                     buttons: buttons.map(button => {
                         if (button.type === "location_request") {
                             return {
-                                type: "location_request" // No title here
+                                type: "reply", // Use "reply" type instead of "location_request"
+                                reply: {
+                                    id: "share_location", // Unique ID for the location request
+                                    title: button.title || "📍 Send Location" // Button title
+                                }
                             };
                         } else {
                             return {
@@ -694,7 +698,11 @@ async function askForNextMissingField(session, from) {
             case "location":
                 await sendInteractiveButtons(from, getLocationMessage(lang), [
                     {
-                        type: "location_request" // No title property
+                        type: "reply", // Use "reply" type
+                        reply: {
+                            id: "share_location", // Unique ID for the location request
+                            title: lang === 'ar' ? '📍 إرسال الموقع' : '📍 Send Location' // Button title
+                        }
                     }
                 ]);
                 break;
@@ -1062,12 +1070,15 @@ app.post('/webhook', async (req, res) => {
                 if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                     const buttonId = message.interactive.button_reply.id;
 
-                    if (buttonId === "send_site") {
+                    if (buttonId === "share_location") { // Updated button ID
                         // Send a message with a button to share location
                         await sendInteractiveButtons(from, getLocationMessage(session.language), [
                             {
-                                type: "location_request",
-                                title: getButtonTitle("send_site", session.language) // "Send Location" button
+                                type: "reply", // Use "reply" type
+                                reply: {
+                                    id: "share_location", // Unique ID for the location request
+                                    title: getButtonTitle("send_site", session.language) // "Send Location" button
+                                }
                             }
                         ]);
                     }
@@ -1094,8 +1105,11 @@ app.post('/webhook', async (req, res) => {
                         // Send a message with a button to share location
                         await sendInteractiveButtons(from, getLocationMessage(session.language), [
                             {
-                                type: "location_request",
-                                title: getButtonTitle("send_site", session.language) // "Send Location" button
+                                type: "reply", // Use "reply" type
+                                reply: {
+                                    id: "share_location", // Unique ID for the location request
+                                    title: getButtonTitle("send_site", session.language) // "Send Location" button
+                                }
                             }
                         ]);
                         session.locationPromptSent = true;
@@ -1276,8 +1290,11 @@ app.post('/webhook', async (req, res) => {
                     // Send a message with a button to share location
                     await sendInteractiveButtons(from, getLocationMessage(session.language), [
                         {
-                            type: "location_request",
-                            title: getButtonTitle("send_site", session.language) // "Send Location" button
+                            type: "reply", // Use "reply" type
+                            reply: {
+                                id: "share_location", // Unique ID for the location request
+                                title: getButtonTitle("send_site", session.language) // "Send Location" button
+                            }
                         }
                     ]);
                     return res.sendStatus(200); // Exit and wait for the user's response
