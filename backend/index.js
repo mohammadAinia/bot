@@ -577,20 +577,20 @@ function extractCity(text, language = "en") {
         ar: ["دبي", "أبو ظبي", "الشارقة"]
     };
 
-    // Normalize the text to handle variations in Arabic script
     const normalizedText = text.normalize("NFKC").toLowerCase();
+    console.log("Normalized user text:", normalizedText);
 
-    // Check for city matches in the detected language
     for (const city of cities[language]) {
         const normalizedCity = city.normalize("NFKC").toLowerCase();
         if (normalizedText.includes(normalizedCity)) {
-            return city; // Return the matched city
+            console.log("Matched city:", city);
+            return city;
         }
     }
-
-    // If no match is found, return null
+    console.log("No city matched.");
     return null;
 }
+
 
 
 
@@ -938,6 +938,17 @@ const detectRequestStart = async (text) => {
     const response = await getOpenAIResponse(prompt);
     return response.trim().toLowerCase() === "true";
 };
+function moveToNextStep() {
+    const missingFields = getMissingFields(session.data);
+    if (missingFields.length === 0) {
+        session.step = STATES.CONFIRMATION;
+        sendOrderSummary(from, session);
+    } else {
+        session.step = `ASK_${missingFields[0].toUpperCase()}`;
+        askForNextMissingField(session, from);
+    }
+}
+
 app.post('/webhook', async (req, res) => {
     try {
         console.log('Incoming Webhook Data:', JSON.stringify(req.body, null, 2));
@@ -1153,55 +1164,55 @@ app.post('/webhook', async (req, res) => {
                 session.step = STATES.CITY_SELECTION;
                 return await sendCitySelection(from, session.language); // ✅ Ask user to select city
 
-                case STATES.CITY_SELECTION:
-                    if (message.interactive && message.interactive.button_reply) {
-                        const citySelection = message.interactive.button_reply.id;
-                
-                        const cityMap = {
-                            "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
-                            "dubai": { en: "Dubai", ar: "دبي" },
-                            "sharjah": { en: "Sharjah", ar: "الشارقة" }
-                        };
-                
-                        if (cityMap[citySelection]) {
-                            session.data.city = cityMap[citySelection][session.language] || cityMap[citySelection].en;
-                            session.step = STATES.STREET;
-                
-                            const streetPrompt = session.language === 'ar'
-                                ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
-                                : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
-                
-                            await sendToWhatsApp(from, streetPrompt);
-                        } else {
-                            const invalidSelectionMessage = session.language === 'ar'
-                                ? "❌ اختيار غير صالح. يرجى الاختيار من الخيارات المتاحة."
-                                : "❌ Invalid selection. Please choose from the provided options.";
-                
-                            await sendToWhatsApp(from, invalidSelectionMessage);
-                            await sendCitySelection(from, session.language);
-                        }
+            case STATES.CITY_SELECTION:
+                if (message.interactive && message.interactive.button_reply) {
+                    const citySelection = message.interactive.button_reply.id;
+
+                    const cityMap = {
+                        "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
+                        "dubai": { en: "Dubai", ar: "دبي" },
+                        "sharjah": { en: "Sharjah", ar: "الشارقة" }
+                    };
+
+                    if (cityMap[citySelection]) {
+                        session.data.city = cityMap[citySelection][session.language] || cityMap[citySelection].en;
+                        session.step = STATES.STREET;
+
+                        const streetPrompt = session.language === 'ar'
+                            ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
+                            : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
+
+                        await sendToWhatsApp(from, streetPrompt);
                     } else {
-                        // If the user sends a text message instead of selecting a city button
-                        const selectedCity = extractCity(textRaw, session.language);
-                        if (selectedCity) {
-                            session.data.city = selectedCity;
-                            session.step = STATES.STREET;
-                
-                            const streetPrompt = session.language === 'ar'
-                                ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
-                                : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
-                
-                            await sendToWhatsApp(from, streetPrompt);
-                        } else {
-                            const selectCityMessage = session.language === 'ar'
-                                ? "❌ يرجى اختيار مدينة من الخيارات المتاحة."
-                                : "❌ Please select a city from the provided options.";
-                
-                            await sendToWhatsApp(from, selectCityMessage);
-                            await sendCitySelection(from, session.language);
-                        }
+                        const invalidSelectionMessage = session.language === 'ar'
+                            ? "❌ اختيار غير صالح. يرجى الاختيار من الخيارات المتاحة."
+                            : "❌ Invalid selection. Please choose from the provided options.";
+
+                        await sendToWhatsApp(from, invalidSelectionMessage);
+                        await sendCitySelection(from, session.language);
                     }
-                    break;
+                } else {
+                    // If the user sends a text message instead of selecting a city button
+                    const selectedCity = extractCity(textRaw, session.language);
+                    if (selectedCity) {
+                        session.data.city = selectedCity;
+                        session.step = STATES.STREET;
+
+                        const streetPrompt = session.language === 'ar'
+                            ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
+                            : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
+
+                        await sendToWhatsApp(from, streetPrompt);
+                    } else {
+                        const selectCityMessage = session.language === 'ar'
+                            ? "❌ يرجى اختيار مدينة من الخيارات المتاحة."
+                            : "❌ Please select a city from the provided options.";
+
+                        await sendToWhatsApp(from, selectCityMessage);
+                        await sendCitySelection(from, session.language);
+                    }
+                }
+                break;
 
             case STATES.STREET:
                 session.data.street = textRaw;
@@ -1372,44 +1383,23 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case "ASK_CITY":
-                // If the city is already provided, skip this step
                 if (session.data.city) {
-                    const missingFields = getMissingFields(session.data);
-                    if (missingFields.length === 0) {
-                        session.step = STATES.CONFIRMATION;
-                        await sendOrderSummary(from, session);
-                    } else {
-                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                        await askForNextMissingField(session, from);
-                    }
+                    moveToNextStep();
                     return res.sendStatus(200);
                 }
 
-                // If the user hasn't selected a city yet, ask for it
-                if (!textRaw) {
-                    await sendCitySelection(from, session.language);
-                    return res.sendStatus(200); // Exit and wait for the user's response
-                }
-
-                // If the city is selected, store it and proceed to the next step
+                console.log("Checking user response for city:", textRaw);
                 const selectedCity = extractCity(textRaw);
                 if (selectedCity) {
                     session.data.city = selectedCity;
-
-                    // Check for other missing fields
-                    const missingFields = getMissingFields(session.data);
-                    if (missingFields.length === 0) {
-                        session.step = STATES.CONFIRMATION;
-                        await sendOrderSummary(from, session);
-                    } else {
-                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                        await askForNextMissingField(session, from);
-                    }
+                    console.log("City set to:", selectedCity);
+                    moveToNextStep();
                 } else {
                     await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
                     await sendCitySelection(from, session.language);
                 }
                 break;
+
 
             case "ASK_STREET":
                 // If the user hasn't provided a street name yet, ask for it
