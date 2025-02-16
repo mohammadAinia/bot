@@ -517,7 +517,11 @@ const sendCitySelection = async (to, language) => {
         const cityButtons = [
             { type: "reply", reply: { id: "abu_dhabi", title: language === 'ar' ? 'أبو ظبي' : 'Abu Dhabi' } },
             { type: "reply", reply: { id: "dubai", title: language === 'ar' ? 'دبي' : 'Dubai' } },
-            { type: "reply", reply: { id: "sharjah", title: language === 'ar' ? 'الشارقة' : 'Sharjah' } }
+            { type: "reply", reply: { id: "sharjah", title: language === 'ar' ? 'الشارقة' : 'Sharjah' } },
+            { type: "reply", reply: { id: "ajman", title: language === 'ar' ? 'عجمان' : 'Ajman' } },
+            { type: "reply", reply: { id: "umm_al_quwain", title: language === 'ar' ? 'أم القيوين' : 'Umm Al Quwain' } },
+            { type: "reply", reply: { id: "ras_al_khaimah", title: language === 'ar' ? 'رأس الخيمة' : 'Ras Al Khaimah' } },
+            { type: "reply", reply: { id: "fujairah", title: language === 'ar' ? 'الفجيرة' : 'Fujairah' } }
         ];
 
         const payload = {
@@ -1109,7 +1113,11 @@ app.post('/webhook', async (req, res) => {
                     const cityMap = {
                         "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
                         "dubai": { en: "Dubai", ar: "دبي" },
-                        "sharjah": { en: "Sharjah", ar: "الشارقة" }
+                        "sharjah": { en: "Sharjah", ar: "الشارقة" },
+                        "ajman": { en: "Ajman", ar: "عجمان" },
+                        "umm_al_quwain": { en: "Umm Al Quwain", ar: "أم القيوين" },
+                        "ras_al_khaimah": { en: "Ras Al Khaimah", ar: "رأس الخيمة" },
+                        "fujairah": { en: "Fujairah", ar: "الفجيرة" }
                     };
 
                     if (cityMap[citySelection]) {
