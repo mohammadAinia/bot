@@ -956,14 +956,18 @@ app.post('/webhook', async (req, res) => {
                 if (message.type === "text") {
                     const isRequestStart = await detectRequestStart(textRaw);
                     if (isRequestStart) {
-                        session.inRequest = true; // Set inRequest to true
+                        session.inRequest = true;
                         const extractedData = await extractInformationFromText(textRaw, session.language);
-                        console.log("Extracted Data:", extractedData); // Debugging
-                        session.data = { ...session.data, ...extractedData };
+
+                        // Preserve existing phone number unless new one is extracted
+                        session.data = {
+                            ...session.data, // Keep existing data including phone from WhatsApp
+                            ...extractedData,
+                            phone: extractedData.phone || session.data.phone // Only overwrite if new phone found
+                        };
 
                         // Check for missing fields
                         const missingFields = getMissingFields(session.data);
-                        console.log("Missing Fields:", missingFields); // Debugging
 
                         if (missingFields.length === 0) {
                             session.step = STATES.CONFIRMATION;
