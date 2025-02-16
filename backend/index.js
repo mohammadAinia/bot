@@ -892,7 +892,7 @@ const sendLocationButton = async (to, language) => {
     }
 };
 
-
+//
 const detectRequestStart = async (text) => {
     const prompt = `
         Determine if the user's message indicates the start of a request for Lootah Biofuels. 
