@@ -901,7 +901,7 @@ app.post('/webhook', async (req, res) => {
             }
             return res.sendStatus(200);
         }
-
+//
         // Handle messages based on the current state
         switch (session.step) {
             case STATES.WELCOME:
