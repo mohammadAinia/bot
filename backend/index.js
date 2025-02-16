@@ -460,7 +460,7 @@ const sendInteractiveButtons = async (to, message, buttons) => {
                         if (button.type === "location_request") {
                             return {
                                 type: "location_request",
-                                name: button.name || "share_location" // Use 'name' instead of 'title'
+                                title: button.title || "📍 Send Location" // CORRECTED: Use title instead of name
                             };
                         } else {
                             return {
@@ -693,7 +693,7 @@ async function askForNextMissingField(session, from) {
                 await sendInteractiveButtons(from, getLocationMessage(lang), [
                     {
                         type: "location_request",
-                        name: "share_location" // Use 'name' instead of 'title'
+                        title: lang === 'ar' ? '📍 إرسال الموقع' : '📍 Send Location' // CORRECTED: Use title
                     }
                 ]);
                 break;
@@ -1147,7 +1147,6 @@ app.post('/webhook', async (req, res) => {
                     await sendInteractiveButtons(from, getLocationMessage(session.language), [
                         {
                             type: "location_request",
-                            name: "share_location",
                             title: session.language === 'ar' ? '📍 إرسال الموقع' : '📍 Send Location'
                         }
                     ]);
