@@ -527,24 +527,29 @@ async function extractInformationFromText(text, language = "en") {
 
     // Use OpenAI for additional extraction
     const prompt = `
-        Extract the following information from the text and return a valid JSON object:
-        {
-          "name": "The user's full name or null",
-          "phone": "The user's phone number or null",
-          "email": "The user's email address or null",
-          "address": "The user's full address or null",
-          "city": "The user's city (e.g., Dubai, Sharjah, Abu Dhabi) or null",
-          "street": "The user's street name or null",
-          "building_name": "The user's building name or null",
-          "flat_no": "The user's flat number or null",
-          "latitude": "The user's latitude or null",
-          "longitude": "The user's longitude or null"
-        }
-        
-        If any information is missing, assign null to that field.
+    Extract the following information from the text and return a valid JSON object:
+    {
+      "name": "The user's full name or null",
+      "phone": "The user's phone number or null",
+      "email": "The user's email address or null",
+      "address": "The user's full address or null",
+      "city": "The user's city (e.g., Dubai, Sharjah, Abu Dhabi) or null",
+      "street": "The user's street name or null",
+      "building_name": "The user's building name or null",
+      "flat_no": "The user's flat number or null",
+      "latitude": "The user's latitude or null",
+      "longitude": "The user's longitude or null"
+    }
+    
+    If any information is missing, assign null to that field.
 
-        Text: ${text}
-    `;
+    **Rules for Arabic Text:**
+    1. Recognize city names in Arabic: دبي (Dubai), أبو ظبي (Abu Dhabi), الشارقة (Sharjah).
+    2. Extract names written in Arabic script.
+    3. Extract phone numbers in UAE format (e.g., +9715xxxxxxxx).
+
+    Text: ${text}
+`;
 
     const aiResponse = await getOpenAIResponse(prompt, ``, language); // Pass prompt, not textRaw
 
@@ -562,14 +567,19 @@ function extractCity(text, language = "en") {
         ar: ["دبي", "أبو ظبي", "الشارقة"]
     };
 
-    const cityPatterns = cities[language].map(city => new RegExp(city, 'i')); // Case-insensitive matching
+    // Normalize the text to handle variations in Arabic script
+    const normalizedText = text.normalize("NFKC").toLowerCase();
 
-    for (let i = 0; i < cityPatterns.length; i++) {
-        if (cityPatterns[i].test(text)) {
-            return cities[language][i]; // Return the matched city
+    // Check for city matches in the detected language
+    for (const city of cities[language]) {
+        const normalizedCity = city.normalize("NFKC").toLowerCase();
+        if (normalizedText.includes(normalizedCity)) {
+            return city; // Return the matched city
         }
     }
-    return null; // Return null if no city is found
+
+    // If no match is found, return null
+    return null;
 }
 
 
@@ -612,6 +622,10 @@ async function askForNextMissingField(session, from) {
         session.step = `ASK_${nextField.toUpperCase()}`;
 
         switch (nextField) {
+            case "city":
+                // If the city is missing, send the city selection buttons
+                await sendCitySelection(from, session.language);
+                break;
             case "email":
                 await sendToWhatsApp(from, "✉️ Could you please share your email address? We'll use it for sending updates on your order.");
                 break;
@@ -627,9 +641,6 @@ async function askForNextMissingField(session, from) {
             case "address":
                 await sendToWhatsApp(from, "🏠 Please provide your address.");
                 break;
-            case "city":
-                await sendCitySelection(from, session.language);
-                break;
             case "street":
                 await sendToWhatsApp(from, "🛣️ Please provide your street name.");
                 break;
@@ -639,7 +650,6 @@ async function askForNextMissingField(session, from) {
             case "flat_no":
                 await sendToWhatsApp(from, "🏠 Please provide your flat number.");
                 break;
-
             case "quantity":
                 await sendToWhatsApp(from, "🔢 Please provide the quantity (in liters).");
                 break;
@@ -1133,55 +1143,55 @@ app.post('/webhook', async (req, res) => {
                 session.step = STATES.CITY_SELECTION;
                 return await sendCitySelection(from, session.language); // ✅ Ask user to select city
 
-            case STATES.CITY_SELECTION:
-                if (message.interactive && message.interactive.button_reply) {
-                    const citySelection = message.interactive.button_reply.id;
-
-                    const cityMap = {
-                        "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
-                        "dubai": { en: "Dubai", ar: "دبي" },
-                        "sharjah": { en: "Sharjah", ar: "الشارقة" }
-                    };
-
-                    if (cityMap[citySelection]) {
-                        session.data.city = cityMap[citySelection][session.language] || cityMap[citySelection].en;
-                        session.step = STATES.STREET;
-
-                        const streetPrompt = session.language === 'ar'
-                            ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
-                            : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
-
-                        await sendToWhatsApp(from, streetPrompt);
+                case STATES.CITY_SELECTION:
+                    if (message.interactive && message.interactive.button_reply) {
+                        const citySelection = message.interactive.button_reply.id;
+                
+                        const cityMap = {
+                            "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
+                            "dubai": { en: "Dubai", ar: "دبي" },
+                            "sharjah": { en: "Sharjah", ar: "الشارقة" }
+                        };
+                
+                        if (cityMap[citySelection]) {
+                            session.data.city = cityMap[citySelection][session.language] || cityMap[citySelection].en;
+                            session.step = STATES.STREET;
+                
+                            const streetPrompt = session.language === 'ar'
+                                ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
+                                : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
+                
+                            await sendToWhatsApp(from, streetPrompt);
+                        } else {
+                            const invalidSelectionMessage = session.language === 'ar'
+                                ? "❌ اختيار غير صالح. يرجى الاختيار من الخيارات المتاحة."
+                                : "❌ Invalid selection. Please choose from the provided options.";
+                
+                            await sendToWhatsApp(from, invalidSelectionMessage);
+                            await sendCitySelection(from, session.language);
+                        }
                     } else {
-                        const invalidSelectionMessage = session.language === 'ar'
-                            ? "❌ اختيار غير صالح. يرجى الاختيار من الخيارات المتاحة."
-                            : "❌ Invalid selection. Please choose from the provided options.";
-
-                        await sendToWhatsApp(from, invalidSelectionMessage);
-                        await sendCitySelection(from, session.language);
+                        // If the user sends a text message instead of selecting a city button
+                        const selectedCity = extractCity(textRaw, session.language);
+                        if (selectedCity) {
+                            session.data.city = selectedCity;
+                            session.step = STATES.STREET;
+                
+                            const streetPrompt = session.language === 'ar'
+                                ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
+                                : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
+                
+                            await sendToWhatsApp(from, streetPrompt);
+                        } else {
+                            const selectCityMessage = session.language === 'ar'
+                                ? "❌ يرجى اختيار مدينة من الخيارات المتاحة."
+                                : "❌ Please select a city from the provided options.";
+                
+                            await sendToWhatsApp(from, selectCityMessage);
+                            await sendCitySelection(from, session.language);
+                        }
                     }
-                } else {
-                    // If the user sends a text message instead of selecting a city button
-                    const selectedCity = extractCity(textRaw, session.language);
-                    if (selectedCity) {
-                        session.data.city = selectedCity;
-                        session.step = STATES.STREET;
-
-                        const streetPrompt = session.language === 'ar'
-                            ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
-                            : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
-
-                        await sendToWhatsApp(from, streetPrompt);
-                    } else {
-                        const selectCityMessage = session.language === 'ar'
-                            ? "❌ يرجى اختيار مدينة من الخيارات المتاحة."
-                            : "❌ Please select a city from the provided options.";
-
-                        await sendToWhatsApp(from, selectCityMessage);
-                        await sendCitySelection(from, session.language);
-                    }
-                }
-                break;
+                    break;
 
             case STATES.STREET:
                 session.data.street = textRaw;
