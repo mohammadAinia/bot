@@ -821,6 +821,8 @@ app.post('/webhook', async (req, res) => {
         const changes = entry?.changes?.[0];
         const value = changes?.value;
         const messages = value?.messages;
+        const session = userSessions[from];
+
 
         if (!messages || !Array.isArray(messages) || messages.length === 0) {
             return res.sendStatus(200);
@@ -854,24 +856,23 @@ app.post('/webhook', async (req, res) => {
                 language: detectedLanguage,
                 inRequest: false // Track if the user is in a request
             };
-
+        
             // Generate the welcome message in the detected or default language
             const welcomeMessage = await getOpenAIResponse(
                 "Generate a WhatsApp welcome message for Lootah Biofuels.",
                 "",
                 detectedLanguage // Use the detected or default language
             );
-
+        
             // Send the welcome message with buttons
             await sendInteractiveButtons(from, welcomeMessage, [
                 { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
                 { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
             ]);
-
+        
             return res.sendStatus(200);
         }
-
-        const session = userSessions[from];
+        
         const classification = await isQuestionOrRequest(textRaw);
 
         if (classification === "question") {
@@ -1247,6 +1248,12 @@ app.post('/webhook', async (req, res) => {
                 break;
 
                 case "ASK_CITY":
+                    if (!session) {
+                        console.error("❌ Session is not defined.");
+                        await sendToWhatsApp(from, "❌ An error occurred. Please try again.");
+                        return res.sendStatus(200);
+                    }
+                
                     if (session.data.city) {
                         moveToNextStep();
                         return res.sendStatus(200);
@@ -1254,7 +1261,7 @@ app.post('/webhook', async (req, res) => {
                 
                     console.log("Checking user response for city:", textRaw);
                     const selectedCity = extractCity(textRaw, session.language);
-                    
+                
                     if (selectedCity) {
                         session.data.city = selectedCity;
                         console.log("City set to:", selectedCity);
