@@ -690,7 +690,12 @@ async function askForNextMissingField(session, from) {
                 await sendToWhatsApp(from, getPhoneMessage(lang));
                 break;
             case "location":
-                await sendToWhatsApp(from, getLocationMessage(lang));
+                await sendInteractiveButtons(from, getLocationMessage(lang), [
+                    {
+                        type: "location_request",
+                        title: lang === 'ar' ? '📍 إرسال الموقع' : '📍 Send Location'
+                    }
+                ]);
                 break;
             case "address":
                 await sendToWhatsApp(from, getAddressMessage(lang));
