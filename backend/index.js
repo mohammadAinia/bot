@@ -821,7 +821,8 @@ app.post('/webhook', async (req, res) => {
         const changes = entry?.changes?.[0];
         const value = changes?.value;
         const messages = value?.messages;
-        
+
+        const message = messages[0];
         const from = message.from;
         const session = userSessions[from];
 
@@ -830,7 +831,6 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(200);
         }
 
-        const message = messages[0];
         if (!message?.from) return res.sendStatus(400);
 
         const textRaw = message.text?.body || "";
