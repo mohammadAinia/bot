@@ -813,7 +813,9 @@ function getCitySelectionMessage(language) {
 }
 
 function getInvalidCityMessage(language) {
-    return language === 'ar' ? '❌ خيار غير صالح، يرجى اختيار مدينة من الخيارات المتاحة.' : '❌ Invalid selection, please choose from the provided options.';
+    return language === 'ar' ?
+        '❌ المدينة المحددة لا تتطابق مع موقعك. يرجى اختيار المدينة الصحيحة.' :
+        '❌ The selected city does not match your location. Please choose the correct city.';
 }
 
 function getStreetMessage(language) {
@@ -895,7 +897,23 @@ function moveToNextStep(session, from) {  // ✅ Add parameters
         askForNextMissingField(session, from);
     }
 }
+const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
+    try {
+        // Use a geocoding API to get the city name from the latitude and longitude
+        const response = await axios.get(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
+        const actualCity = response.data.city;
 
+        // Normalize city names for comparison
+        const normalizedSelectedCity = selectedCity.toLowerCase().trim();
+        const normalizedActualCity = actualCity.toLowerCase().trim();
+
+        // Check if the selected city matches the actual city
+        return normalizedSelectedCity === normalizedActualCity;
+    } catch (error) {
+        console.error("❌ Error validating city and location:", error);
+        return false;
+    }
+};
 app.post('/webhook', async (req, res) => {
     try {
         console.log("🔹 Incoming Webhook Data:", JSON.stringify(req.body, null, 2));
@@ -1096,6 +1114,15 @@ app.post('/webhook', async (req, res) => {
                         longitude >= UAE_BOUNDS.minLng &&
                         longitude <= UAE_BOUNDS.maxLng
                     ) {
+                        // Check if the selected city matches the location
+                        if (session.data.city) {
+                            const isValidCity = await validateCityAndLocation(latitude, longitude, session.data.city);
+                            if (!isValidCity) {
+                                await sendToWhatsApp(from, getInvalidCityMessage(session.language));
+                                return res.sendStatus(200);
+                            }
+                        }
+
                         session.data.latitude = latitude;
                         session.data.longitude = longitude;
                         session.step = STATES.ADDRESS;
@@ -1121,7 +1148,6 @@ app.post('/webhook', async (req, res) => {
                 session.data.address = textRaw;
                 session.step = STATES.CITY_SELECTION;
                 return await sendCitySelection(from, session.language); // ✅ Ask user to select city
-
             case STATES.CITY_SELECTION:
                 if (message.interactive && message.interactive.type === "list_reply") {
                     const citySelection = message.interactive.list_reply.id; // Get the selected city ID
