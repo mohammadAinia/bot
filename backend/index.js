@@ -510,6 +510,8 @@ function convertArabicNumbers(arabicNumber) {
 
 const sendCitySelection = async (to, language) => {
     try {
+        console.log("🔹 Sending city selection to:", to);
+
         const cityPrompt = language === 'ar'
             ? 'الرجاء اختيار المدينة من القائمة:'
             : 'Please select your city from the list:';
@@ -545,13 +547,17 @@ const sendCitySelection = async (to, language) => {
             }
         };
 
-        await axios.post(process.env.WHATSAPP_API_URL, payload, {
+        console.log("🔹 Payload for city selection:", JSON.stringify(payload, null, 2));
+
+        const response = await axios.post(process.env.WHATSAPP_API_URL, payload, {
             headers: {
                 Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
                 "Content-Type": "application/json"
             },
             timeout: 5000
         });
+
+        console.log("🔹 City selection sent successfully:", response.data);
 
     } catch (error) {
         console.error("❌ Failed to send city selection:", error);
@@ -1193,7 +1199,8 @@ app.post('/webhook', async (req, res) => {
                 console.log("🔹 Entered CITY_SELECTION state for user:", from);
 
                 try {
-                    if (!message.interactive?.type === "list_reply") {
+                    // Ensure the message type is a list reply
+                    if (message.interactive?.type !== "list_reply") {
                         throw new Error("Invalid message type for city selection");
                     }
 
@@ -1216,7 +1223,7 @@ app.post('/webhook', async (req, res) => {
                     console.log("🔹 Selected city:", selectedCity);
                     session.data.city = selectedCity;
 
-                    // Location validation
+                    // Location validation (if location is already provided)
                     if (session.data.latitude && session.data.longitude) {
                         const validation = await validateCityAndLocation(
                             session.data.latitude,
