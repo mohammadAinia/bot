@@ -624,18 +624,20 @@ function extractCity(text, language = "en") {
         ar: ["دبي", "أبو ظبي", "الشارقة", "عجمان", "رأس الخيمة", "الفجيرة", "أم القيوين"]
     };
 
-    const normalizedText = text.normalize("NFKC").toLowerCase().trim();
-    console.log("Normalized user text:", normalizedText);
+    // Handle both list selections and text input
+    const normalizedText = text.normalize("NFKC").toLowerCase().trim()
+        .replace(/\s+/g, ' '); // Normalize spaces
 
     for (const city of cities[language]) {
-        const normalizedCity = city.normalize("NFKC").toLowerCase();
-        console.log("Checking city:", normalizedCity);
-        if (normalizedText.includes(normalizedCity) || normalizedText.includes(normalizedCity.replace(/\s/g, ""))) {
+        // Create match pattern that handles spaces and diacritics
+        const normalizedCity = city.normalize("NFKC").toLowerCase().replace(/\s+/g, '[\\s]*');
+        const pattern = new RegExp(`\\b${normalizedCity}\\b`, 'i');
+
+        if (pattern.test(normalizedText)) {
             console.log("Matched city:", city);
             return city;
         }
     }
-    console.log("No city matched.");
     return null;
 }
 
@@ -899,33 +901,23 @@ function moveToNextStep(session, from) {  // ✅ Add parameters
 }
 const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
     try {
-        // If location is not available, return isValid: true
-        if (!latitude || !longitude) {
-            return {
-                isValid: true,
-                actualCity: null
-            };
-        }
+        if (!latitude || !longitude) return { isValid: true, actualCity: null };
 
-        // Use a geocoding API to get the city name from the latitude and longitude
-        const response = await axios.get(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
-        const actualCity = response.data.city;
+        const response = await axios.get(
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
+        );
 
-        // Normalize city names for comparison
-        const normalizedSelectedCity = selectedCity.toLowerCase().trim();
-        const normalizedActualCity = actualCity.toLowerCase().trim();
+        // Broad match for UAE cities
+        const actualCity = response.data.city.toLowerCase();
+        const expectedCity = selectedCity.toLowerCase();
 
-        // Return both the validation result and the actual city name
         return {
-            isValid: normalizedSelectedCity === normalizedActualCity,
-            actualCity: actualCity
+            isValid: actualCity.includes(expectedCity) || expectedCity.includes(actualCity),
+            actualCity: response.data.city
         };
     } catch (error) {
-        console.error("❌ Error validating city and location:", error);
-        return {
-            isValid: false,
-            actualCity: null
-        };
+        console.error("Geocoding error:", error);
+        return { isValid: true, actualCity: null }; // Fail open
     }
 };
 app.post('/webhook', async (req, res) => {
