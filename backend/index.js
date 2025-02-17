@@ -1168,6 +1168,7 @@ app.post('/webhook', async (req, res) => {
                         "fujairah": { en: "Fujairah", ar: "الفجيرة" }
                     };
 
+
                     if (cityMap[citySelection]) {
                         const selectedCity = cityMap[citySelection][session.language] || cityMap[citySelection].en;
 
@@ -1459,10 +1460,15 @@ app.post('/webhook', async (req, res) => {
                 if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                     const citySelection = message.interactive.button_reply.id;
 
+                    // Updated cityMap to include all cities from sendCitySelection
                     const cityMap = {
                         "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
                         "dubai": { en: "Dubai", ar: "دبي" },
-                        "sharjah": { en: "Sharjah", ar: "الشارقة" }
+                        "sharjah": { en: "Sharjah", ar: "الشارقة" },
+                        "ajman": { en: "Ajman", ar: "عجمان" },
+                        "umm_al_quwain": { en: "Umm Al Quwain", ar: "أم القيوين" },
+                        "ras_al_khaimah": { en: "Ras Al Khaimah", ar: "رأس الخيمة" },
+                        "fujairah": { en: "Fujairah", ar: "الفجيرة" }
                     };
 
                     if (cityMap[citySelection]) {
@@ -1471,10 +1477,17 @@ app.post('/webhook', async (req, res) => {
 
                         // If the user has already shared a location, validate it
                         if (session.data.latitude && session.data.longitude) {
-                            const validation = await validateCityAndLocation(session.data.latitude, session.data.longitude, session.data.city);
+                            const validation = await validateCityAndLocation(
+                                session.data.latitude,
+                                session.data.longitude,
+                                session.data.city
+                            );
 
                             if (!validation.isValid) {
-                                await sendToWhatsApp(from, `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`);
+                                await sendToWhatsApp(
+                                    from,
+                                    `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`
+                                );
                                 return res.sendStatus(200);
                             }
                         }
@@ -1496,10 +1509,17 @@ app.post('/webhook', async (req, res) => {
 
                         // Validate against detected location
                         if (session.data.latitude && session.data.longitude) {
-                            const validation = await validateCityAndLocation(session.data.latitude, session.data.longitude, session.data.city);
+                            const validation = await validateCityAndLocation(
+                                session.data.latitude,
+                                session.data.longitude,
+                                session.data.city
+                            );
 
                             if (!validation.isValid) {
-                                await sendToWhatsApp(from, `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`);
+                                await sendToWhatsApp(
+                                    from,
+                                    `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`
+                                );
                                 return res.sendStatus(200);
                             }
                         }
@@ -1516,6 +1536,7 @@ app.post('/webhook', async (req, res) => {
                     await sendCitySelection(from, session.language);
                 }
                 break;
+
 
 
 
