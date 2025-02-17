@@ -1004,7 +1004,12 @@ app.post('/webhook', async (req, res) => {
             if (userCheck && userCheck.exists) {
                 userSessions[from] = {
                     step: STATES.REGISTERED_WELCOME,
-                    data: { ...userCheck.data, phone: from, fromAPI: true },
+                    data: {
+                        ...userCheck.data,
+                        phone: from,
+                        city: userCheck.data.city || null,  // Ensure city is properly mapped
+                        fromAPI: true
+                    },
                     language: detectedLanguage,
                     inRequest: true
                 };
@@ -1041,12 +1046,16 @@ app.post('/webhook', async (req, res) => {
             if (message.interactive?.type === "button_reply") {
                 const buttonId = message.interactive.button_reply.id;
                 if (buttonId === "yes_update") {
-                    session.step = STATES.NAME;
+                    session.step = session.data.city ? STATES.ADDRESS : STATES.NAME;
                     await sendToWhatsApp(from, getNameMessage(session.language));
                 } else if (buttonId === "no_update") {
-                    session.step = STATES.QUANTITY;
-                    session.data.fromAPI = true;
-                    await sendToWhatsApp(from, getQuantityMessage(session.language));
+                    if (!session.data.city) {
+                        session.step = STATES.CITY_SELECTION;
+                        await sendCitySelection(from, session.language);
+                    } else {
+                        session.step = STATES.QUANTITY;
+                        await sendToWhatsApp(from, getQuantityMessage(session.language));
+                    }
                 }
             }
             return res.sendStatus(200);
@@ -1200,7 +1209,7 @@ app.post('/webhook', async (req, res) => {
                 return await sendCitySelection(from, session.language); // ✅ Ask user to select city
             case STATES.CITY_SELECTION:
                 if (message.interactive && message.interactive.type === "list_reply") {
-                    const citySelection = message.interactive.list_reply.id; // Get the selected city ID
+                    const citySelection = message.interactive.list_reply.id;
                     const cityMap = {
                         "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
                         "dubai": { en: "Dubai", ar: "دبي" },
@@ -1210,11 +1219,17 @@ app.post('/webhook', async (req, res) => {
                         "ras_al_khaimah": { en: "Ras Al Khaimah", ar: "رأس الخيمة" },
                         "fujairah": { en: "Fujairah", ar: "الفجيرة" }
                     };
+
                     if (cityMap[citySelection]) {
                         const selectedCity = cityMap[citySelection][session.language] || cityMap[citySelection].en;
-                        // Validate the selected city against the actual city from the location (if location is available)
+
+                        // Preserved location validation
                         if (session.data.latitude && session.data.longitude) {
-                            const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
+                            const validationResult = await validateCityAndLocation(
+                                session.data.latitude,
+                                session.data.longitude,
+                                selectedCity
+                            );
                             if (!validationResult.isValid) {
                                 const errorMessage = session.language === 'ar'
                                     ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
@@ -1225,7 +1240,7 @@ app.post('/webhook', async (req, res) => {
                                 return res.sendStatus(200);
                             }
                         }
-                        // If location is not available, accept the city without validation
+
                         session.data.city = selectedCity;
                         session.step = STATES.STREET;
                         const streetPrompt = session.language === 'ar'
@@ -1242,12 +1257,14 @@ app.post('/webhook', async (req, res) => {
                         await sendCitySelection(from, session.language);
                     }
                 } else {
-                    // If the user sends a text message instead of selecting from the list
                     const selectedCity = extractCity(textRaw, session.language);
                     if (selectedCity) {
-                        // Validate the selected city against the actual city from the location (if location is available)
                         if (session.data.latitude && session.data.longitude) {
-                            const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
+                            const validationResult = await validateCityAndLocation(
+                                session.data.latitude,
+                                session.data.longitude,
+                                selectedCity
+                            );
                             if (!validationResult.isValid) {
                                 const errorMessage = session.language === 'ar'
                                     ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
@@ -1258,7 +1275,6 @@ app.post('/webhook', async (req, res) => {
                                 return res.sendStatus(200);
                             }
                         }
-                        // If location is not available, accept the city without validation
                         session.data.city = selectedCity;
                         session.step = STATES.STREET;
                         const streetPrompt = session.language === 'ar'
@@ -1308,29 +1324,34 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
             case STATES.QUANTITY:
-                console.log("🔹 Entered QUANTITY state for user:", from);
-                console.log("🔹 textRaw:", textRaw);
-                if (!textRaw || textRaw.trim() === "") {
-                    console.log("🔹 No quantity provided. Asking for quantity.");
-                    await sendToWhatsApp(from, getQuantityMessage(session.language));
-                    return res.sendStatus(200);
-                }
-                if (isNaN(textRaw)) {
-                    console.log("🔹 Invalid quantity provided. Asking for valid quantity.");
-                    await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
-                    return res.sendStatus(200);
-                }
-                console.log("🔹 Valid quantity provided:", textRaw);
-                session.data.quantity = textRaw;
-                // Reuse the `missingFields` variable declared outside the switch statement
-                missingFields = getMissingFields(session.data);
-                console.log("🔹 Missing fields after quantity:", missingFields);
-                if (missingFields.length === 0) {
-                    session.step = STATES.CONFIRMATION;
-                    await sendOrderSummary(from, session);
+                if (session.data.fromAPI) {
+                    session.data.quantity = textRaw;
+                    if (!session.data.city) {
+                        session.step = STATES.CITY_SELECTION;
+                        await sendCitySelection(from, session.language);
+                    } else {
+                        session.step = STATES.CONFIRMATION;
+                        await sendAPIDataSummary(from, session);
+                    }
                 } else {
-                    session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                    await askForNextMissingField(session, from);
+                    // Original quantity handling
+                    if (!textRaw || textRaw.trim() === "") {
+                        await sendToWhatsApp(from, getQuantityMessage(session.language));
+                        return res.sendStatus(200);
+                    }
+                    if (isNaN(textRaw)) {
+                        await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
+                        return res.sendStatus(200);
+                    }
+                    session.data.quantity = textRaw;
+                    missingFields = getMissingFields(session.data);
+                    if (missingFields.length === 0) {
+                        session.step = STATES.CONFIRMATION;
+                        await sendOrderSummary(from, session);
+                    } else {
+                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                        await askForNextMissingField(session, from);
+                    }
                 }
                 break;
             case "ASK_NAME":
