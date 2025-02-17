@@ -899,8 +899,11 @@ function moveToNextStep(session, from) {  // ✅ Add parameters
 }
 const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
     try {
+        console.log("Validating city and location:", { latitude, longitude, selectedCity });
+
         // If location is not available, accept the city without validation
         if (!latitude || !longitude) {
+            console.log("No location data. Skipping validation.");
             return { isValid: true, actualCity: null };
         }
 
@@ -909,6 +912,7 @@ const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
             `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
         );
         const actualCity = response.data.city;
+        console.log("Actual city from geocoding:", actualCity);
 
         // If no city is detected, accept the selection
         if (!actualCity) {
@@ -919,9 +923,11 @@ const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
         // Normalize both city names
         const normalizedSelectedCity = selectedCity.toLowerCase().trim();
         const normalizedActualCity = actualCity.toLowerCase().trim();
+        console.log("Normalized cities:", { normalizedSelectedCity, normalizedActualCity });
 
         // Allow a substring match: if one contains the other, it's considered valid.
         const isValid = normalizedActualCity.includes(normalizedSelectedCity) || normalizedSelectedCity.includes(normalizedActualCity);
+        console.log("Validation result:", isValid);
 
         return {
             isValid,
