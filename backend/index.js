@@ -508,59 +508,70 @@ function convertArabicNumbers(arabicNumber) {
     return arabicNumber.replace(/[\u0660-\u0669]/g, d => arabicToWestern[d] || d);
 }
 
+// const sendCitySelection = async (to, language) => {
+//     try {
+//         const cityPrompt = language === 'ar'
+//             ? 'يرجى اختيار المدينة من القائمة:'
+//             : 'Please select your city from the list:';
+
+//         const cityOptions = [
+//             { id: "abu_dhabi", title: language === 'ar' ? 'أبو ظبي' : 'Abu Dhabi' },
+//             { id: "dubai", title: language === 'ar' ? 'دبي' : 'Dubai' },
+//             { id: "sharjah", title: language === 'ar' ? 'الشارقة' : 'Sharjah' },
+//             { id: "ajman", title: language === 'ar' ? 'عجمان' : 'Ajman' },
+//             { id: "umm_al_quwain", title: language === 'ar' ? 'أم القيوين' : 'Umm Al Quwain' },
+//             { id: "ras_al_khaimah", title: language === 'ar' ? 'رأس الخيمة' : 'Ras Al Khaimah' },
+//             { id: "fujairah", title: language === 'ar' ? 'الفجيرة' : 'Fujairah' }
+//         ];
+
+//         const payload = {
+//             messaging_product: "whatsapp",
+//             recipient_type: "individual",
+//             to: to,
+//             type: "interactive",
+//             interactive: {
+//                 type: "list",
+//                 body: {
+//                     text: cityPrompt
+//                 },
+//                 action: {
+//                     button: language === 'ar' ? 'اختر المدينة' : 'Select City', // Button text
+//                     sections: [
+//                         {
+//                             title: language === 'ar' ? 'المدن' : 'Cities', // Section title
+//                             rows: cityOptions.map(city => ({
+//                                 id: city.id,
+//                                 title: city.title
+//                             }))
+//                         }
+//                     ]
+//                 }
+//             }
+//         };
+
+//         console.log("Sending City Selection Payload:", JSON.stringify(payload, null, 2));
+
+//         const response = await axios.post(process.env.WHATSAPP_API_URL, payload, {
+//             headers: {
+//                 Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+//                 "Content-Type": "application/json"
+//             }
+//         });
+
+//         console.log("City Selection Response:", response.data);
+//     } catch (error) {
+//         console.error("Error sending city selection:", error.response?.data || error.message);
+//     }
+// };
 const sendCitySelection = async (to, language) => {
     try {
         const cityPrompt = language === 'ar'
-            ? 'يرجى اختيار المدينة من القائمة:'
-            : 'Please select your city from the list:';
+            ? '🏙️ يرجى إدخال اسم مدينتك.'
+            : '🏙️ Please enter your city name.';
 
-        const cityOptions = [
-            { id: "abu_dhabi", title: language === 'ar' ? 'أبو ظبي' : 'Abu Dhabi' },
-            { id: "dubai", title: language === 'ar' ? 'دبي' : 'Dubai' },
-            { id: "sharjah", title: language === 'ar' ? 'الشارقة' : 'Sharjah' },
-            { id: "ajman", title: language === 'ar' ? 'عجمان' : 'Ajman' },
-            { id: "umm_al_quwain", title: language === 'ar' ? 'أم القيوين' : 'Umm Al Quwain' },
-            { id: "ras_al_khaimah", title: language === 'ar' ? 'رأس الخيمة' : 'Ras Al Khaimah' },
-            { id: "fujairah", title: language === 'ar' ? 'الفجيرة' : 'Fujairah' }
-        ];
-
-        const payload = {
-            messaging_product: "whatsapp",
-            recipient_type: "individual",
-            to: to,
-            type: "interactive",
-            interactive: {
-                type: "list",
-                body: {
-                    text: cityPrompt
-                },
-                action: {
-                    button: language === 'ar' ? 'اختر المدينة' : 'Select City', // Button text
-                    sections: [
-                        {
-                            title: language === 'ar' ? 'المدن' : 'Cities', // Section title
-                            rows: cityOptions.map(city => ({
-                                id: city.id,
-                                title: city.title
-                            }))
-                        }
-                    ]
-                }
-            }
-        };
-
-        console.log("Sending City Selection Payload:", JSON.stringify(payload, null, 2));
-
-        const response = await axios.post(process.env.WHATSAPP_API_URL, payload, {
-            headers: {
-                Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-                "Content-Type": "application/json"
-            }
-        });
-
-        console.log("City Selection Response:", response.data);
+        await sendToWhatsApp(to, cityPrompt);
     } catch (error) {
-        console.error("Error sending city selection:", error.response?.data || error.message);
+        console.error("Error sending city selection prompt:", error.response?.data || error.message);
     }
 };
 async function extractInformationFromText(text, language = "en") {
@@ -618,27 +629,30 @@ async function extractInformationFromText(text, language = "en") {
         return extractedData; // Return at least the manually extracted data
     }
 }
+// function extractCity(text, language = "en") {
+//     const cities = {
+//         en: ["Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Ras Al Khaimah", "Fujairah", "Umm Al Quwain"],
+//         ar: ["دبي", "أبو ظبي", "الشارقة", "عجمان", "رأس الخيمة", "الفجيرة", "أم القيوين"]
+//     };
+
+//     const normalizedText = text.normalize("NFKC").toLowerCase().trim();
+//     console.log("Normalized user text:", normalizedText);
+
+//     for (const city of cities[language]) {
+//         const normalizedCity = city.normalize("NFKC").toLowerCase();
+//         console.log("Checking city:", normalizedCity);
+//         if (normalizedText.includes(normalizedCity) || normalizedText.includes(normalizedCity.replace(/\s/g, ""))) {
+//             console.log("Matched city:", city);
+//             return city;
+//         }
+//     }
+//     console.log("No city matched.");
+//     return null;
+// }
 function extractCity(text, language = "en") {
-    const cities = {
-        en: ["Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Ras Al Khaimah", "Fujairah", "Umm Al Quwain"],
-        ar: ["دبي", "أبو ظبي", "الشارقة", "عجمان", "رأس الخيمة", "الفجيرة", "أم القيوين"]
-    };
-
-    const normalizedText = text.normalize("NFKC").toLowerCase().trim();
-    console.log("Normalized user text:", normalizedText);
-
-    for (const city of cities[language]) {
-        const normalizedCity = city.normalize("NFKC").toLowerCase();
-        console.log("Checking city:", normalizedCity);
-        if (normalizedText.includes(normalizedCity) || normalizedText.includes(normalizedCity.replace(/\s/g, ""))) {
-            console.log("Matched city:", city);
-            return city;
-        }
-    }
-    console.log("No city matched.");
-    return null;
+    // Simply return the text as the city name
+    return text.trim();
 }
-
 
 
 
@@ -932,27 +946,6 @@ const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
 };
 
 
-async function checkUserRegistered(phone) {
-    try {
-        const response = await axios.post(
-            'https://dev.lootahbiofuels.com/api/v1/check-user',
-            { phone_number: phone },
-            {
-                headers: {
-                    'API-KEY': 'iUmcFyQUYa7l0u5J1aOxoGpIoh0iQSqpAlXX8Zho5vfxlTK4mXr41GvOHc4JwIkvltIUSoCDmc9VMbmJLajSIMK3NHx3M5ggaff8JMBTlZCryZlr8SmmhmYGGlmXo8uM',
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
-        return response.data;
-    } catch (error) {
-        console.error('User check failed:', error);
-        return { exists: false };
-    }
-}
-
-
 app.post('/webhook', async (req, res) => {
     try {
         console.log("🔹 Incoming Webhook Data:", JSON.stringify(req.body, null, 2));
@@ -1004,12 +997,7 @@ app.post('/webhook', async (req, res) => {
             if (userCheck && userCheck.exists) {
                 userSessions[from] = {
                     step: STATES.REGISTERED_WELCOME,
-                    data: {
-                        ...userCheck.data,
-                        phone: from,
-                        city: userCheck.data.city || null,  // Ensure city is properly mapped
-                        fromAPI: true
-                    },
+                    data: { ...userCheck.data, phone: from, fromAPI: true },
                     language: detectedLanguage,
                     inRequest: true
                 };
@@ -1046,16 +1034,12 @@ app.post('/webhook', async (req, res) => {
             if (message.interactive?.type === "button_reply") {
                 const buttonId = message.interactive.button_reply.id;
                 if (buttonId === "yes_update") {
-                    session.step = session.data.city ? STATES.ADDRESS : STATES.NAME;
+                    session.step = STATES.NAME;
                     await sendToWhatsApp(from, getNameMessage(session.language));
                 } else if (buttonId === "no_update") {
-                    if (!session.data.city) {
-                        session.step = STATES.CITY_SELECTION;
-                        await sendCitySelection(from, session.language);
-                    } else {
-                        session.step = STATES.QUANTITY;
-                        await sendToWhatsApp(from, getQuantityMessage(session.language));
-                    }
+                    session.step = STATES.QUANTITY;
+                    session.data.fromAPI = true;
+                    await sendToWhatsApp(from, getQuantityMessage(session.language));
                 }
             }
             return res.sendStatus(200);
@@ -1207,91 +1191,117 @@ app.post('/webhook', async (req, res) => {
                 session.data.address = textRaw;
                 session.step = STATES.CITY_SELECTION;
                 return await sendCitySelection(from, session.language); // ✅ Ask user to select city
+            // case STATES.CITY_SELECTION:
+            //     if (message.interactive && message.interactive.type === "list_reply") {
+            //         const citySelection = message.interactive.list_reply.id; // Get the selected city ID
+            //         const cityMap = {
+            //             "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
+            //             "dubai": { en: "Dubai", ar: "دبي" },
+            //             "sharjah": { en: "Sharjah", ar: "الشارقة" },
+            //             "ajman": { en: "Ajman", ar: "عجمان" },
+            //             "umm_al_quwain": { en: "Umm Al Quwain", ar: "أم القيوين" },
+            //             "ras_al_khaimah": { en: "Ras Al Khaimah", ar: "رأس الخيمة" },
+            //             "fujairah": { en: "Fujairah", ar: "الفجيرة" }
+            //         };
+            //         if (cityMap[citySelection]) {
+            //             const selectedCity = cityMap[citySelection][session.language] || cityMap[citySelection].en;
+            //             // Validate the selected city against the actual city from the location (if location is available)
+            //             if (session.data.latitude && session.data.longitude) {
+            //                 const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
+            //                 if (!validationResult.isValid) {
+            //                     const errorMessage = session.language === 'ar'
+            //                         ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
+            //                         : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
+
+            //                     await sendToWhatsApp(from, errorMessage);
+            //                     await sendCitySelection(from, session.language);
+            //                     return res.sendStatus(200);
+            //                 }
+            //             }
+            //             // If location is not available, accept the city without validation
+            //             session.data.city = selectedCity;
+            //             session.step = STATES.STREET;
+            //             const streetPrompt = session.language === 'ar'
+            //                 ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
+            //                 : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
+
+            //             await sendToWhatsApp(from, streetPrompt);
+            //         } else {
+            //             const invalidSelectionMessage = session.language === 'ar'
+            //                 ? "❌ اختيار غير صالح. يرجى الاختيار من الخيارات المتاحة."
+            //                 : "❌ Invalid selection. Please choose from the provided options.";
+
+            //             await sendToWhatsApp(from, invalidSelectionMessage);
+            //             await sendCitySelection(from, session.language);
+            //         }
+            //     } else {
+            //         // If the user sends a text message instead of selecting from the list
+            //         const selectedCity = extractCity(textRaw, session.language);
+            //         if (selectedCity) {
+            //             // Validate the selected city against the actual city from the location (if location is available)
+            //             if (session.data.latitude && session.data.longitude) {
+            //                 const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
+            //                 if (!validationResult.isValid) {
+            //                     const errorMessage = session.language === 'ar'
+            //                         ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
+            //                         : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
+
+            //                     await sendToWhatsApp(from, errorMessage);
+            //                     await sendCitySelection(from, session.language);
+            //                     return res.sendStatus(200);
+            //                 }
+            //             }
+            //             // If location is not available, accept the city without validation
+            //             session.data.city = selectedCity;
+            //             session.step = STATES.STREET;
+            //             const streetPrompt = session.language === 'ar'
+            //                 ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
+            //                 : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
+
+            //             await sendToWhatsApp(from, streetPrompt);
+            //         } else {
+            //             const selectCityMessage = session.language === 'ar'
+            //                 ? "❌ يرجى اختيار مدينة من الخيارات المتاحة."
+            //                 : "❌ Please select a city from the provided options.";
+
+            //             await sendToWhatsApp(from, selectCityMessage);
+            //             await sendCitySelection(from, session.language);
+            //         }
+            //     }
+            //     break;
             case STATES.CITY_SELECTION:
-                if (message.interactive && message.interactive.type === "list_reply") {
-                    const citySelection = message.interactive.list_reply.id;
-                    const cityMap = {
-                        "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
-                        "dubai": { en: "Dubai", ar: "دبي" },
-                        "sharjah": { en: "Sharjah", ar: "الشارقة" },
-                        "ajman": { en: "Ajman", ar: "عجمان" },
-                        "umm_al_quwain": { en: "Umm Al Quwain", ar: "أم القيوين" },
-                        "ras_al_khaimah": { en: "Ras Al Khaimah", ar: "رأس الخيمة" },
-                        "fujairah": { en: "Fujairah", ar: "الفجيرة" }
-                    };
+    // If the user sends a text message, treat it as the city name
+    if (message.type === "text") {
+        const selectedCity = textRaw.trim(); // Directly use the user's input as the city name
+        if (selectedCity) {
+            // Accept the city without any validation
+            session.data.city = selectedCity;
+            session.step = STATES.STREET;
 
-                    if (cityMap[citySelection]) {
-                        const selectedCity = cityMap[citySelection][session.language] || cityMap[citySelection].en;
+            const streetPrompt = session.language === 'ar'
+                ? `✅ لقد أدخلت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
+                : `✅ You entered *${session.data.city}*.\n\n🏠 Please provide the street name.`;
 
-                        // Preserved location validation
-                        if (session.data.latitude && session.data.longitude) {
-                            const validationResult = await validateCityAndLocation(
-                                session.data.latitude,
-                                session.data.longitude,
-                                selectedCity
-                            );
-                            if (!validationResult.isValid) {
-                                const errorMessage = session.language === 'ar'
-                                    ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
-                                    : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
+            await sendToWhatsApp(from, streetPrompt);
+        } else {
+            // If the user sends an empty message, ask them to enter a valid city name
+            const errorMessage = session.language === 'ar'
+                ? "❌ يرجى إدخال اسم مدينة صحيح."
+                : "❌ Please enter a valid city name.";
 
-                                await sendToWhatsApp(from, errorMessage);
-                                await sendCitySelection(from, session.language);
-                                return res.sendStatus(200);
-                            }
-                        }
+            await sendToWhatsApp(from, errorMessage);
+            await sendCitySelection(from, session.language); // Ask for city again
+        }
+    } else {
+        // If the user sends something other than text (e.g., an image, location, etc.)
+        const errorMessage = session.language === 'ar'
+            ? "❌ يرجى إدخال اسم المدينة كنص."
+            : "❌ Please enter the city name as text.";
 
-                        session.data.city = selectedCity;
-                        session.step = STATES.STREET;
-                        const streetPrompt = session.language === 'ar'
-                            ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
-                            : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
-
-                        await sendToWhatsApp(from, streetPrompt);
-                    } else {
-                        const invalidSelectionMessage = session.language === 'ar'
-                            ? "❌ اختيار غير صالح. يرجى الاختيار من الخيارات المتاحة."
-                            : "❌ Invalid selection. Please choose from the provided options.";
-
-                        await sendToWhatsApp(from, invalidSelectionMessage);
-                        await sendCitySelection(from, session.language);
-                    }
-                } else {
-                    const selectedCity = extractCity(textRaw, session.language);
-                    if (selectedCity) {
-                        if (session.data.latitude && session.data.longitude) {
-                            const validationResult = await validateCityAndLocation(
-                                session.data.latitude,
-                                session.data.longitude,
-                                selectedCity
-                            );
-                            if (!validationResult.isValid) {
-                                const errorMessage = session.language === 'ar'
-                                    ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
-                                    : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
-
-                                await sendToWhatsApp(from, errorMessage);
-                                await sendCitySelection(from, session.language);
-                                return res.sendStatus(200);
-                            }
-                        }
-                        session.data.city = selectedCity;
-                        session.step = STATES.STREET;
-                        const streetPrompt = session.language === 'ar'
-                            ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
-                            : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
-
-                        await sendToWhatsApp(from, streetPrompt);
-                    } else {
-                        const selectCityMessage = session.language === 'ar'
-                            ? "❌ يرجى اختيار مدينة من الخيارات المتاحة."
-                            : "❌ Please select a city from the provided options.";
-
-                        await sendToWhatsApp(from, selectCityMessage);
-                        await sendCitySelection(from, session.language);
-                    }
-                }
-                break;
+        await sendToWhatsApp(from, errorMessage);
+        await sendCitySelection(from, session.language); // Ask for city again
+    }
+    break;
             case STATES.STREET:
                 session.data.street = textRaw;
                 session.step = STATES.BUILDING_NAME;
@@ -1324,34 +1334,29 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
             case STATES.QUANTITY:
-                if (session.data.fromAPI) {
-                    session.data.quantity = textRaw;
-                    if (!session.data.city) {
-                        session.step = STATES.CITY_SELECTION;
-                        await sendCitySelection(from, session.language);
-                    } else {
-                        session.step = STATES.CONFIRMATION;
-                        await sendAPIDataSummary(from, session);
-                    }
+                console.log("🔹 Entered QUANTITY state for user:", from);
+                console.log("🔹 textRaw:", textRaw);
+                if (!textRaw || textRaw.trim() === "") {
+                    console.log("🔹 No quantity provided. Asking for quantity.");
+                    await sendToWhatsApp(from, getQuantityMessage(session.language));
+                    return res.sendStatus(200);
+                }
+                if (isNaN(textRaw)) {
+                    console.log("🔹 Invalid quantity provided. Asking for valid quantity.");
+                    await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
+                    return res.sendStatus(200);
+                }
+                console.log("🔹 Valid quantity provided:", textRaw);
+                session.data.quantity = textRaw;
+                // Reuse the `missingFields` variable declared outside the switch statement
+                missingFields = getMissingFields(session.data);
+                console.log("🔹 Missing fields after quantity:", missingFields);
+                if (missingFields.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
                 } else {
-                    // Original quantity handling
-                    if (!textRaw || textRaw.trim() === "") {
-                        await sendToWhatsApp(from, getQuantityMessage(session.language));
-                        return res.sendStatus(200);
-                    }
-                    if (isNaN(textRaw)) {
-                        await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
-                        return res.sendStatus(200);
-                    }
-                    session.data.quantity = textRaw;
-                    missingFields = getMissingFields(session.data);
-                    if (missingFields.length === 0) {
-                        session.step = STATES.CONFIRMATION;
-                        await sendOrderSummary(from, session);
-                    } else {
-                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                        await askForNextMissingField(session, from);
-                    }
+                    session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                    await askForNextMissingField(session, from);
                 }
                 break;
             case "ASK_NAME":
@@ -1979,103 +1984,565 @@ const sendLocationRequest = async (to, message) => {
     });
 };
 
+app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+
+
+
+//enter city via select choice
+
+// const sendCitySelection = async (to, language) => {
+//     try {
+//         const cityPrompt = language === 'ar'
+//             ? 'يرجى اختيار المدينة من القائمة:'
+//             : 'Please select your city from the list:';
+
+//         const cityOptions = [
+//             { id: "abu_dhabi", title: language === 'ar' ? 'أبو ظبي' : 'Abu Dhabi' },
+//             { id: "dubai", title: language === 'ar' ? 'دبي' : 'Dubai' },
+//             { id: "sharjah", title: language === 'ar' ? 'الشارقة' : 'Sharjah' },
+//             { id: "ajman", title: language === 'ar' ? 'عجمان' : 'Ajman' },
+//             { id: "umm_al_quwain", title: language === 'ar' ? 'أم القيوين' : 'Umm Al Quwain' },
+//             { id: "ras_al_khaimah", title: language === 'ar' ? 'رأس الخيمة' : 'Ras Al Khaimah' },
+//             { id: "fujairah", title: language === 'ar' ? 'الفجيرة' : 'Fujairah' }
+//         ];
+
+//         const payload = {
+//             messaging_product: "whatsapp",
+//             recipient_type: "individual",
+//             to: to,
+//             type: "interactive",
+//             interactive: {
+//                 type: "list",
+//                 body: {
+//                     text: cityPrompt
+//                 },
+//                 action: {
+//                     button: language === 'ar' ? 'اختر المدينة' : 'Select City', // Button text
+//                     sections: [
+//                         {
+//                             title: language === 'ar' ? 'المدن' : 'Cities', // Section title
+//                             rows: cityOptions.map(city => ({
+//                                 id: city.id,
+//                                 title: city.title
+//                             }))
+//                         }
+//                     ]
+//                 }
+//             }
+//         };
+
+//         console.log("Sending City Selection Payload:", JSON.stringify(payload, null, 2));
+
+//         const response = await axios.post(process.env.WHATSAPP_API_URL, payload, {
+//             headers: {
+//                 Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+//                 "Content-Type": "application/json"
+//             }
+//         });
+
+//         console.log("City Selection Response:", response.data);
+//     } catch (error) {
+//         console.error("Error sending city selection:", error.response?.data || error.message);
+//     }
+// };
+// async function extractInformationFromText(text, language = "en") {
+//     const extractedData = {
+//         quantity: extractQuantity(text), // Extract quantity
+//         city: extractCity(text, language) // Extract city
+//     };
+
+//     // Extract name using regex or simple logic
+//     const nameMatch = text.match(/(?:انا|اسمي|my name is|name is)\s+([\u0600-\u06FF\s]+|[a-zA-Z\s]+)/i);
+//     if (nameMatch && nameMatch[1]) {
+//         extractedData.name = nameMatch[1].trim();
+//     }
+
+//     // Extract phone number using regex
+//     const phoneRegex = /(?:\+971|0)?(?:5\d|4\d)\s?\d{3}\s?\d{3}/; // Matches UAE phone numbers
+//     const phoneMatch = text.match(phoneRegex);
+//     if (phoneMatch) {
+//         extractedData.phone = formatPhoneNumber(phoneMatch[0]); // Format the phone number
+//     }
+
+//     // Use OpenAI for additional extraction
+//     const prompt = `
+//     Extract the following information from the text and return a valid JSON object:
+//     {
+//       "name": "The user's full name or null",
+//       "phone": "The user's phone number or null",
+//       "email": "The user's email address or null",
+//       "address": "The user's full address or null",
+//       "city": "The user's city (e.g., Dubai, Sharjah, Abu Dhabi) or null",
+//       "street": "The user's street name or null",
+//       "building_name": "The user's building name or null",
+//       "flat_no": "The user's flat number or null",
+//       "latitude": "The user's latitude or null",
+//       "longitude": "The user's longitude or null"
+//     }
+    
+//     If any information is missing, assign null to that field.
+
+//     **Rules for Arabic Text:**
+//     1. Recognize city names in Arabic: دبي (Dubai), أبو ظبي (Abu Dhabi), الشارقة (Sharjah).
+//     2. Extract names written in Arabic script.
+//     3. Extract phone numbers in UAE format (e.g., +9715xxxxxxxx).
+
+//     Text: ${text}
+// `;
+
+//     const aiResponse = await getOpenAIResponse(prompt, ``, language); // Pass prompt, not textRaw
+
+//     try {
+//         const aiExtractedData = JSON.parse(aiResponse);
+//         return { ...aiExtractedData, ...extractedData };
+//     } catch (e) {
+//         console.error("❌ Failed to parse AI response as JSON:", aiResponse);
+//         return extractedData; // Return at least the manually extracted data
+//     }
+// }
+// function extractCity(text, language = "en") {
+//     const cities = {
+//         en: ["Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Ras Al Khaimah", "Fujairah", "Umm Al Quwain"],
+//         ar: ["دبي", "أبو ظبي", "الشارقة", "عجمان", "رأس الخيمة", "الفجيرة", "أم القيوين"]
+//     };
+
+//     const normalizedText = text.normalize("NFKC").toLowerCase().trim();
+//     console.log("Normalized user text:", normalizedText);
+
+//     for (const city of cities[language]) {
+//         const normalizedCity = city.normalize("NFKC").toLowerCase();
+//         console.log("Checking city:", normalizedCity);
+//         if (normalizedText.includes(normalizedCity) || normalizedText.includes(normalizedCity.replace(/\s/g, ""))) {
+//             console.log("Matched city:", city);
+//             return city;
+//         }
+//     }
+//     console.log("No city matched.");
+//     return null;
+// }
 
 
 
 
 
+// function getMissingFields(sessionData) {
+//     // Define fields in the desired sequence
+//     const orderedFields = [
+//         'name',
+//         'phone',
+//         'email',
+//         'latitude',
+//         'longitude',
+//         'address',
+//         'city',
+//         'street',
+//         'building_name',
+//         'flat_no',
+//         'quantity'
+//     ];
+
+//     const missingFields = [];
+
+//     // Check fields in specified order
+//     orderedFields.forEach(field => {
+//         const value = sessionData[field];
+//         if (value === null ||
+//             value === undefined ||
+//             (typeof value === "string" &&
+//                 (value.trim() === "" || value.trim().toLowerCase() === "null"))
+//         ) {
+//             missingFields.push(field);
+//         }
+//     });
+
+//     // Handle location fields
+//     if (missingFields.includes('latitude') || missingFields.includes('longitude')) {
+//         missingFields.push('location');
+//     }
+
+//     // Remove technical fields and preserve order
+//     return missingFields
+//         .filter(field => !['latitude', 'longitude'].includes(field))
+//         .sort((a, b) => orderedFields.indexOf(a) - orderedFields.indexOf(b));
+// }
+
+// async function askForNextMissingField(session, from) {
+//     const missingFields = getMissingFields(session.data);
+//     const lang = session.language; // Get current session language
+
+//     if (missingFields.length === 0) {
+//         session.step = STATES.CONFIRMATION;
+//         await sendOrderSummary(from, session);
+//     } else {
+//         const nextField = missingFields[0];
+//         session.step = `ASK_${nextField.toUpperCase()}`;
+
+//         switch (nextField) {
+//             case "city":
+//                 await sendCitySelection(from, lang);
+//                 break;
+//             case "email":
+//                 await sendToWhatsApp(from, getEmailMessage(lang));
+//                 break;
+//             case "name":
+//                 await sendToWhatsApp(from, getNameMessage(lang));
+//                 break;
+//             case "phone":
+//                 await sendToWhatsApp(from, getPhoneMessage(lang));
+//                 break;
+//             case "location":
+//                 await sendToWhatsApp(from, getLocationMessage(lang));
+//                 break;
+//             case "address":
+//                 await sendToWhatsApp(from, getAddressMessage(lang));
+//                 break;
+//             case "street":
+//                 await sendToWhatsApp(from, getStreetMessage(lang));
+//                 break;
+//             case "building_name":
+//                 await sendToWhatsApp(from, getBuildingMessage(lang));
+//                 break;
+//             case "flat_no":
+//                 await sendToWhatsApp(from, getFlatMessage(lang));
+//                 break;
+//             case "quantity":
+//                 await sendToWhatsApp(from, getQuantityMessage(lang));
+//                 break;
+//             default:
+//                 await sendToWhatsApp(from, lang === 'ar'
+//                     ? `🔹 يرجى تقديم ${nextField.replace(/_/g, " ")}`
+//                     : `🔹 Please provide your ${nextField.replace(/_/g, " ")}`);
+//                 break;
+//         }
+//     }
+// }
+// //
+// async function isQuestionOrRequest(text) {
+//     const prompt = `
+//     Classify the user's input into one of the following categories:
+    
+//     1️⃣ **"request"** → If the user is making a service request or wants to start a new request. Examples:
+//        - "I want to create a request"
+//        - "I want to create a new request"
+//        - "I have oil I want to get rid of"
+//        - "Hello, I have 50 liters of oil in Dubai"
+//        - "Please collect oil from my location"
+//        - "I need a pickup for used oil"
+//        - "New order request"
+//        - "I am Mohammad and I have 50 liters in Sharjah"
+    
+//     2️⃣ **"question"** → If the user is **asking for information** about the company, services, or anything general. Examples:
+//        - "What services do you provide?"
+//        - "How does your oil collection work?"
+//        - "Where are you located?"
+//        - "What is the cost of biodiesel?"
+    
+//     3️⃣ **"greeting"** → If the user is just saying hello. Examples:
+//        - "Hi"
+//        - "Hello"
+//        - "Good morning"
+    
+//     4️⃣ **"other"** → If the input does not fit the above categories.
+    
+//     Respond ONLY with one of these words: "request", "question", "greeting", or "other".
+
+//     **User Input:** "${text}"
+// `;
+
+//     const aiResponse = await getOpenAIResponse(prompt);
+//     const response = aiResponse.trim().toLowerCase();
+
+//     return response;
+// }
+
+// const getButtonTitle = (buttonId, language) => {
+//     const buttonTitles = {
+//         "contact_us": { en: "Contact Us", ar: "اتصل بنا" },
+//         "new_request": { en: "New Request", ar: "طلب جديد" },
+//         "send_site": { en: "Send Site", ar: "إرسال الموقع" }
+//     };
+
+//     return buttonTitles[buttonId]?.[language] || buttonTitles[buttonId]?.en || buttonId;
+// };
+// function getContactMessage(language) {
+//     return language === 'ar' ? '📞 يمكنك الاتصال بنا على support@example.com أو الاتصال على +1234567890.' : '📞 You can contact us at support@example.com or call +1234567890.';
+// }
+// function getNameMessage(language) {
+//     return language === 'ar' ? '🔹 يرجى تقديم اسمك الكامل.' : '🔹 Please provide your full name.';
+// }
+
+// function getEmailMessage(language) {
+//     return language === 'ar' ? '📧 يرجى تقديم عنوان بريدك الإلكتروني.' : '📧 Please provide your email address.';
+// }
+
+// function getInvalidOptionMessage(language) {
+//     return language === 'ar' ? '❌ خيار غير صالح، يرجى تحديد زر صالح.' : '❌ Invalid option, please select a valid button.';
+// }
+// function getPhoneMessage(language) {
+//     return language === 'ar' ? '📱 يرجى تقديم رقم هاتفك (يجب أن يكون رقم إماراتي).' : '📱 Please provide your phone number (must be a valid Emirati number).';
+// }
+
+// function getInvalidPhoneMessage(language) {
+//     return language === 'ar' ? '❌ رقم الهاتف غير صالح، يرجى إدخال رقم إماراتي صالح.' : '❌ Invalid phone number, please enter a valid Emirati number.';
+// }
+
+// function getAddressMessage(language) {
+//     return language === 'ar' ? '📍 يرجى تقديم عنوانك الكامل.' : '📍 Please provide your full address.';
+// }
+
+// function getCitySelectionMessage(language) {
+//     return language === 'ar' ? '🏙️ يرجى اختيار مدينتك من الخيارات أدناه.' : '🏙️ Please select your city from the options below.';
+// }
+
+// function getInvalidCityMessage(language) {
+//     return language === 'ar' ?
+//         '❌ المدينة المحددة لا تتطابق مع موقعك. يرجى اختيار المدينة الصحيحة.' :
+//         '❌ The selected city does not match your location. Please choose the correct city.';
+// }
+
+// function getStreetMessage(language) {
+//     return language === 'ar' ? '🏠 يرجى تقديم اسم الشارع.' : '🏠 Please provide the street name.';
+// }
+
+// function getBuildingMessage(language) {
+//     return language === 'ar' ? '🏢 يرجى تقديم اسم المبنى.' : '🏢 Please provide the building name.';
+// }
+
+// function getFlatMessage(language) {
+//     return language === 'ar' ? '🚪 يرجى تقديم رقم الشقة.' : '🚪 Please provide the flat number.';
+// }
+
+// const getLocationMessage = (language) => {
+//     return language === 'ar'
+//         ? "📍 يرجى مشاركة موقعك الحالي لتحديد موقعك."
+//         : "📍 Please share your current location to determine your site.";
+// };
 
 
+// function getQuantityMessage(language) {
+//     return language === 'ar' ? '📦 يرجى إدخال الكمية (باللترات).' : '📦 Please provide the quantity (in liters).';
+// }
+
+// function getInvalidQuantityMessage(language) {
+//     return language === 'ar' ? '❌ يرجى إدخال كمية صالحة (أرقام فقط).' : '❌ Please enter a valid quantity (numeric values only).';
+// }
+
+// function getConfirmationMessage(language) {
+//     return language === 'ar' ? '✅ يرجى التأكيد على صحة التفاصيل قبل الإرسال.' : '✅ Please confirm that the details are correct before submission.';
+// }
+// function getContinueMessage(language) {
+//     return language === 'ar' ?
+//         'لإكمال الاستفسار، يمكنك طرح أسئلة أخرى. إذا كنت ترغب في تقديم طلب أو الاتصال بنا، اختر من الخيارات التالية:' :
+//         'To complete the inquiry, you can ask other questions. If you want to submit a request or contact us, choose from the following options:';
+// }
+// function getInvalidUAERegionMessage(language) {
+//     return language === 'ar' ?
+//         '❌ الموقع الذي أرسلته خارج الإمارات. يرجى إرسال موقع داخل الإمارات.' :
+//         '❌ The location you shared is outside the UAE. Please send a location within the Emirates.';
+// }
+// //
 
 
+// //
+// const detectRequestStart = async (text) => {
+//     const prompt = `
+//         Determine if the user's message indicates the start of a request for Lootah Biofuels. 
+//         Respond with "true" if the message indicates a request start, otherwise respond with "false".
 
+//         Examples of request start:
+//         - "I want to create a request"
+//         - "I have oil I want to get rid of"
+//         - "Please collect oil from my location"
+//         - "I need a pickup for used oil"
+//         - "New order request"
+//         - "I am Mohammad and I have 50 liters in Sharjah"
+//         - "أريد إنشاء طلب جديد"
+//         - "لدي زيت أريد التخلص منه"
+//         - "الرجاء جمع الزيت من موقعي"
+//         - "أحتاج إلى استلام الزيت المستعمل"
+//         - "طلب جديد"
+//         - "أنا محمد ولدي 50 لتر في الشارقة"
 
+//         User Input: "${text}"
+//     `;
+
+//     const response = await getOpenAIResponse(prompt);
+//     return response.trim().toLowerCase() === "true";
+// };
+// function moveToNextStep(session, from) {  // ✅ Add parameters
+//     const missingFields = getMissingFields(session.data);
+//     if (missingFields.length === 0) {
+//         session.step = STATES.CONFIRMATION;
+//         sendOrderSummary(from, session);
+//     } else {
+//         session.step = `ASK_${missingFields[0].toUpperCase()}`;
+//         askForNextMissingField(session, from);
+//     }
+// }
+// const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
+//     try {
+//         // If location is not available, accept the city without validation
+//         if (!latitude || !longitude) {
+//             return {
+//                 isValid: true,
+//                 actualCity: null
+//             };
+//         }
+
+//         // Use a geocoding API to get the city name from the latitude and longitude
+//         const response = await axios.get(
+//             `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
+//         );
+//         const actualCity = response.data.city;
+
+//         // Normalize city names for comparison
+//         const normalizedSelectedCity = selectedCity.toLowerCase().trim();
+//         const normalizedActualCity = actualCity.toLowerCase().trim();
+
+//         // Return both the validation result and the actual city name
+//         return {
+//             isValid: normalizedSelectedCity === normalizedActualCity,
+//             actualCity: actualCity
+//         };
+//     } catch (error) {
+//         console.error("❌ Error validating city and location:", error);
+//         return {
+//             isValid: true, // Fail open
+//             actualCity: null
+//         };
+//     }
+// };
 
 
 // app.post('/webhook', async (req, res) => {
 //     try {
-//         console.log('Incoming Webhook Data:', JSON.stringify(req.body, null, 2));
+//         console.log("🔹 Incoming Webhook Data:", JSON.stringify(req.body, null, 2));
+//         if (!req.body.entry || !Array.isArray(req.body.entry) || req.body.entry.length === 0) {
+//             console.error("❌ Error: Missing or invalid 'entry' in webhook payload.");
+//             return res.sendStatus(400);
+//         }
+//         const entry = req.body.entry[0];
+//         if (!entry.changes || !Array.isArray(entry.changes) || entry.changes.length === 0) {
+//             console.error("❌ Error: Missing or invalid 'changes' in webhook payload.");
+//             return res.sendStatus(400);
+//         }
+//         const changes = entry.changes[0];
+//         const value = changes.value;
 
-//         const entry = req.body.entry?.[0];
-//         const changes = entry?.changes?.[0];
-//         const value = changes?.value;
-//         const messages = value?.messages;
-
-//         if (!messages || !Array.isArray(messages) || messages.length === 0) {
+//         if (!value?.messages || !Array.isArray(value.messages) || value.messages.length === 0) {
+//             console.warn("⚠️ No messages found in webhook payload. Ignoring event.");
 //             return res.sendStatus(200);
 //         }
 
-//         const message = messages[0];
-//         if (!message?.from) return res.sendStatus(400);
+//         const message = value.messages[0];
+//         if (!message?.from) {
+//             console.error("❌ Error: Missing 'from' field in message.");
+//             return res.sendStatus(400);
+//         }
 
 //         const from = message.from;
+//         const session = userSessions[from];
 //         const textRaw = message.text?.body || "";
 //         const text = textRaw.toLowerCase().trim();
 
+//         // Language detection
 //         let detectedLanguage = "en";
 //         try {
 //             const detected = langdetect.detect(textRaw);
 //             if (Array.isArray(detected) && detected.length > 0) {
 //                 detectedLanguage = detected[0].lang;
 //             }
+//             if (detectedLanguage !== "ar" && detectedLanguage !== "en") {
+//                 detectedLanguage = "en";
+//             }
 //         } catch (error) {
-//             console.log("⚠️ Language detection failed.", error);
+//             console.log("⚠️ Language detection failed. Defaulting to English.", error);
 //         }
 
+//         // New user session initialization with registration check
 //         if (!userSessions[from]) {
-//             userSessions[from] = { step: STATES.WELCOME, data: {}, language: detectedLanguage };
-//             const welcomeMessage = await getOpenAIResponse("Generate a WhatsApp welcome message for Lootah Biofuels.", "", detectedLanguage);
-//             await sendInteractiveButtons(from, welcomeMessage, [
-//                 { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
-//                 { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
-//             ]);
+//             const userCheck = await checkUserRegistered(from);
+//             if (userCheck && userCheck.exists) {
+//                 userSessions[from] = {
+//                     step: STATES.REGISTERED_WELCOME,
+//                     data: { ...userCheck.data, phone: from, fromAPI: true },
+//                     language: detectedLanguage,
+//                     inRequest: true
+//                 };
+//                 const welcomeMsg = detectedLanguage === 'ar'
+//                     ? `مرحبًا ${userCheck.data.name}! هل ترغب في تحديث معلوماتك؟`
+//                     : `Welcome ${userCheck.data.name}! Would you like to update your information?`;
+//                 await sendInteractiveButtons(from, welcomeMsg, [
+//                     { type: "reply", reply: { id: "yes_update", title: getButtonTitle("yes", detectedLanguage) } },
+//                     { type: "reply", reply: { id: "no_update", title: getButtonTitle("no", detectedLanguage) } }
+//                 ]);
+//                 return res.sendStatus(200);
+//             } else {
+//                 userSessions[from] = {
+//                     step: STATES.WELCOME,
+//                     data: { phone: from },
+//                     language: detectedLanguage,
+//                     inRequest: false
+//                 };
+//                 const welcomeMessage = await getOpenAIResponse(
+//                     "Generate a WhatsApp welcome message for Lootah Biofuels.",
+//                     "",
+//                     detectedLanguage
+//                 );
+//                 await sendInteractiveButtons(from, welcomeMessage, [
+//                     { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
+//                     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
+//                 ]);
+//                 return res.sendStatus(200);
+//             }
+//         }
+
+//         // Handle registered users
+//         if (session.step === STATES.REGISTERED_WELCOME) {
+//             if (message.interactive?.type === "button_reply") {
+//                 const buttonId = message.interactive.button_reply.id;
+//                 if (buttonId === "yes_update") {
+//                     session.step = STATES.NAME;
+//                     await sendToWhatsApp(from, getNameMessage(session.language));
+//                 } else if (buttonId === "no_update") {
+//                     session.step = STATES.QUANTITY;
+//                     session.data.fromAPI = true;
+//                     await sendToWhatsApp(from, getQuantityMessage(session.language));
+//                 }
+//             }
 //             return res.sendStatus(200);
 //         }
 
-//         const session = userSessions[from];
 //         const classification = await isQuestionOrRequest(textRaw);
-
-//         if (classification === "request") {
-//             // Extract and store information
-//             const extractedData = await extractInformationFromText(textRaw);
-//             session.data = { ...session.data, ...extractedData };
-
-//             // Check for missing fields
-//             const missingFields = getMissingFields(session.data);
-
-//             if (missingFields.length === 0) {
-//                 session.step = STATES.CONFIRMATION;
-//                 await sendOrderSummary(from, session);
-//             } else {
-//                 session.step = `ASK_${missingFields[0].toUpperCase()}`;
-//                 await askForNextMissingField(session, from);
-//             }
-//         } else if (classification === "question") {
-//             // Handle questions
+//         if (classification === "question") {
 //             const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-//             const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-
-//             await sendInteractiveButtons(from, reply, [
-//                 { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-//                 { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-//             ]);
+//             if (session.inRequest) {
+//                 await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
+//             } else {
+//                 const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+//                 await sendInteractiveButtons(from, reply, [
+//                     { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+//                     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+//                 ]);
+//             }
+//             return res.sendStatus(200);
 //         }
 
-
-//         // Handle messages based on the current state
+//         let missingFields;
 //         switch (session.step) {
 //             case STATES.WELCOME:
 //                 if (message.type === "text") {
 //                     const isRequestStart = await detectRequestStart(textRaw);
 //                     if (isRequestStart) {
-//                         const extractedData = await extractInformationFromText(textRaw);
-//                         session.data = { ...session.data, ...extractedData };
-
-//                         console.log(`Extracted Data: ${JSON.stringify(extractedData, null, 2)}`); // Debugging
-
+//                         session.inRequest = true;
+//                         const extractedData = await extractInformationFromText(textRaw, session.language);
+//                         session.data = {
+//                             ...session.data,
+//                             ...extractedData,
+//                             phone: extractedData.phone || session.data.phone
+//                         };
+//                         console.log("Extracted data:", extractedData);
 //                         const missingFields = getMissingFields(session.data);
-//                         console.log(`Missing Fields: ${missingFields}`); // Debugging
-
 //                         if (missingFields.length === 0) {
 //                             session.step = STATES.CONFIRMATION;
 //                             await sendOrderSummary(from, session);
@@ -2086,7 +2553,6 @@ const sendLocationRequest = async (to, message) => {
 //                     } else {
 //                         const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
 //                         const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-
 //                         await sendInteractiveButtons(from, reply, [
 //                             { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
 //                             { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
@@ -2094,10 +2560,10 @@ const sendLocationRequest = async (to, message) => {
 //                     }
 //                 } else if (message.type === "interactive" && message.interactive?.type === "button_reply") {
 //                     const buttonId = message.interactive.button_reply.id;
-
 //                     if (buttonId === "contact_us") {
 //                         await sendToWhatsApp(from, getContactMessage(session.language));
 //                     } else if (buttonId === "new_request") {
+//                         session.inRequest = true;
 //                         session.step = STATES.NAME;
 //                         await sendToWhatsApp(from, getNameMessage(session.language));
 //                     } else {
@@ -2105,32 +2571,22 @@ const sendLocationRequest = async (to, message) => {
 //                     }
 //                 }
 //                 break;
-
 //             case STATES.NAME:
 //                 if (!textRaw) {
 //                     await sendToWhatsApp(from, getNameMessage(session.language));
 //                 } else {
-//                     try {
-//                         const validationResult = await analyzeInput(textRaw, "name");
-//                         console.log(`Name Validation Result: ${validationResult}`); // Debugging
-
-//                         // Make the check case-insensitive and trim whitespace
-//                         if (validationResult.trim().toLowerCase() === "valid") {
-//                             session.data.name = textRaw;
-//                             session.data.phone = from; // Auto-capture phone from WhatsApp
-//                             session.step = STATES.EMAIL;
-//                             await sendToWhatsApp(from, getEmailMessage(session.language));
-//                         } else {
-//                             await sendToWhatsApp(from, "❌ Please provide a valid full name. 😊");
-//                         }
-//                     } catch (error) {
-//                         console.error("Error validating name:", error);
-//                         await sendToWhatsApp(from, "❌ Oops! Something went wrong. Please try again.");
+//                     if (textRaw.trim().length > 0) {
+//                         session.data.name = textRaw;
+//                         session.step = STATES.EMAIL;
+//                         await sendToWhatsApp(from, getEmailMessage(session.language));
+//                     } else {
+//                         const errorMsg = session.language === 'ar'
+//                             ? "❌ يرجى تقديم اسم صحيح"
+//                             : "❌ Please provide a valid full name";
+//                         await sendToWhatsApp(from, errorMsg);
 //                     }
 //                 }
 //                 break;
-
-
 //             case STATES.PHONE_INPUT:
 //                 if (!isValidPhone(textRaw)) {
 //                     await sendToWhatsApp(from, getInvalidPhoneMessage(session.language));
@@ -2140,28 +2596,29 @@ const sendLocationRequest = async (to, message) => {
 //                 session.step = STATES.EMAIL;
 //                 await sendToWhatsApp(from, getEmailMessage(session.language)); // Ask for email
 //                 break;
-
-//                 case STATES.EMAIL:
-//                     if (!isValidEmail(textRaw)) {
-//                         await sendToWhatsApp(from, "❌ Please provide a valid email address (e.g., example@domain.com).");
-//                         return res.sendStatus(200);
-//                     }
-//                     session.data.email = textRaw;
-//                     session.step = STATES.LONGITUDE;
-//                     await sendToWhatsApp(from, getLocationMessage(session.language)); // Ask for location
-//                     break;
-
+//             case STATES.EMAIL:
+//                 if (!isValidEmail(textRaw)) {
+//                     await sendToWhatsApp(from, "❌ Please provide a valid email address (e.g., example@domain.com).");
+//                     return res.sendStatus(200);
+//                 }
+//                 session.data.email = textRaw;
+//                 session.step = STATES.LONGITUDE;
+//                 await sendToWhatsApp(from, getLocationMessage(session.language)); // Ask for location
+//                 break;
 //             case STATES.LONGITUDE:
 //                 if (message.type === "interactive" && message.interactive?.type === "button_reply") {
 //                     const buttonId = message.interactive.button_reply.id;
-
-//                     if (buttonId === "share_location") {
-//                         // Send instructions to share location via WhatsApp
-//                         await sendToWhatsApp(from, getLocationMessage(session.language));
+//                     if (buttonId === "send_site") {
+//                         // Send a message with a button to share location
+//                         await sendInteractiveButtons(from, getLocationMessage(session.language), [
+//                             {
+//                                 type: "location_request",
+//                                 title: getButtonTitle("send_site", session.language) // "Send Location" button
+//                             }
+//                         ]);
 //                     }
 //                 } else if (message.location) {
 //                     const { latitude, longitude } = message.location;
-
 //                     // Validate UAE location
 //                     const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
 //                     if (
@@ -2170,6 +2627,14 @@ const sendLocationRequest = async (to, message) => {
 //                         longitude >= UAE_BOUNDS.minLng &&
 //                         longitude <= UAE_BOUNDS.maxLng
 //                     ) {
+//                         // Check if the selected city matches the location
+//                         if (session.data.city) {
+//                             const isValidCity = await validateCityAndLocation(latitude, longitude, session.data.city);
+//                             if (!isValidCity) {
+//                                 await sendToWhatsApp(from, getInvalidCityMessage(session.language));
+//                                 return res.sendStatus(200);
+//                             }
+//                         }
 //                         session.data.latitude = latitude;
 //                         session.data.longitude = longitude;
 //                         session.step = STATES.ADDRESS;
@@ -2179,7 +2644,13 @@ const sendLocationRequest = async (to, message) => {
 //                     }
 //                 } else {
 //                     if (!session.locationPromptSent) {
-//                         await sendLocationButton(from, session.language); // Send location button
+//                         // Send a message with a button to share location
+//                         await sendInteractiveButtons(from, getLocationMessage(session.language), [
+//                             {
+//                                 type: "location_request",
+//                                 title: getButtonTitle("send_site", session.language) // "Send Location" button
+//                             }
+//                         ]);
 //                         session.locationPromptSent = true;
 //                     }
 //                 }
@@ -2188,21 +2659,36 @@ const sendLocationRequest = async (to, message) => {
 //                 session.data.address = textRaw;
 //                 session.step = STATES.CITY_SELECTION;
 //                 return await sendCitySelection(from, session.language); // ✅ Ask user to select city
-
 //             case STATES.CITY_SELECTION:
-//                 if (message.interactive && message.interactive.button_reply) {
-//                     const citySelection = message.interactive.button_reply.id;
-
+//                 if (message.interactive && message.interactive.type === "list_reply") {
+//                     const citySelection = message.interactive.list_reply.id; // Get the selected city ID
 //                     const cityMap = {
 //                         "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
 //                         "dubai": { en: "Dubai", ar: "دبي" },
-//                         "sharjah": { en: "Sharjah", ar: "الشارقة" }
+//                         "sharjah": { en: "Sharjah", ar: "الشارقة" },
+//                         "ajman": { en: "Ajman", ar: "عجمان" },
+//                         "umm_al_quwain": { en: "Umm Al Quwain", ar: "أم القيوين" },
+//                         "ras_al_khaimah": { en: "Ras Al Khaimah", ar: "رأس الخيمة" },
+//                         "fujairah": { en: "Fujairah", ar: "الفجيرة" }
 //                     };
-
 //                     if (cityMap[citySelection]) {
-//                         session.data.city = cityMap[citySelection][session.language] || cityMap[citySelection].en;
-//                         session.step = STATES.STREET;
+//                         const selectedCity = cityMap[citySelection][session.language] || cityMap[citySelection].en;
+//                         // Validate the selected city against the actual city from the location (if location is available)
+//                         if (session.data.latitude && session.data.longitude) {
+//                             const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
+//                             if (!validationResult.isValid) {
+//                                 const errorMessage = session.language === 'ar'
+//                                     ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
+//                                     : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
 
+//                                 await sendToWhatsApp(from, errorMessage);
+//                                 await sendCitySelection(from, session.language);
+//                                 return res.sendStatus(200);
+//                             }
+//                         }
+//                         // If location is not available, accept the city without validation
+//                         session.data.city = selectedCity;
+//                         session.step = STATES.STREET;
 //                         const streetPrompt = session.language === 'ar'
 //                             ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
 //                             : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
@@ -2217,313 +2703,378 @@ const sendLocationRequest = async (to, message) => {
 //                         await sendCitySelection(from, session.language);
 //                     }
 //                 } else {
-//                     const selectCityMessage = session.language === 'ar'
-//                         ? "❌ يرجى اختيار مدينة من الخيارات المتاحة."
-//                         : "❌ Please select a city from the provided options.";
+//                     // If the user sends a text message instead of selecting from the list
+//                     const selectedCity = extractCity(textRaw, session.language);
+//                     if (selectedCity) {
+//                         // Validate the selected city against the actual city from the location (if location is available)
+//                         if (session.data.latitude && session.data.longitude) {
+//                             const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
+//                             if (!validationResult.isValid) {
+//                                 const errorMessage = session.language === 'ar'
+//                                     ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
+//                                     : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
 
-//                     await sendToWhatsApp(from, selectCityMessage);
-//                     await sendCitySelection(from, session.language);
+//                                 await sendToWhatsApp(from, errorMessage);
+//                                 await sendCitySelection(from, session.language);
+//                                 return res.sendStatus(200);
+//                             }
+//                         }
+//                         // If location is not available, accept the city without validation
+//                         session.data.city = selectedCity;
+//                         session.step = STATES.STREET;
+//                         const streetPrompt = session.language === 'ar'
+//                             ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
+//                             : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
+
+//                         await sendToWhatsApp(from, streetPrompt);
+//                     } else {
+//                         const selectCityMessage = session.language === 'ar'
+//                             ? "❌ يرجى اختيار مدينة من الخيارات المتاحة."
+//                             : "❌ Please select a city from the provided options.";
+
+//                         await sendToWhatsApp(from, selectCityMessage);
+//                         await sendCitySelection(from, session.language);
+//                     }
 //                 }
 //                 break;
-
 //             case STATES.STREET:
 //                 session.data.street = textRaw;
 //                 session.step = STATES.BUILDING_NAME;
 //                 await sendToWhatsApp(from, getBuildingMessage(session.language)); // Ask for building name
 //                 break;
-
 //             case STATES.BUILDING_NAME:
+//                 if (!textRaw || textRaw.trim() === "") {
+//                     // If no building name is provided, ask for it again
+//                     await sendToWhatsApp(from, getBuildingMessage(session.language));
+//                     return res.sendStatus(200); // Exit and wait for the user's response
+//                 }
+//                 // If the building name is provided, store it and proceed to the next step
 //                 session.data.building_name = textRaw;
 //                 session.step = STATES.FLAT_NO;
 //                 await sendToWhatsApp(from, getFlatMessage(session.language)); // Ask for flat number
 //                 break;
-
 //             case STATES.FLAT_NO:
+//                 if (!textRaw) {
+//                     await sendToWhatsApp(from, getFlatMessage(session.language));
+//                     return res.sendStatus(200);
+//                 }
 //                 session.data.flat_no = textRaw;
-//                 session.step = STATES.QUANTITY;
-
-//                 await sendToWhatsApp(from, getQuantityMessage(session.language)); // Ask for quantity
-//                 break;
-
-//             case STATES.QUANTITY:
-//                 if (session.awaitingQuantityInput) {
-//                     if (textRaw.trim() === "" || isNaN(textRaw)) {
-//                         await sendToWhatsApp(from, getInvalidQuantityMessage(session.language)); // ❌ Invalid quantity message
-//                         return res.sendStatus(200);
-//                     }
-
-//                     session.data.quantity = textRaw;
-//                     session.awaitingQuantityInput = false;
+//                 missingFields = getMissingFields(session.data); // Reuse the variable
+//                 if (missingFields.length === 0) {
 //                     session.step = STATES.CONFIRMATION;
-//                     sendOrderSummary(from, session);
+//                     await sendOrderSummary(from, session);
 //                 } else {
-//                     session.awaitingQuantityInput = true;
-//                     await sendToWhatsApp(from, getQuantityMessage(session.language)); // ✅ Ask for quantity dynamically
+//                     session.step = `ASK_${missingFields[0].toUpperCase()}`;
+//                     await askForNextMissingField(session, from);
 //                 }
 //                 break;
-//             case "ASK_NAME":    
-//                 if (!textRaw) {
-//                     await sendToWhatsApp(from, getNameMessage(session.language));
+//             case STATES.QUANTITY:
+//                 console.log("🔹 Entered QUANTITY state for user:", from);
+//                 console.log("🔹 textRaw:", textRaw);
+//                 if (!textRaw || textRaw.trim() === "") {
+//                     console.log("🔹 No quantity provided. Asking for quantity.");
+//                     await sendToWhatsApp(from, getQuantityMessage(session.language));
+//                     return res.sendStatus(200);
+//                 }
+//                 if (isNaN(textRaw)) {
+//                     console.log("🔹 Invalid quantity provided. Asking for valid quantity.");
+//                     await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
+//                     return res.sendStatus(200);
+//                 }
+//                 console.log("🔹 Valid quantity provided:", textRaw);
+//                 session.data.quantity = textRaw;
+//                 // Reuse the `missingFields` variable declared outside the switch statement
+//                 missingFields = getMissingFields(session.data);
+//                 console.log("🔹 Missing fields after quantity:", missingFields);
+//                 if (missingFields.length === 0) {
+//                     session.step = STATES.CONFIRMATION;
+//                     await sendOrderSummary(from, session);
 //                 } else {
-//                     try {
-//                         const validationResult = await analyzeInput(textRaw, "name");
-//                         console.log(`Name Validation Result: ${validationResult}`); // Debugging
-
-//                         if (validationResult.trim().toLowerCase() === "valid") {
-//                             session.data.name = textRaw;
-//                             const missingFields = getMissingFields(session.data);
-
-//                             if (missingFields.length === 0) {
-//                                 session.step = STATES.CONFIRMATION;
-//                                 await sendOrderSummary(from, session);
-//                             } else {
-//                                 session.step = `ASK_${missingFields[0].toUpperCase()}`;
-//                                 await askForNextMissingField(session, from);
-//                             }
-//                         } else {
-//                             await sendToWhatsApp(from, "❌ Please provide a valid full name. 😊");
-//                         }
-//                     } catch (error) {
-//                         console.error("Error validating name:", error);
-//                         await sendToWhatsApp(from, "❌ Oops! Something went wrong. Please try again.");
-//                     }
+//                     session.step = `ASK_${missingFields[0].toUpperCase()}`;
+//                     await askForNextMissingField(session, from);
+//                 }
+//                 break;
+//             case "ASK_NAME":
+//                 // If the user hasn't provided a name yet, ask for it
+//                 if (!textRaw) {
+//                     await sendToWhatsApp(from, "👤 Please provide your full name.");
+//                     return res.sendStatus(200); // Exit and wait for the user's response
+//                 }
+//                 // If the name is provided, store it and proceed to the next step
+//                 session.data.name = textRaw;
+//                 // Check for other missing fields
+//                 const missingFieldsName = getMissingFields(session.data);
+//                 if (missingFieldsName.length === 0) {
+//                     session.step = STATES.CONFIRMATION;
+//                     await sendOrderSummary(from, session);
+//                 } else {
+//                     session.step = `ASK_${missingFieldsName[0].toUpperCase()}`;
+//                     await askForNextMissingField(session, from);
+//                 }
+//                 break;
+//             case "ASK_PHONE":
+//                 // If the user hasn't provided a phone number yet, ask for it
+//                 if (!textRaw) {
+//                     await sendToWhatsApp(from, "📞 Please provide your phone number.");
+//                     return res.sendStatus(200); // Exit and wait for the user's response
+//                 }
+//                 // Validate the phone number after the user provides it
+//                 if (!isValidPhone(textRaw)) {
+//                     await sendToWhatsApp(from, "❌ Invalid phone number, please enter a valid number.");
+//                     return res.sendStatus(200); // Exit and wait for the user to correct their input
+//                 }
+//                 // If the phone number is valid, store it and proceed to the next step
+//                 session.data.phone = formatPhoneNumber(textRaw);
+//                 // Check for other missing fields
+//                 const missingFieldsPhone = getMissingFields(session.data);
+//                 if (missingFieldsPhone.length === 0) {
+//                     session.step = STATES.CONFIRMATION;
+//                     await sendOrderSummary(from, session);
+//                 } else {
+//                     session.step = `ASK_${missingFieldsPhone[0].toUpperCase()}`;
+//                     await askForNextMissingField(session, from);
 //                 }
 //                 break;
 //             case "ASK_EMAIL":
+//                 // If the user hasn't provided an email yet, ask for it
 //                 if (!textRaw) {
-//                     await sendToWhatsApp(from, getEmailMessage(session.language));
+//                     await sendToWhatsApp(from, "✉️ Could you please share your email address? We'll use it for sending updates on your order.");
+//                     return res.sendStatus(200); // Exit and wait for the user's response
+//                 }
+//                 // Validate the email after the user provides it
+//                 if (!isValidEmail(textRaw)) {
+//                     await sendToWhatsApp(from, "❌ Invalid email address, please enter a valid one (e.g., example@domain.com).");
+//                     return res.sendStatus(200); // Exit and wait for the user to correct their input
+//                 }
+//                 // If the email is valid, store it and proceed to the next step
+//                 session.data.email = textRaw;
+//                 // Check for other missing fields
+//                 const missingFieldsEmail = getMissingFields(session.data);
+//                 if (missingFieldsEmail.length === 0) {
+//                     session.step = STATES.CONFIRMATION;
+//                     await sendOrderSummary(from, session);
 //                 } else {
-//                     try {
-//                         const validationResult = await analyzeInput(textRaw, "email");
-//                         console.log(`Email Validation Result: ${validationResult}`); // Debugging
-
-//                         if (validationResult.trim().toLowerCase() === "valid") {
-//                             session.data.email = textRaw;
-//                             const missingFields = getMissingFields(session.data);
-
-//                             if (missingFields.length === 0) {
-//                                 session.step = STATES.CONFIRMATION;
-//                                 await sendOrderSummary(from, session);
-//                             } else {
-//                                 session.step = `ASK_${missingFields[0].toUpperCase()}`;
-//                                 await askForNextMissingField(session, from);
-//                             }
-//                         } else {
-//                             await sendToWhatsApp(from, "❌ Please provide a valid email address. 😊");
-//                         }
-//                     } catch (error) {
-//                         console.error("Error validating email:", error);
-//                         await sendToWhatsApp(from, "❌ Oops! Something went wrong. Please try again.");
-//                     }
+//                     session.step = `ASK_${missingFieldsEmail[0].toUpperCase()}`;
+//                     await askForNextMissingField(session, from);
 //                 }
 //                 break;
-
-//             case "ASK_PHONE":
-//                 if (!textRaw) {
-//                     await sendToWhatsApp(from, getPhoneMessage(session.language));
-//                 } else {
-//                     try {
-//                         const validationResult = await analyzeInput(textRaw, "phone");
-//                         console.log(`Phone Validation Result: ${validationResult}`); // Debugging
-
-//                         if (validationResult.trim().toLowerCase() === "valid") {
-//                             session.data.phone = formatPhoneNumber(textRaw);
-//                             const missingFields = getMissingFields(session.data);
-
-//                             if (missingFields.length === 0) {
-//                                 session.step = STATES.CONFIRMATION;
-//                                 await sendOrderSummary(from, session);
-//                             } else {
-//                                 session.step = `ASK_${missingFields[0].toUpperCase()}`;
-//                                 await askForNextMissingField(session, from);
-//                             }
-//                         } else {
-//                             await sendToWhatsApp(from, "❌ Please provide a valid phone number. 😊");
+//             case "ASK_LOCATION":
+//                 // If the user hasn't shared their location yet, ask for it
+//                 if (!message.location) {
+//                     // Send a message with a button to share location
+//                     await sendInteractiveButtons(from, getLocationMessage(session.language), [
+//                         {
+//                             type: "location_request",
+//                             title: getButtonTitle("send_site", session.language) // "Send Location" button
 //                         }
-//                     } catch (error) {
-//                         console.error("Error validating phone:", error);
-//                         await sendToWhatsApp(from, "❌ Oops! Something went wrong. Please try again.");
+//                     ]);
+//                     return res.sendStatus(200); // Exit and wait for the user's response
+//                 }
+//                 // If the location is shared, store it and proceed to the next step
+//                 const { latitude, longitude } = message.location;
+//                 // Validate UAE location
+//                 const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
+//                 if (
+//                     latitude >= UAE_BOUNDS.minLat &&
+//                     latitude <= UAE_BOUNDS.maxLat &&
+//                     longitude >= UAE_BOUNDS.minLng &&
+//                     longitude <= UAE_BOUNDS.maxLng
+//                 ) {
+//                     session.data.latitude = latitude;
+//                     session.data.longitude = longitude;
+//                     // Check for other missing fields
+//                     const missingFields = getMissingFields(session.data);
+//                     if (missingFields.length === 0) {
+//                         session.step = STATES.CONFIRMATION;
+//                         await sendOrderSummary(from, session);
+//                     } else {
+//                         session.step = `ASK_${missingFields[0].toUpperCase()}`;
+//                         await askForNextMissingField(session, from);
 //                     }
+//                 } else {
+//                     await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
 //                 }
 //                 break;
-
 //             case "ASK_ADDRESS":
+//                 // If the user hasn't provided an address yet, ask for it
 //                 if (!textRaw) {
-//                     await sendToWhatsApp(from, getAddressMessage(session.language));
+//                     await sendToWhatsApp(from, "🏠 Please provide your address.");
+//                     return res.sendStatus(200); // Exit and wait for the user's response
+//                 }
+//                 // If the address is provided, store it and proceed to the next step
+//                 session.data.address = textRaw;
+//                 // Check for other missing fields
+//                 const missingFieldsAddress = getMissingFields(session.data);
+//                 if (missingFieldsAddress.length === 0) {
+//                     session.step = STATES.CONFIRMATION;
+//                     await sendOrderSummary(from, session);
 //                 } else {
-//                     try {
-//                         const validationResult = await analyzeInput(textRaw, "address");
-//                         console.log(`Address Validation Result: ${validationResult}`); // Debugging
-
-//                         if (validationResult.trim().toLowerCase() === "valid") {
-//                             session.data.address = textRaw;
-//                             const missingFields = getMissingFields(session.data);
-
-//                             if (missingFields.length === 0) {
-//                                 session.step = STATES.CONFIRMATION;
-//                                 await sendOrderSummary(from, session);
-//                             } else {
-//                                 session.step = `ASK_${missingFields[0].toUpperCase()}`;
-//                                 await askForNextMissingField(session, from);
-//                             }
-//                         } else {
-//                             await sendToWhatsApp(from, "❌ Please provide a valid address. 😊");
-//                         }
-//                     } catch (error) {
-//                         console.error("Error validating address:", error);
-//                         await sendToWhatsApp(from, "❌ Oops! Something went wrong. Please try again.");
-//                     }
+//                     session.step = `ASK_${missingFieldsAddress[0].toUpperCase()}`;
+//                     await askForNextMissingField(session, from);
 //                 }
 //                 break;
-
 //             case "ASK_CITY":
-//                 if (!textRaw) {
-//                     await sendToWhatsApp(from, getCitySelectionMessage(session.language));
-//                 } else {
-//                     try {
-//                         const validationResult = await analyzeInput(textRaw, "city");
-//                         console.log(`City Validation Result: ${validationResult}`); // Debugging
-
-//                         if (validationResult.trim().toLowerCase() === "valid") {
-//                             session.data.city = textRaw;
-//                             const missingFields = getMissingFields(session.data);
-
-//                             if (missingFields.length === 0) {
-//                                 session.step = STATES.CONFIRMATION;
-//                                 await sendOrderSummary(from, session);
-//                             } else {
-//                                 session.step = `ASK_${missingFields[0].toUpperCase()}`;
-//                                 await askForNextMissingField(session, from);
+//                 if (!session) {
+//                     console.error("❌ Session is not defined.");
+//                     await sendToWhatsApp(from, "❌ An error occurred. Please try again.");
+//                     return res.sendStatus(200);
+//                 }
+//                 if (session.data.city) {
+//                     moveToNextStep(session, from);
+//                     return res.sendStatus(200);
+//                 }
+//                 // Handle button replies
+//                 if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+//                     const citySelection = message.interactive.button_reply.id;
+//                     // Updated cityMap to include all cities from sendCitySelection
+//                     const cityMap = {
+//                         "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
+//                         "dubai": { en: "Dubai", ar: "دبي" },
+//                         "sharjah": { en: "Sharjah", ar: "الشارقة" },
+//                         "ajman": { en: "Ajman", ar: "عجمان" },
+//                         "umm_al_quwain": { en: "Umm Al Quwain", ar: "أم القيوين" },
+//                         "ras_al_khaimah": { en: "Ras Al Khaimah", ar: "رأس الخيمة" },
+//                         "fujairah": { en: "Fujairah", ar: "الفجيرة" }
+//                     };
+//                     if (cityMap[citySelection]) {
+//                         session.data.city = cityMap[citySelection][session.language] || cityMap[citySelection].en;
+//                         console.log("City set to:", session.data.city);
+//                         // If the user has already shared a location, validate it
+//                         if (session.data.latitude && session.data.longitude) {
+//                             const validation = await validateCityAndLocation(
+//                                 session.data.latitude,
+//                                 session.data.longitude,
+//                                 session.data.city
+//                             );
+//                             if (!validation.isValid) {
+//                                 await sendToWhatsApp(
+//                                     from,
+//                                     `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`
+//                                 );
+//                                 return res.sendStatus(200);
 //                             }
-//                         } else {
-//                             await sendToWhatsApp(from, "❌ Please provide a valid city. 😊");
 //                         }
-//                     } catch (error) {
-//                         console.error("Error validating city:", error);
-//                         await sendToWhatsApp(from, "❌ Oops! Something went wrong. Please try again.");
+//                         moveToNextStep(session, from);
+//                     } else {
+//                         await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
+//                         await sendCitySelection(from, session.language);
 //                     }
+//                 }
+//                 // Handle text input
+//                 else if (message.type === "text") {
+//                     console.log("Checking user response for city:", textRaw);
+//                     const selectedCity = extractCity(textRaw, session.language);
+//                     if (selectedCity) {
+//                         session.data.city = selectedCity;
+//                         console.log("City set to:", selectedCity);
+//                         // Validate against detected location
+//                         if (session.data.latitude && session.data.longitude) {
+//                             const validation = await validateCityAndLocation(
+//                                 session.data.latitude,
+//                                 session.data.longitude,
+//                                 session.data.city
+//                             );
+//                             if (!validation.isValid) {
+//                                 await sendToWhatsApp(
+//                                     from,
+//                                     `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`
+//                                 );
+//                                 return res.sendStatus(200);
+//                             }
+//                         }
+//                         moveToNextStep(session, from);
+//                     } else {
+//                         await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
+//                         await sendCitySelection(from, session.language);
+//                     }
+//                 }
+//                 // Handle invalid input
+//                 else {
+//                     await sendToWhatsApp(from, "❌ Invalid input. Please select a city from the options.");
+//                     await sendCitySelection(from, session.language);
 //                 }
 //                 break;
 //             case "ASK_STREET":
+//                 // If the user hasn't provided a street name yet, ask for it
 //                 if (!textRaw) {
-//                     await sendToWhatsApp(from, getStreetMessage(session.language));
+//                     await sendToWhatsApp(from, "🛣️ Please provide your street name.");
+//                     return res.sendStatus(200); // Exit and wait for the user's response
+//                 }
+//                 // If the street name is provided, store it and proceed to the next step
+//                 session.data.street = textRaw;
+//                 // Check for other missing fields
+//                 const missingFieldsStreet = getMissingFields(session.data);
+//                 if (missingFieldsStreet.length === 0) {
+//                     session.step = STATES.CONFIRMATION;
+//                     await sendOrderSummary(from, session);
 //                 } else {
-//                     try {
-//                         const validationResult = await analyzeInput(textRaw, "street");
-//                         console.log(`Street Validation Result: ${validationResult}`); // Debugging
-
-//                         if (validationResult.trim().toLowerCase() === "valid") {
-//                             session.data.street = textRaw;
-//                             const missingFields = getMissingFields(session.data);
-
-//                             if (missingFields.length === 0) {
-//                                 session.step = STATES.CONFIRMATION;
-//                                 await sendOrderSummary(from, session);
-//                             } else {
-//                                 session.step = `ASK_${missingFields[0].toUpperCase()}`;
-//                                 await askForNextMissingField(session, from);
-//                             }
-//                         } else {
-//                             await sendToWhatsApp(from, "❌ Please provide a valid street name. 😊");
-//                         }
-//                     } catch (error) {
-//                         console.error("Error validating street:", error);
-//                         await sendToWhatsApp(from, "❌ Oops! Something went wrong. Please try again.");
-//                     }
+//                     session.step = `ASK_${missingFieldsStreet[0].toUpperCase()}`;
+//                     await askForNextMissingField(session, from);
 //                 }
 //                 break;
-
 //             case "ASK_BUILDING_NAME":
+//                 // If the user hasn't provided a building name yet, ask for it
 //                 if (!textRaw) {
-//                     await sendToWhatsApp(from, getBuildingMessage(session.language));
+//                     await sendToWhatsApp(from, "🏢 Please provide your building name.");
+//                     return res.sendStatus(200); // Exit and wait for the user's response
+//                 }
+//                 // If the building name is provided, store it and proceed to the next step
+//                 session.data.building_name = textRaw;
+//                 // Check for other missing fields
+//                 const missingFieldsBuilding = getMissingFields(session.data);
+//                 if (missingFieldsBuilding.length === 0) {
+//                     session.step = STATES.CONFIRMATION;
+//                     await sendOrderSummary(from, session);
 //                 } else {
-//                     try {
-//                         const validationResult = await analyzeInput(textRaw, "building_name");
-//                         console.log(`Building Name Validation Result: ${validationResult}`); // Debugging
-
-//                         if (validationResult.trim().toLowerCase() === "valid") {
-//                             session.data.building_name = textRaw;
-//                             const missingFields = getMissingFields(session.data);
-
-//                             if (missingFields.length === 0) {
-//                                 session.step = STATES.CONFIRMATION;
-//                                 await sendOrderSummary(from, session);
-//                             } else {
-//                                 session.step = `ASK_${missingFields[0].toUpperCase()}`;
-//                                 await askForNextMissingField(session, from);
-//                             }
-//                         } else {
-//                             await sendToWhatsApp(from, "❌ Please provide a valid building name. 😊");
-//                         }
-//                     } catch (error) {
-//                         console.error("Error validating building name:", error);
-//                         await sendToWhatsApp(from, "❌ Oops! Something went wrong. Please try again.");
-//                     }
+//                     session.step = `ASK_${missingFieldsBuilding[0].toUpperCase()}`;
+//                     await askForNextMissingField(session, from);
 //                 }
 //                 break;
-
 //             case "ASK_FLAT_NO":
+//                 // If the user hasn't provided a flat number yet, ask for it
 //                 if (!textRaw) {
-//                     await sendToWhatsApp(from, getFlatMessage(session.language));
+//                     await sendToWhatsApp(from, "🏠 Please provide your flat number.");
+//                     return res.sendStatus(200); // Exit and wait for the user's response
+//                 }
+//                 // If the flat number is provided, store it and proceed to the next step
+//                 session.data.flat_no = textRaw;
+//                 // Check for other missing fields
+//                 const missingFieldsFlat = getMissingFields(session.data);
+//                 if (missingFieldsFlat.length === 0) {
+//                     session.step = STATES.CONFIRMATION;
+//                     await sendOrderSummary(from, session);
 //                 } else {
-//                     try {
-//                         const validationResult = await analyzeInput(textRaw, "flat_no");
-//                         console.log(`Flat Number Validation Result: ${validationResult}`); // Debugging
-
-//                         if (validationResult.trim().toLowerCase() === "valid") {
-//                             session.data.flat_no = textRaw;
-//                             const missingFields = getMissingFields(session.data);
-
-//                             if (missingFields.length === 0) {
-//                                 session.step = STATES.CONFIRMATION;
-//                                 await sendOrderSummary(from, session);
-//                             } else {
-//                                 session.step = `ASK_${missingFields[0].toUpperCase()}`;
-//                                 await askForNextMissingField(session, from);
-//                             }
-//                         } else {
-//                             await sendToWhatsApp(from, "❌ Please provide a valid flat number. 😊");
-//                         }
-//                     } catch (error) {
-//                         console.error("Error validating flat number:", error);
-//                         await sendToWhatsApp(from, "❌ Oops! Something went wrong. Please try again.");
-//                     }
+//                     session.step = `ASK_${missingFieldsFlat[0].toUpperCase()}`;
+//                     await askForNextMissingField(session, from);
 //                 }
 //                 break;
-
 //             case "ASK_QUANTITY":
+//                 // If the user hasn't provided a quantity yet, ask for it
 //                 if (!textRaw) {
-//                     await sendToWhatsApp(from, getQuantityMessage(session.language));
+//                     await sendToWhatsApp(from, "🔢 Please provide the quantity (in liters).");
+//                     return res.sendStatus(200); // Exit and wait for the user's response
+//                 }
+//                 // Validate the quantity after the user provides it
+//                 if (isNaN(textRaw) || textRaw.trim() === "") {
+//                     await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
+//                     return res.sendStatus(200); // Exit and wait for the user to correct their input
+//                 }
+//                 // If the quantity is valid, store it and proceed to the next step
+//                 session.data.quantity = textRaw;
+
+//                 // Check for other missing fields
+//                 const missingFieldsQuantity = getMissingFields(session.data);
+//                 if (missingFieldsQuantity.length === 0) {
+//                     session.step = STATES.CONFIRMATION;
+//                     await sendOrderSummary(from, session);
 //                 } else {
-//                     try {
-//                         const validationResult = await analyzeInput(textRaw, "quantity");
-//                         console.log(`Quantity Validation Result: ${validationResult}`); // Debugging
-
-//                         if (validationResult.trim().toLowerCase() === "valid") {
-//                             session.data.quantity = extractQuantity(textRaw);
-//                             const missingFields = getMissingFields(session.data);
-
-//                             if (missingFields.length === 0) {
-//                                 session.step = STATES.CONFIRMATION;
-//                                 await sendOrderSummary(from, session);
-//                             } else {
-//                                 session.step = `ASK_${missingFields[0].toUpperCase()}`;
-//                                 await askForNextMissingField(session, from);
-//                             }
-//                         } else {
-//                             await sendToWhatsApp(from, "❌ Please provide a valid quantity (numeric values only). 😊");
-//                         }
-//                     } catch (error) {
-//                         console.error("Error validating quantity:", error);
-//                         await sendToWhatsApp(from, "❌ Oops! Something went wrong. Please try again.");
-//                     }
+//                     session.step = `ASK_${missingFieldsQuantity[0].toUpperCase()}`;
+//                     await askForNextMissingField(session, from);
 //                 }
 //                 break;
-
 //             case STATES.CONFIRMATION:
 //                 if (message.type === "interactive" && message.interactive.type === "button_reply") {
-//                     const buttonId = message.interactive.button_reply.id; // Extract button ID
-
+//                     const buttonId = message.interactive.button_reply.id;
 //                     if (buttonId === "yes_confirm") {
 //                         const requestData = {
 //                             user_name: session.data.name,
@@ -2538,44 +3089,31 @@ const sendLocationRequest = async (to, message) => {
 //                             longitude: session.data.longitude,
 //                             quantity: session.data.quantity
 //                         };
-
-//                         console.log('Request Data:', requestData);
-
+//                         if (session.data.fromAPI) {
+//                             requestData.update_info = true;
+//                         }
 //                         try {
-//                             const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
+//                             const response = await axios.post('https://dev.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
 //                                 headers: { 'Content-Type': 'application/json' },
 //                                 timeout: 5000
 //                             });
-
 //                             if (response.status === 200) {
-//                                 console.log('API Response:', response.data);
-//                                 await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
+//                                 await sendToWhatsApp(from, session.data.fromAPI
+//                                     ? "✅ تم تحديث طلبك بنجاح! سنتصل بك قريبًا."
+//                                     : "✅ Your request has been successfully submitted! We will contact you soon.");
 //                             } else {
-//                                 console.error(`❌ API returned unexpected status code: ${response.status}`);
 //                                 await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
 //                             }
 //                         } catch (error) {
-//                             if (error.response) {
-//                                 console.error('API Error Response:', error.response.data);
-//                                 console.error('API Status Code:', error.response.status);
-
-//                                 // Explicitly check for status code 422
-//                                 if (error.response.status === 422) {
-//                                     await sendToWhatsApp(from, "❌ Your phone number must be Emirati to proceed with this request.");
-//                                 } else {
-//                                     await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
-//                                 }
-//                             } else {
-//                                 console.error('Network or request error:', error.message);
-//                                 await sendToWhatsApp(from, "❌ Unable to reach the server. Please check your internet connection and try again.");
-//                             }
+//                             // Error handling unchanged
 //                         }
 //                         delete userSessions[from];
-
-
 //                     } else if (buttonId === "no_correct") {
 //                         session.step = STATES.MODIFY;
-//                         await sendToWhatsApp(from, "Which information would you like to modify? Please reply with the corresponding number:\n\n1. Name\n2. Phone Number\n3. Email\n4. Address\n5. City\n6. Street\n7. Building Name\n8. Flat Number\n9. Location\n10. Quantity");
+//                         const modifyMessage = session.data.fromAPI
+//                             ? "Which information would you like to update?"
+//                             : "Which information would you like to modify?";
+//                         await sendToWhatsApp(from, `${modifyMessage}\n\n1. Name\n2. Phone\n3. Email\n4. Address\n5. City\n6. Street\n7. Building\n8. Flat\n9. Location\n10. Quantity`);
 //                     }
 //                 }
 //                 break;
@@ -2729,1048 +3267,3 @@ const sendLocationRequest = async (to, message) => {
 //         res.sendStatus(500);
 //     }
 // });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// app.post('/webhook', async (req, res) => {
-// try {
-//     console.log('Incoming Webhook Data:', req.body);
-
-//     const entry = req.body.entry?.[0];
-//     const changes = entry?.changes?.[0];
-//     const value = changes?.value;
-//     const messages = value?.messages;
-
-//     if (!messages || messages.length === 0) {
-//         console.log('No messages received, returning early.');
-//         return res.sendStatus(200);
-//     }
-
-//     const message = messages[0];
-//     const from = message.from;
-//     const textRaw = message.text?.body || "";
-//     const text = textRaw.toLowerCase().trim();
-
-//     // 1. Check if the user wants to end the request
-//     if (shouldEndRequest(text)) {
-//         delete userSessions[from]; // Reset the session
-//         const welcomeMessage = await generateWelcomeMessage();
-//         await sendInteractiveButtons(from, welcomeMessage, [
-//             { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
-//             { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
-//         ]);
-//         return res.sendStatus(200);
-//     }
-
-//     // 2. Initialize user session if it doesn't exist
-//     if (!userSessions[from]) {
-//         userSessions[from] = {
-//             step: STATES.WELCOME,
-//             data: { phone: formatPhoneNumber(from) },
-//         };
-
-//         const welcomeMessage = await generateWelcomeMessage();
-//         await sendInteractiveButtons(from, welcomeMessage, [
-//             { type: "reply", reply: { id: "contact_us", title: "📞 Contact Us" } },
-//             { type: "reply", reply: { id: "new_request", title: "📝 New Request" } }
-//         ]);
-//         return res.sendStatus(200);
-//     }
-
-//     const session = userSessions[from];
-
-//     if (!session.data.phone) {
-//         session.data.phone = formatPhoneNumber(from);
-//     }
-
-//     // 3. Handle interactive button replies (e.g., new request, contact us)
-//     if (message.interactive && message.interactive.button_reply) {
-//         const buttonId = message.interactive.button_reply.id;
-
-//         if (buttonId === "new_request") {
-//             // Reset session data for a new request
-//             session.data = { phone: formatPhoneNumber(from) };
-//             session.step = STATES.NAME;
-
-//             // Ask for the user's name
-//             const namePrompt = await generateMissingFieldPrompt("name");
-//             await sendToWhatsApp(from, namePrompt);
-//             return res.sendStatus(200);
-//         } else if (buttonId === "contact_us") {
-//             await sendToWhatsApp(from, "You can reach us at support@example.com. 📞");
-//             return res.sendStatus(200);
-//         }
-//     }
-
-//         // 4. Process message based on current step FIRST
-//         switch (session.step) {
-//             case STATES.WELCOME:
-//                 if (message.type === "text") {
-//                     const extractedData = await extractInformationFromText(textRaw);
-//                     session.data = { ...session.data, ...extractedData };
-
-//                     const missingFields = getMissingFields(session.data);
-//                     if (missingFields.length === 0) {
-//                         session.step = STATES.CONFIRMATION;
-//                         await sendOrderSummary(from, session);
-//                     } else if (missingFields.includes("city")) {
-//                         session.step = STATES.CITY_SELECTION;
-//                         await sendCitySelection(from);
-//                     } else {
-//                         await askForNextMissingField(session, from);
-//                     }
-//                 }
-//                 break;
-
-//             case STATES.NAME:
-//                 const nameValidationResponse = await analyzeInput(textRaw, "name");
-
-//                 if (nameValidationResponse.toLowerCase().includes("valid")) {
-//                     session.data.name = textRaw.trim(); // Trim whitespace
-//                     session.step = STATES.EMAIL;
-//                     const nextPrompt = await getOpenAIResponse("Thanks! Now, please provide your email.", "");
-//                     await sendToWhatsApp(from, nextPrompt);
-//                 } else {
-//                     await sendToWhatsApp(from, nameValidationResponse.replace("invalid:", ""));
-//                 }
-//                 break;
-
-//             case STATES.EMAIL:
-//                 const emailValidationResponse = await analyzeInput(textRaw, "email");
-
-//                 if (emailValidationResponse.toLowerCase().includes("valid")) {
-//                     session.data.email = textRaw;
-//                     session.step = STATES.LONGITUDE;
-//                     const locationPrompt = await getOpenAIResponse("Please share your location.");
-//                     await sendToWhatsApp(from, locationPrompt);
-//                     session.locationPromptSent = true;
-//                 } else {
-//                     await sendToWhatsApp(from, emailValidationResponse);
-//                 }
-//                 break;
-//                 case STATES.LONGITUDE:
-//                     if (message.location) {
-//                         const { latitude, longitude } = message.location;
-//                         const UAE_BOUNDS = {
-//                             minLat: 22.5,
-//                             maxLat: 26.5,
-//                             minLng: 51.6,
-//                             maxLng: 56.5
-//                         };
-
-//                         if (
-//                             latitude >= UAE_BOUNDS.minLat &&
-//                             latitude <= UAE_BOUNDS.maxLat &&
-//                             longitude >= UAE_BOUNDS.minLng &&
-//                             longitude <= UAE_BOUNDS.maxLng
-//                         ) {
-//                             session.data.latitude = latitude;
-//                             session.data.longitude = longitude;
-//                             session.step = STATES.CITY_SELECTION;
-//                             await sendCitySelection(from);
-//                         } else {
-//                             await sendToWhatsApp(from, "Invalid location. Please share a valid location within the UAE.");
-//                         }
-//                     } else if (!session.locationPromptSent) {
-//                         const locationPrompt = await getOpenAIResponse("Please share your location by clicking the button below.");
-
-//                         // This sends a message with a clickable text to open the location-sharing feature
-//                         await sendLocationRequest(from, locationPrompt);
-
-//                         session.locationPromptSent = true;
-//                     }
-//                     break;
-
-
-
-
-//             case STATES.CITY_SELECTION:
-//                 if (message.interactive && message.interactive.button_reply) {
-//                     const citySelection = message.interactive.button_reply.id;
-//                     const cityMap = {
-//                         "abu_dhabi": "Abu Dhabi",
-//                         "dubai": "Dubai",
-//                         "sharjah": "Sharjah"
-//                     };
-
-//                     if (cityMap[citySelection]) {
-//                         session.data.city = cityMap[citySelection];
-//                         session.step = STATES.ADDRESS;
-//                         const addressPrompt = await generateMissingFieldPrompt("address");
-//                         await sendToWhatsApp(from, addressPrompt);
-//                     } else {
-//                         await sendCitySelection(from);
-//                     }
-//                 }
-//                 break;
-
-//             case STATES.ADDRESS:
-//                 const addressValidationResponse = await analyzeInput(textRaw, "address");
-
-//                 if (addressValidationResponse.toLowerCase().includes("valid")) {
-//                     session.data.address = textRaw;
-//                     session.step = STATES.STREET;
-//                     const streetPrompt = await generateMissingFieldPrompt("street");
-//                     await sendToWhatsApp(from, streetPrompt);
-//                 } else {
-//                     await sendToWhatsApp(from, addressValidationResponse);
-//                 }
-//                 break;
-
-//             case STATES.STREET:
-//                 const streetValidationResponse = await analyzeInput(textRaw, "street name");
-
-//                 if (streetValidationResponse.toLowerCase().includes("valid")) {
-//                     session.data.street = textRaw;
-//                     session.step = STATES.BUILDING_NAME;
-//                     const buildingPrompt = await getOpenAIResponse("Please provide the building name.");
-//                     await sendToWhatsApp(from, buildingPrompt);
-//                 } else {
-//                     await sendToWhatsApp(from, streetValidationResponse);
-//                 }
-//                 break;
-
-//             case STATES.BUILDING_NAME:
-//                 const buildingValidationResponse = await analyzeInput(textRaw, "building name");
-
-//                 if (buildingValidationResponse.toLowerCase().includes("valid")) {
-//                     session.data.building_name = textRaw;
-//                     session.step = STATES.FLAT_NO;
-//                     const flatPrompt = await getOpenAIResponse("Please provide your apartment number.");
-//                     await sendToWhatsApp(from, flatPrompt);
-//                 } else {
-//                     await sendToWhatsApp(from, buildingValidationResponse);
-//                 }
-//                 break;
-
-//             case STATES.FLAT_NO:
-//                 const flatValidationResponse = await analyzeInput(textRaw, "flat number");
-
-//                 if (flatValidationResponse.toLowerCase().includes("valid")) {
-//                     session.data.flat_no = textRaw;
-//                     session.step = STATES.QUANTITY;
-//                     const quantityPrompt = await getOpenAIResponse("Please provide the quantity.");
-//                     await sendToWhatsApp(from, quantityPrompt);
-//                 } else {
-//                     await sendToWhatsApp(from, flatValidationResponse);
-//                 }
-//                 break;
-
-//             case STATES.QUANTITY:
-//                 const quantityValidationResponse = await analyzeInput(textRaw, "quantity");
-
-//                 if (quantityValidationResponse.toLowerCase().includes("valid")) {
-//                     session.data.quantity = extractQuantity(textRaw);
-//                     session.step = STATES.CONFIRMATION;
-//                     const summary = await getOpenAIResponse("Here is your order summary. Please confirm.");
-//                     sendOrderSummary(from, session, summary);
-//                 } else {
-//                     await sendToWhatsApp(from, quantityValidationResponse);
-//                 }
-//                 break;
-
-
-//             case "ASK_NAME": {
-//                 session.data.name = textRaw;
-//                 const missingAfterName = getMissingFields(session.data);
-//                 if (missingAfterName.length === 0) {
-//                     session.step = STATES.CONFIRMATION;
-//                     await sendOrderSummary(from, session);
-//                 } else {
-//                     await askForNextMissingField(session, from, missingAfterName);
-//                 }
-//                 break;
-//             }
-
-//             case "ASK_EMAIL": {
-//                 if (!isValidEmail(textRaw)) {
-//                     await sendToWhatsApp(from, "❌ Invalid email address, please enter a valid one.");
-//                     return res.sendStatus(200);
-//                 }
-//                 session.data.email = textRaw;
-//                 const missingAfterEmail = getMissingFields(session.data);
-//                 if (missingAfterEmail.length === 0) {
-//                     session.step = STATES.CONFIRMATION;
-//                     await sendOrderSummary(from, session);
-//                 } else {
-//                     await askForNextMissingField(session, from, missingAfterEmail);
-//                 }
-//                 break;
-//             }
-
-//             case "ASK_ADDRESS": {
-//                 session.data.address = textRaw;
-//                 const missingAfterAddress = getMissingFields(session.data);
-//                 if (missingAfterAddress.length === 0) {
-//                     session.step = STATES.CONFIRMATION;
-//                     await sendOrderSummary(from, session);
-//                 } else {
-//                     await askForNextMissingField(session, from, missingAfterAddress);
-//                 }
-//                 break;
-//             }
-
-//             case "ASK_CITY": {
-//                 session.step = STATES.CITY_SELECTION;
-//                 return await sendCitySelection(from);
-//             }
-
-//             case "ASK_STREET": {
-//                 session.data.street = textRaw;
-//                 const missingAfterStreet = getMissingFields(session.data);
-//                 if (missingAfterStreet.length === 0) {
-//                     session.step = STATES.CONFIRMATION;
-//                     await sendOrderSummary(from, session);
-//                 } else {
-//                     await askForNextMissingField(session, from, missingAfterStreet);
-//                 }
-//                 break;
-//             }
-
-//             case "ASK_BUILDING_NAME": {
-//                 session.data.building_name = textRaw;
-//                 const missingAfterBuilding = getMissingFields(session.data);
-//                 if (missingAfterBuilding.length === 0) {
-//                     session.step = STATES.CONFIRMATION;
-//                     await sendOrderSummary(from, session);
-//                 } else {
-//                     await askForNextMissingField(session, from, missingAfterBuilding);
-//                 }
-//                 break;
-//             }
-
-//             case "ASK_FLAT_NO": {
-//                 session.data.flat_no = textRaw;
-//                 const missingAfterFlat = getMissingFields(session.data);
-//                 if (missingAfterFlat.length === 0) {
-//                     session.step = STATES.CONFIRMATION;
-//                     await sendOrderSummary(from, session);
-//                 } else {
-//                     await askForNextMissingField(session, from, missingAfterFlat);
-//                 }
-//                 break;
-//             }
-
-//             case "ASK_LATITUDE": {
-//                 if (message.location) {
-//                     session.data.latitude = message.location.latitude;
-//                     session.data.longitude = message.location.longitude;
-//                     const missingAfterLocation = getMissingFields(session.data);
-//                     if (missingAfterLocation.length === 0) {
-//                         session.step = STATES.CONFIRMATION;
-//                         await sendOrderSummary(from, session);
-//                     } else {
-//                         await askForNextMissingField(session, from, missingAfterLocation);
-//                     }
-//                 } else {
-//                     await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
-//                 }
-//                 break;
-//             }
-
-//             case "ASK_LONGITUDE": {
-//                 if (message.location) {
-//                     session.data.latitude = message.location.latitude;
-//                     session.data.longitude = message.location.longitude;
-//                     const missingAfterLocation = getMissingFields(session.data);
-//                     if (missingAfterLocation.length === 0) {
-//                         session.step = STATES.CONFIRMATION;
-//                         await sendOrderSummary(from, session);
-//                     } else {
-//                         await askForNextMissingField(session, from, missingAfterLocation);
-//                     }
-//                 } else {
-//                     await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
-//                 }
-//                 break;
-//             }
-
-//             case "ASK_QUANTITY": {
-//                 const quantity = extractQuantity(textRaw);
-
-//                 if (!quantity) {
-//                     await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
-//                     return res.sendStatus(200);
-//                 }
-
-//                 session.data.quantity = quantity;
-//                 const missingAfterQuantity = getMissingFields(session.data);
-
-//                 if (missingAfterQuantity.length === 0) {
-//                     session.step = STATES.CONFIRMATION;
-//                     await sendOrderSummary(from, session);
-//                 } else {
-//                     await askForNextMissingField(session, from, missingAfterQuantity);
-//                 }
-//                 break;
-//             }
-
-//             case STATES.CONFIRMATION:
-//                 if (message.type === "interactive" && message.interactive.type === "button_reply") {
-//                     const buttonId = message.interactive.button_reply.id;
-
-//                     if (buttonId === "yes_confirm") {
-//                         const requestData = {
-//                             user_name: session.data.name,
-//                             email: session.data.email,
-//                             phone_number: session.data.phone,
-//                             city: session.data.city,
-//                             address: session.data.address,
-//                             street: session.data.street,
-//                             building_name: session.data.building_name,
-//                             flat_no: session.data.flat_no,
-//                             latitude: session.data.latitude,
-//                             longitude: session.data.longitude,
-//                             quantity: session.data.quantity
-//                         };
-
-//                         console.log('Request Data:', requestData);
-
-//                         try {
-//                             const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
-//                                 headers: { 'Content-Type': 'application/json' },
-//                                 timeout: 5000
-//                             });
-
-//                             if (response.status === 200) {
-//                                 console.log('API Response:', response.data);
-//                                 await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
-//                             } else {
-//                                 console.error(`❌ API returned unexpected status code: ${response.status}`);
-//                                 await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
-//                             }
-//                         } catch (error) {
-//                             if (error.response) {
-//                                 console.error('API Error Response:', error.response.data);
-//                                 console.error('API Status Code:', error.response.status);
-
-//                                 if (error.response.status === 422) {
-//                                     await sendToWhatsApp(from, "❌ Your phone number must be Emirati to proceed with this request.");
-//                                 } else {
-//                                     await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
-//                                 }
-//                             } else {
-//                                 console.error('Network or request error:', error.message);
-//                                 await sendToWhatsApp(from, "❌ Unable to reach the server. Please check your internet connection and try again.");
-//                             }
-//                         }
-//                         delete userSessions[from];
-//                     } else if (buttonId === "no_correct") {
-//                         session.step = STATES.MODIFY;
-//                         await sendToWhatsApp(from, "Which information would you like to modify? Please reply with the corresponding number:\n\n1. Name\n2. Phone Number\n3. Email\n4. Address\n5. City\n6. Street\n7. Building Name\n8. Flat Number\n9. Location\n10. Quantity");
-//                     }
-//                 }
-//                 break;
-
-//             case STATES.MODIFY:
-//                 const normalizedText = convertArabicNumbers(text);
-//                 const fieldToModify = parseInt(normalizedText);
-//                 if (isNaN(fieldToModify) || fieldToModify < 1 || fieldToModify > 11) {
-//                     await sendToWhatsApp(from, "❌ Invalid option. Please choose a number between 1 and 11.");
-//                     return res.sendStatus(200);
-//                 }
-
-//                 const fieldMap = {
-//                     1: "name",
-//                     2: "phone",
-//                     3: "email",
-//                     4: "address",
-//                     5: "city",
-//                     6: "street",
-//                     7: "building_name",
-//                     8: "flat_no",
-//                     9: "location",
-//                     10: "quantity"
-//                 };
-
-//                 const selectedField = fieldMap[fieldToModify];
-
-//                 if (selectedField === "location") {
-//                     await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
-//                     session.step = "MODIFY_LOCATION";
-//                 } else if (selectedField === "city") {
-//                     await sendCitySelection(from);
-//                     session.step = "MODIFY_CITY_SELECTION";
-//                 } else {
-//                     session.modifyField = selectedField;
-//                     session.step = `MODIFY_${selectedField.toUpperCase()}`;
-//                     await sendToWhatsApp(from, `🔹 Please provide the new value for ${selectedField.replace(/_/g, " ")}.`);
-//                 }
-//                 break;
-
-//             case "MODIFY_NAME":
-//                 session.data.name = textRaw;
-//                 session.step = STATES.CONFIRMATION;
-//                 await sendUpdatedSummary(from, session);
-//                 break;
-
-//             case "MODIFY_PHONE":
-//                 if (!isValidPhone(textRaw)) {
-//                     await sendToWhatsApp(from, "❌ Invalid phone number, please enter a valid number.");
-//                     return res.sendStatus(200);
-//                 }
-//                 session.data.phone = formatPhoneNumber(textRaw);
-//                 session.step = STATES.CONFIRMATION;
-//                 await sendUpdatedSummary(from, session);
-//                 break;
-
-//             case "MODIFY_EMAIL":
-//                 if (!isValidEmail(textRaw)) {
-//                     await sendToWhatsApp(from, "❌ Invalid email address, please enter a valid one.");
-//                     return res.sendStatus(200);
-//                 }
-//                 session.data.email = textRaw;
-//                 session.step = STATES.CONFIRMATION;
-//                 await sendUpdatedSummary(from, session);
-//                 break;
-
-//             case "MODIFY_ADDRESS":
-//                 session.data.address = textRaw;
-//                 session.step = STATES.CONFIRMATION;
-//                 await sendUpdatedSummary(from, session);
-//                 break;
-
-//             case "MODIFY_CITY_SELECTION":
-//                 if (message.interactive && message.interactive.button_reply) {
-//                     const citySelection = message.interactive.button_reply.id;
-//                     const cityMap = {
-//                         "abu_dhabi": "Abu Dhabi",
-//                         "dubai": "Dubai",
-//                         "sharjah": "Sharjah"
-//                     };
-
-//                     if (cityMap[citySelection]) {
-//                         session.data.city = cityMap[citySelection];
-//                         session.step = STATES.CONFIRMATION;
-//                         await sendUpdatedSummary(from, session);
-//                     } else {
-//                         await sendToWhatsApp(from, "❌ Invalid selection. Please choose from the provided options.");
-//                         await sendCitySelection(from);
-//                     }
-//                 } else {
-//                     await sendToWhatsApp(from, "❌ Please select a city from the provided options.");
-//                     await sendCitySelection(from);
-//                 }
-//                 break;
-
-//             case "MODIFY_STREET":
-//                 session.data.street = textRaw;
-//                 session.step = STATES.CONFIRMATION;
-//                 await sendUpdatedSummary(from, session);
-//                 break;
-
-//             case "MODIFY_BUILDING_NAME":
-//                 session.data.building_name = textRaw;
-//                 session.step = STATES.CONFIRMATION;
-//                 await sendUpdatedSummary(from, session);
-//                 break;
-
-//             case "MODIFY_FLAT_NO":
-//                 session.data.flat_no = textRaw;
-//                 session.step = STATES.CONFIRMATION;
-//                 await sendUpdatedSummary(from, session);
-//                 break;
-
-//             case "MODIFY_LOCATION":
-//                 if (message.location) {
-//                     session.data.latitude = message.location.latitude;
-//                     session.data.longitude = message.location.longitude;
-//                     session.step = STATES.CONFIRMATION;
-//                     await sendUpdatedSummary(from, session);
-//                 } else {
-//                     await sendToWhatsApp(from, "📍 Please share your location using WhatsApp's location feature.");
-//                 }
-//                 break;
-
-//             case "MODIFY_QUANTITY": {
-//                 const quantity = extractQuantity(textRaw);
-
-//                 if (!quantity) {
-//                     await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
-//                     return res.sendStatus(200);
-//                 }
-
-//                 session.data.quantity = quantity;
-//                 session.step = STATES.CONFIRMATION;
-//                 await sendUpdatedSummary(from, session);
-//                 break;
-//             }
-
-//             default:
-//                 await sendToWhatsApp(from, "❌ An unexpected error occurred. Please try again.");
-//                 delete userSessions[from];
-//                 break;
-//         }
-
-//         res.sendStatus(200);
-//     } catch (error) {
-//         console.error('❌ Error:', error.response?.data || error.message || error);
-//         res.sendStatus(500);
-//     }
-// });
-// const getOpenAIResponse = async (userMessage) => {
-//     try {
-//         const messages = [
-//             { role: "system", content: systemMessage },  // Editable default message
-//         ];
-
-//         if (guidanceMessage && guidanceMessage.trim() !== "") {
-//             messages.push({ role: "system", content: guidanceMessage });
-//         }
-
-//         messages.push({ role: "user", content: userMessage });
-
-//         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-//             model: "gpt-4",
-//             messages,
-//             max_tokens: 150,
-//             temperature: 0.7
-//         }, {
-//             headers: {
-//                 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-//                 'Content-Type': 'application/json'
-//             }
-//         });
-
-//         if (!response.data.choices || !response.data.choices[0] || !response.data.choices[0].message) {
-//             throw new Error("Invalid response structure from OpenAI API");
-//         }
-
-//         return response.data.choices[0].message.content.trim();
-//     } catch (error) {
-//         console.error('❌ Error with OpenAI:', error.response?.data || error.message);
-//         return "❌ Sorry, an error occurred while processing your request.";
-//     }
-// };
-// Helper function to check if all required fields have been collected.
-// const areAllFieldsCollected = (session) => {
-//     const requiredFields = ["name", "email", "buildingName", "apartmentNumber", "city", "location", "oilAmount"];
-//     return requiredFields.every(field => session.data[field]);
-//   };
-
-//   // Improved extraction logic inside getOpenAIResponse:
-//   // Only update a field if it hasn’t been set yet.
-//   const getOpenAIResponse = async (userMessage, sessionData) => {
-//     try {
-//         const systemMessage = `
-//         You are a friendly assistant for a WhatsApp bot used by Lootah Biofuels. Your task is to guide users through the request submission process in an engaging and lively way, and answer any questions they have about the company.
-
-//         **Instructions:**
-//         1. **Extract Data:** Parse the user's message to extract the following fields:
-//            - Name (e.g., "John" from "My name is John")
-//            - Email (e.g., "john@example.com")
-//            - Building Name (e.g., "Sunrise Tower")
-//            - Apartment Number (e.g., "Apt 101")
-//            - City (e.g., "Dubai")
-//            - Oil Amount (e.g., "50 liters" → "50")
-
-//         2. **Confirm Values:** After extracting a value, ask the user to confirm it (e.g., "Just to confirm, your name is John, right?").
-//         3. **Avoid Repetition:** Never ask for information already confirmed and stored in the session.
-//         4. **Session Data:** Here is the current session data: ${JSON.stringify(sessionData.data)}
-
-//         **Response Format:**
-//         - Return a JSON object with two fields: 
-//           \`response\` (your reply to the user) 
-//           \`updates\` (key-value pairs of extracted data to save to the session)
-//         `;
-
-//         const messages = [
-//             { role: "system", content: systemMessage },
-//             { role: "user", content: userMessage }
-//         ];
-
-//         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-//             model: "gpt-4-1106-preview", // Use the correct model
-//             messages,
-//             max_tokens: 300,
-//             temperature: 0.2,
-//             response_format: { type: "json_object" } // Force JSON output
-//         }, {
-//             headers: {
-//                 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-//                 'Content-Type': 'application/json'
-//             }
-//         });
-
-//         const parsedResponse = response.data.choices?.[0]?.message?.content;
-//         if (!parsedResponse) throw new Error("Invalid response from OpenAI API");
-
-//         const { response: aiResponse, updates } = JSON.parse(parsedResponse);
-
-//         // Update session data with extracted values
-//         if (updates) {
-//             Object.assign(sessionData.data, updates);
-//         }
-
-//         return aiResponse;
-//     } catch (error) {
-//         console.error('❌ Error with OpenAI:', error.response?.data || error.message);
-//         return "❌ Oops! Something went wrong, can you please try again?";
-//     }
-// };
-
-
-// app.post('/webhook', async (req, res) => {
-//     try {
-//         const entry = req.body.entry?.[0];
-//         const changes = entry?.changes?.[0];
-//         const value = changes?.value;
-//         const messages = value?.messages;
-
-//         if (!messages || messages.length === 0) {
-//             return res.sendStatus(200);
-//         }
-
-//         const message = messages[0];
-//         const from = message.from;
-//         const textRaw = message.text?.body || "";
-
-//         // Initialize user session if it doesn't exist
-//         if (!userSessions[from]) {
-//             userSessions[from] = { data: { phone: formatPhoneNumber(from) } };
-//         }
-
-//         const session = userSessions[from];
-
-//         // Handle location sharing
-//         if (message.location) {
-//             const { latitude, longitude, name: streetName } = message.location;
-//             session.data.location = { latitude, longitude, streetName };
-//             await sendToWhatsApp(from, "📍 Thanks for sharing your location! Let’s proceed.");
-//             return res.sendStatus(200);
-//         }
-
-//         // Handle oil amount
-//         if (textRaw.match(/liters?/i)) {
-//             const oilAmount = textRaw.match(/\d+/)?.[0];
-//             if (oilAmount) {
-//                 session.data.oilAmount = oilAmount;
-//                 await sendToWhatsApp(from, `👍 Got it! You’ve mentioned ${oilAmount} liters of oil. Let’s proceed.`);
-//             } else {
-//                 await sendToWhatsApp(from, "🤔 Can you please share how much oil you used in liters?");
-//             }
-//             return res.sendStatus(200);
-//         }
-
-//         // Get ChatGPT's response
-//         const aiResponse = await getOpenAIResponse(textRaw, session);
-
-//         // Check if all required fields are collected
-//         if (areAllFieldsCollected(session)) {
-//             const summary = `
-//             🎉 Here's what I have so far:
-//             - Name: ${session.data.name}
-//             - Email: ${session.data.email}
-//             - Phone: ${session.data.phone}
-//             - Building Name: ${session.data.buildingName}
-//             - Apartment Number: ${session.data.apartmentNumber}
-//             - City: ${session.data.city}
-//             - Location: Latitude: ${session.data.location.latitude}, Longitude: ${session.data.location.longitude}, Street: ${session.data.location.streetName}
-//             - Oil Amount: ${session.data.oilAmount}
-
-//             🙌 Should I go ahead and submit your request? Just reply "Yes" to confirm or "No" to edit.
-//             `;
-//             await sendToWhatsApp(from, summary);
-//             session.step = "CONFIRMATION";
-//             return res.sendStatus(200);
-//         }
-
-//         // Handle confirmation
-//         if (session.step === "CONFIRMATION" && textRaw.toLowerCase() === "yes") {
-//             const requestData = session.data;
-//             try {
-//                 const apiResponse = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
-//                     headers: { 'Content-Type': 'application/json' },
-//                     timeout: 5000
-//                 });
-
-//                 if (apiResponse.status === 200) {
-//                     await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We'll contact you soon.");
-//                 } else {
-//                     await sendToWhatsApp(from, "❌ Something went wrong! Please try again later.");
-//                 }
-//             } catch (error) {
-//                 await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
-//             }
-
-//             delete userSessions[from];
-//         } else {
-//             await sendToWhatsApp(from, aiResponse);
-//         }
-
-//         res.sendStatus(200);
-//     } catch (error) {
-//         console.error('❌ Error:', error.response?.data || error.message || error);
-//         res.sendStatus(500);
-//     }
-// });
-
-// async function askForNextMissingField(session, from, missingFields) {
-//     if (!session.greetingSent) {
-//         const greetingMessage = `Hey ${session.data.name || 'there'}! 👋 Ready to complete your order? Let's get started! 😊`;
-//         await sendToWhatsApp(from, greetingMessage);
-//         session.greetingSent = true;
-//     }
-
-//     if (missingFields.length === 0) {
-//         session.step = STATES.CONFIRMATION;
-//         return await sendOrderSummary(from, session);
-//     }
-
-//     const nextMissingField = missingFields[0];
-//     session.step = `ASK_${nextMissingField.toUpperCase()}`;
-
-//     const dynamicPrompt = `
-//         The user is submitting an order to Lootah Biofuels. Missing field: "${nextMissingField}". Ask for it briefly with a friendly tone and emojis.
-
-//         Example: "Hey, we just need your name to proceed! 😊"
-//     `;
-
-//     const dynamicResponse = await getOpenAIResponse(dynamicPrompt);
-//     await sendToWhatsApp(from, dynamicResponse);
-// }
-// case STATES.CITY_SELECTION:
-//     if (message.interactive && message.interactive.button_reply) {
-//         const citySelection = message.interactive.button_reply.id;
-//         const cityMap = {
-//             "abu_dhabi": "Abu Dhabi",
-//             "dubai": "Dubai",
-//             "sharjah": "Sharjah"
-//         };
-
-//         if (cityMap[citySelection]) {
-//             session.data.city = cityMap[citySelection];
-//             session.step = STATES.STREET;
-//             const cityResponse = await getOpenAIResponse("The user selected the city " + cityMap[citySelection] + ". Now, ask them for the street name.");
-//             await sendToWhatsApp(from, cityResponse);
-//         } else {
-//             const invalidCityResponse = await getOpenAIResponse("The user made an invalid city selection. Ask them to choose from the provided options.");
-//             await sendToWhatsApp(from, invalidCityResponse);
-//             await sendCitySelection(from); // Re-send city selection
-//         }
-//     } else {
-//         const noCityResponse = await getOpenAIResponse("The user didn't select a city. Ask them to choose from the provided options.");
-//         await sendToWhatsApp(from, noCityResponse);
-//         await sendCitySelection(from); // Re-send city selection buttons
-//     }
-//     break;
-
-// case STATES.STREET:
-//     session.data.street = textRaw;
-//     session.step = STATES.BUILDING_NAME;
-//     const streetResponse = await getOpenAIResponse("User provided the street " + textRaw + ". Ask them for the building name.");
-//     await sendToWhatsApp(from, streetResponse);
-//     break;
-
-// case STATES.BUILDING_NAME:
-//     session.data.building_name = textRaw;
-//     session.step = STATES.FLAT_NO;
-//     const buildingResponse = await getOpenAIResponse("User provided the building name " + textRaw + ". Ask them for the flat number.");
-//     await sendToWhatsApp(from, buildingResponse);
-//     break;
-
-// case STATES.FLAT_NO:
-//     session.data.flat_no = textRaw;
-//     session.step = STATES.LONGITUDE;
-//     const flatResponse = await getOpenAIResponse("User provided the flat number " + textRaw + ". Ask them to share their location.");
-//     if (!session.locationPromptSent) {
-//         await sendToWhatsApp(from, flatResponse);
-//         session.locationPromptSent = true;
-//     }
-//     break;
-
-// case STATES.LONGITUDE:
-//     if (message.location) {
-//         const { latitude, longitude } = message.location;
-//         const UAE_BOUNDS = {
-//             minLat: 22.5,
-//             maxLat: 26.5,
-//             minLng: 51.6,
-//             maxLng: 56.5
-//         };
-
-//         if (
-//             latitude >= UAE_BOUNDS.minLat &&
-//             latitude <= UAE_BOUNDS.maxLat &&
-//             longitude >= UAE_BOUNDS.minLng &&
-//             longitude <= UAE_BOUNDS.maxLng
-//         ) {
-//             session.data.latitude = latitude;
-//             session.data.longitude = longitude;
-//             session.step = STATES.QUANTITY;
-//             session.awaitingQuantityInput = true;
-//             const locationResponse = await getOpenAIResponse("User shared a valid location within the UAE. Now, ask them for the quantity.");
-//             await sendToWhatsApp(from, locationResponse);
-//         } else {
-//             const invalidLocationResponse = await getOpenAIResponse("User shared an invalid location outside the UAE. Ask them to provide a valid location within the UAE.");
-//             await sendToWhatsApp(from, invalidLocationResponse);
-//         }
-//     } else {
-//         if (!session.locationPromptSent) {
-//             const missingPrompt = await generateMissingFieldPrompt("longitude");
-//             await sendToWhatsApp(from, missingPrompt);
-//             session.locationPromptSent = true;
-//         }
-//     }
-//     break;
-// Check if the user is asking a question
-// const isUserAskingQuestion = await isQuestion(textRaw);
-
-// if (isUserAskingQuestion) {
-//     // Answer the question using ChatGPT
-//     const aiResponse = await getOpenAIResponse(textRaw);
-
-//     // Send the answer to the user
-//     await sendToWhatsApp(from, aiResponse);
-
-//     // If the user was in the middle of a request, remind them to continue
-//     if (session.step !== STATES.WELCOME) {
-//         const missingFields = getMissingFields(session.data);
-//         if (missingFields.length > 0) {
-//             const nextMissingField = missingFields[0];
-//             const missingPrompt = await generateMissingFieldPrompt(nextMissingField);
-
-//             if (missingPrompt) {
-//                 await sendToWhatsApp(from, `Let’s go back to complete the request. ${missingPrompt}`);
-//             }
-//         }
-//     }
-
-//     return res.sendStatus(200);
-// }
-// const generateMissingFieldPrompt = async (field) => {
-//     try {
-//         const fieldPromptMap = {
-//             name: "Ask the user to provide their full name. Keep it short, lively, and friendly with an emoji if possible.",
-//             phone: "Ask the user for their phone number in a friendly and casual tone. Include an emoji if it feels appropriate.",
-//             email: "Ask the user for their email address in a casual, short, and polite way, using emojis.",
-//             address: "Ask the user to provide their full address, but keep it simple and friendly with a casual tone.",
-//             city: "Ask the user for their city in a friendly, short way with some emojis.",
-//             street: "Ask the user for their street name, but keep it short and cheerful.",
-//             building_name: "Ask the user for their building name in a friendly and short tone.",
-//             flat_no: "Ask the user for their flat number, ensuring it's friendly and concise.",
-//             latitude: "Ask the user to share their live location via WhatsApp, keeping it casual with an emoji.",
-//             longitude: "Ask the user to share their live location via WhatsApp. Keep it brief and friendly.",
-//             quantity: "Ask the user how many liters they want in a friendly, short manner, with an emoji if appropriate."
-//         };
-
-//         if (!fieldPromptMap[field]) return null;
-
-//         return await getOpenAIResponse(fieldPromptMap[field]);
-//     } catch (error) {
-//         console.error('❌ Error generating missing field prompt:', error);
-//         return "I need more details to proceed. 😊";
-//     }
-// };
-// async function isQuestion(text) {
-//     const prompt = `
-//         Determine if the following text is a question or a greeting.
-//         Respond with:
-//         - "question" if the text is a genuine question.
-//         - "greeting" if the text is a casual greeting like "hi", "hello", "who are you".
-//         - "other" if the text is neither a question nor a greeting.
-
-//         Text: "${text}"
-//     `;
-
-//     const aiResponse = await getOpenAIResponse(prompt);
-//     const response = aiResponse.trim().toLowerCase();
-
-//     return response === "question" ? true : response === "greeting" ? false : "other";
-// }
-
-// const generateWelcomeMessage = async () => {
-//     try {
-//         const systemPrompt = `
-//         You are a friendly WhatsApp assistant for Lootah Biofuels. 
-//         Generate a concise and engaging welcome message that:
-//         - Briefly introduces the company.
-//         - Encourages users to ask any questions or select from the available options.
-//         - Avoids unnecessary repetition.
-//         - Uses emojis sparingly and professionally.
-//         - Returns only the message text, without extra formatting.
-//         `;
-
-//         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-//             model: "gpt-4",
-//             messages: [{ role: "system", content: systemPrompt }],
-//             max_tokens: 100,
-//             temperature: 0.7
-//         }, {
-//             headers: {
-//                 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-//                 'Content-Type': 'application/json'
-//             }
-//         });
-
-//         return response.data.choices?.[0]?.message?.content?.trim() || "Welcome to Lootah Biofuels!";
-//     } catch (error) {
-//         console.error('❌ Error generating welcome message:', error.response?.data || error.message);
-//         return "🌟 Welcome to Lootah Biofuels Refining Company! 🌟\n\nYou can ask any question directly, and I will assist you. If you need further help, choose from the options below.";
-//     }
-// };
-
-// const getOpenAIResponse = async (userMessage, context = "") => {
-//     try {
-//         const systemMessage = `
-//             You are a friendly and intelligent WhatsApp assistant for Lootah Biofuels. 
-//             Your goal is to assist users in completing their orders and answering their questions in a professional yet warm tone.
-//             Always respond concisely, use emojis sparingly, and maintain a helpful attitude.
-//             Do not start your responses with greetings like "Hello" or "Hi" unless explicitly asked to.
-//             Your task is to analyze user input and provide responses based on the context provided.
-//         `;
-
-//         const messages = [
-//             { role: "system", content: systemMessage },
-//         ];
-
-//         // Add context if provided
-//         if (context && context.trim() !== "") {
-//             messages.push({ role: "system", content: context });
-//         }
-
-//         // Add the user's message
-//         messages.push({ role: "user", content: userMessage });
-
-//         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-//             model: "gpt-4",
-//             messages,
-//             max_tokens: 90,
-//             temperature: 0.7
-//         }, {
-//             headers: {
-//                 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-//                 'Content-Type': 'application/json'
-//             }
-//         });
-
-//         if (!response.data.choices || !response.data.choices[0] || !response.data.choices[0].message) {
-//             throw new Error("Invalid response structure from OpenAI API");
-//         }
-
-//         const aiResponse = response.data.choices[0].message.content.trim();
-//         console.log(`OpenAI Response: ${aiResponse}`); // Debugging
-//         return aiResponse;
-//     } catch (error) {
-//         console.error('❌ Error with OpenAI:', error.response?.data || error.message);
-//         return "❌ Oops! Something went wrong. Please try again later.";
-//     }
-// };
-
-
-app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
