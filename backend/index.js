@@ -904,18 +904,24 @@ function moveToNextStep(session, from) {  // ✅ Add parameters
 }
 const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
     try {
+        console.log(`🌍 Validating location: ${latitude}, ${longitude} for city ${selectedCity}`);
+        
         const response = await axios.get(
             `https://api.bigdatacloud.net/data/reverse-geocode-client`,
             {
                 params: { latitude, longitude, localityLanguage: 'en' },
-                timeout: 3000
+                timeout: 5000 // Increased timeout
             }
         );
 
-        const actualCity = response.data?.city || response.data?.locality;
-        if (!actualCity) return { isValid: true, actualCity: null };
+        console.log("🌍 API Response:", response.data);
 
-        // Improved normalization
+        const actualCity = response.data?.city || response.data?.locality;
+        if (!actualCity) {
+            console.warn("⚠️ Unable to detect actual city from coordinates.");
+            return { isValid: false, actualCity: "Unknown" };
+        }
+
         const normalize = (str) =>
             str.toLowerCase()
                 .replace(/(city|region|province|emirate)/gi, '')
@@ -925,6 +931,8 @@ const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
         const normalizedSelected = normalize(selectedCity);
         const normalizedActual = normalize(actualCity);
 
+        console.log(`🔍 Normalized City: Selected = ${normalizedSelected}, Actual = ${normalizedActual}`);
+
         return {
             isValid: normalizedActual.includes(normalizedSelected) ||
                 normalizedSelected.includes(normalizedActual),
@@ -933,9 +941,10 @@ const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
 
     } catch (error) {
         console.error("🌐 Geocoding API error:", error.message);
-        return { isValid: true, actualCity: null };
+        return { isValid: false, actualCity: "Unknown" };
     }
 };
+
 async function checkUserRegistration(phoneNumber) {
     try {
         const response = await axios.get('https://dev.lootahbiofuels.com/api/v1/check-user', {
