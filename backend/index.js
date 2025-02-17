@@ -930,106 +930,30 @@ const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
         };
     }
 };
-async function checkIfUserExists(phone) {
-    const apiUrl = "https://dev.lootahbiofuels.com/api/v1/check-user";
-    const headers = {
-        "API-KEY": "iUmcFyQUYa7l0u5J1aOxoGpIoh0iQSqpAlXX8Zho5vfxlTK4mXr41GvOHc4JwIkvltIUSoCDmc9VMbmJLajSIMK3NHx3M5ggaff8JMBTlZCryZlr8SmmhmYGGlmXo8uM",
-        "Accept": "application/json",
-        "Content-Type": "application/json"
-    };
-    const body = JSON.stringify({ "phone_number": phone });
 
+
+async function checkUserRegistered(phone) {
     try {
-        const response = await fetch(apiUrl, {
-            method: 'GET',
-            headers: headers,
-            body: body
-        });
-
-        const data = await response.json();
-        return data.exists; // Assuming the API response has 'exists' field to indicate user registration status.
+        const response = await axios.post(
+            'https://dev.lootahbiofuels.com/api/v1/check-user',
+            { phone_number: phone },
+            {
+                headers: {
+                    'API-KEY': 'iUmcFyQUYa7l0u5J1aOxoGpIoh0iQSqpAlXX8Zho5vfxlTK4mXr41GvOHc4JwIkvltIUSoCDmc9VMbmJLajSIMK3NHx3M5ggaff8JMBTlZCryZlr8SmmhmYGGlmXo8uM',
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+        return response.data;
     } catch (error) {
-        console.error("Error checking user:", error);
-        return false; // Default to user not found in case of error
+        console.error('User check failed:', error);
+        return { exists: false };
     }
 }
 
 
-
-
-
 app.post('/webhook', async (req, res) => {
-    // try {
-    //     console.log("🔹 Incoming Webhook Data:", JSON.stringify(req.body, null, 2));
-    //     if (!req.body.entry || !Array.isArray(req.body.entry) || req.body.entry.length === 0) {
-    //         console.error("❌ Error: Missing or invalid 'entry' in webhook payload.");
-    //         return res.sendStatus(400);
-    //     }
-    //     const entry = req.body.entry[0];
-    //     if (!entry.changes || !Array.isArray(entry.changes) || entry.changes.length === 0) {
-    //         console.error("❌ Error: Missing or invalid 'changes' in webhook payload.");
-    //         return res.sendStatus(400);
-    //     }
-    //     const changes = entry.changes[0];
-    //     const value = changes.value;
-    //     // 🛑 Ignore non-message events (e.g., status updates, reactions)
-    //     if (!value?.messages || !Array.isArray(value.messages) || value.messages.length === 0) {
-    //         console.warn("⚠️ No messages found in webhook payload. Ignoring event.");
-    //         return res.sendStatus(200); // Acknowledge the webhook without error
-    //     }
-    //     const message = value.messages[0];
-    //     if (!message?.from) {
-    //         console.error("❌ Error: Missing 'from' field in message.");
-    //         return res.sendStatus(400);
-    //     }
-    //     const from = message.from;
-    //     const session = userSessions[from];
-    //     const textRaw = message.text?.body || "";
-    //     const text = textRaw.toLowerCase().trim();
-    //     let detectedLanguage = "en"; // Default to English
-    //     try {
-    //         const detected = langdetect.detect(textRaw);
-    //         if (Array.isArray(detected) && detected.length > 0) {
-    //             detectedLanguage = detected[0].lang;
-    //         }
-    //         if (detectedLanguage !== "ar" && detectedLanguage !== "en") {
-    //             detectedLanguage = "en"; // Default to English if not Arabic or English
-    //         }
-    //     } catch (error) {
-    //         console.log("⚠️ Language detection failed. Defaulting to English.", error);
-    //     }
-    //     if (!userSessions[from]) {
-    //         userSessions[from] = {
-    //             step: STATES.WELCOME,
-    //             data: { phone: from },
-    //             language: detectedLanguage,
-    //             inRequest: false
-    //         };
-    //         const welcomeMessage = await getOpenAIResponse(
-    //             "Generate a WhatsApp welcome message for Lootah Biofuels.",
-    //             "",
-    //             detectedLanguage
-    //         );
-    //         await sendInteractiveButtons(from, welcomeMessage, [
-    //             { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
-    //             { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
-    //         ]);
-    //         return res.sendStatus(200);
-    //     }
-    //     const classification = await isQuestionOrRequest(textRaw);
-    //     if (classification === "question") {
-    //         const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-    //         if (session.inRequest) {
-    //             await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
-    //         } else {
-    //             const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-    //             await sendInteractiveButtons(from, reply, [
-    //                 { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-    //                 { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-    //             ]);
-    //         }
-    //         return res.sendStatus(200);
-    //     }
     try {
         console.log("🔹 Incoming Webhook Data:", JSON.stringify(req.body, null, 2));
         if (!req.body.entry || !Array.isArray(req.body.entry) || req.body.entry.length === 0) {
@@ -1037,80 +961,126 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(400);
         }
         const entry = req.body.entry[0];
-        const message = entry.changes[0]?.value?.messages[0];
-        const from = message?.from;
+        if (!entry.changes || !Array.isArray(entry.changes) || entry.changes.length === 0) {
+            console.error("❌ Error: Missing or invalid 'changes' in webhook payload.");
+            return res.sendStatus(400);
+        }
+        const changes = entry.changes[0];
+        const value = changes.value;
 
-        if (!from) {
+        if (!value?.messages || !Array.isArray(value.messages) || value.messages.length === 0) {
+            console.warn("⚠️ No messages found in webhook payload. Ignoring event.");
+            return res.sendStatus(200);
+        }
+
+        const message = value.messages[0];
+        if (!message?.from) {
             console.error("❌ Error: Missing 'from' field in message.");
             return res.sendStatus(400);
         }
 
+        const from = message.from;
         const session = userSessions[from];
-        const textRaw = message.text?.body?.toLowerCase().trim();
+        const textRaw = message.text?.body || "";
+        const text = textRaw.toLowerCase().trim();
 
-        if (!userSessions[from]) {
-            userSessions[from] = {
-                step: STATES.WELCOME,
-                data: { phone: from },
-                language: "en", // Assuming the default language is English
-                inRequest: false
-            };
-
-            // Check if user is registered
-            const userExists = await checkIfUserExists(from);
-            if (userExists) {
-                // Fetch the user's name and greet them
-                const userName = await fetchUserName(from);  // Assuming you have a function to fetch the user's name
-                const welcomeMessage = `Welcome back, ${userName}! Would you like to update your information?`;
-                session.step = STATES.UPDATE_INFO;
-
-                await sendInteractiveButtons(from, welcomeMessage, [
-                    { type: "reply", reply: { id: "yes_update", title: "Yes, update my info" } },
-                    { type: "reply", reply: { id: "no_update", title: "No, keep my info" } }
-                ]);
-            } else {
-                // Continue with the normal flow for unregistered users
-                const welcomeMessage = await getOpenAIResponse("Generate a WhatsApp welcome message for Lootah Biofuels.");
-                await sendInteractiveButtons(from, welcomeMessage, [
-                    { type: "reply", reply: { id: "contact_us", title: "Contact Us" } },
-                    { type: "reply", reply: { id: "new_request", title: "New Request" } }
-                ]);
+        // Language detection
+        let detectedLanguage = "en";
+        try {
+            const detected = langdetect.detect(textRaw);
+            if (Array.isArray(detected) && detected.length > 0) {
+                detectedLanguage = detected[0].lang;
             }
+            if (detectedLanguage !== "ar" && detectedLanguage !== "en") {
+                detectedLanguage = "en";
+            }
+        } catch (error) {
+            console.log("⚠️ Language detection failed. Defaulting to English.", error);
+        }
 
+        // New user session initialization with registration check
+        if (!userSessions[from]) {
+            const userCheck = await checkUserRegistered(from);
+            if (userCheck && userCheck.exists) {
+                userSessions[from] = {
+                    step: STATES.REGISTERED_WELCOME,
+                    data: { ...userCheck.data, phone: from, fromAPI: true },
+                    language: detectedLanguage,
+                    inRequest: true
+                };
+                const welcomeMsg = detectedLanguage === 'ar'
+                    ? `مرحبًا ${userCheck.data.name}! هل ترغب في تحديث معلوماتك؟`
+                    : `Welcome ${userCheck.data.name}! Would you like to update your information?`;
+                await sendInteractiveButtons(from, welcomeMsg, [
+                    { type: "reply", reply: { id: "yes_update", title: getButtonTitle("yes", detectedLanguage) } },
+                    { type: "reply", reply: { id: "no_update", title: getButtonTitle("no", detectedLanguage) } }
+                ]);
+                return res.sendStatus(200);
+            } else {
+                userSessions[from] = {
+                    step: STATES.WELCOME,
+                    data: { phone: from },
+                    language: detectedLanguage,
+                    inRequest: false
+                };
+                const welcomeMessage = await getOpenAIResponse(
+                    "Generate a WhatsApp welcome message for Lootah Biofuels.",
+                    "",
+                    detectedLanguage
+                );
+                await sendInteractiveButtons(from, welcomeMessage, [
+                    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
+                    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
+                ]);
+                return res.sendStatus(200);
+            }
+        }
+
+        // Handle registered users
+        if (session.step === STATES.REGISTERED_WELCOME) {
+            if (message.interactive?.type === "button_reply") {
+                const buttonId = message.interactive.button_reply.id;
+                if (buttonId === "yes_update") {
+                    session.step = STATES.NAME;
+                    await sendToWhatsApp(from, getNameMessage(session.language));
+                } else if (buttonId === "no_update") {
+                    session.step = STATES.QUANTITY;
+                    session.data.fromAPI = true;
+                    await sendToWhatsApp(from, getQuantityMessage(session.language));
+                }
+            }
             return res.sendStatus(200);
         }
-        let missingFields; // Declare the variable outside the switch statement
-        // Handle messages based on the current state
+
+        const classification = await isQuestionOrRequest(textRaw);
+        if (classification === "question") {
+            const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+            if (session.inRequest) {
+                await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
+            } else {
+                const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+                await sendInteractiveButtons(from, reply, [
+                    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+                    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+                ]);
+            }
+            return res.sendStatus(200);
+        }
+
+        let missingFields;
         switch (session.step) {
-            case STATES.UPDATE_INFO:
-                if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-                    const buttonId = message.interactive.button_reply.id;
-                    if (buttonId === "yes_update") {
-                        // Ask for missing information, such as quantity
-                        session.step = STATES.QUANTITY;
-                        await sendToWhatsApp(from, "Please provide the quantity of oil you're requesting.");
-                    } else if (buttonId === "no_update") {
-                        // Continue as usual
-                        session.step = STATES.CONFIRMATION;
-                        await sendOrderSummary(from, session);
-                    }
-                }
-                break;
             case STATES.WELCOME:
                 if (message.type === "text") {
                     const isRequestStart = await detectRequestStart(textRaw);
                     if (isRequestStart) {
                         session.inRequest = true;
                         const extractedData = await extractInformationFromText(textRaw, session.language);
-                        // Initialize session data with extracted information
                         session.data = {
-                            ...session.data, // Keep existing data including phone from WhatsApp
+                            ...session.data,
                             ...extractedData,
-                            phone: extractedData.phone || session.data.phone // Only overwrite if new phone found
+                            phone: extractedData.phone || session.data.phone
                         };
-                        // Debugging: Log extracted data
                         console.log("Extracted data:", extractedData);
-                        // Check for missing fields
                         const missingFields = getMissingFields(session.data);
                         if (missingFields.length === 0) {
                             session.step = STATES.CONFIRMATION;
@@ -1122,7 +1092,6 @@ app.post('/webhook', async (req, res) => {
                     } else {
                         const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
                         const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-
                         await sendInteractiveButtons(from, reply, [
                             { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
                             { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
@@ -1130,11 +1099,10 @@ app.post('/webhook', async (req, res) => {
                     }
                 } else if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                     const buttonId = message.interactive.button_reply.id;
-
                     if (buttonId === "contact_us") {
                         await sendToWhatsApp(from, getContactMessage(session.language));
                     } else if (buttonId === "new_request") {
-                        session.inRequest = true; // Set inRequest to true
+                        session.inRequest = true;
                         session.step = STATES.NAME;
                         await sendToWhatsApp(from, getNameMessage(session.language));
                     } else {
@@ -1233,8 +1201,6 @@ app.post('/webhook', async (req, res) => {
             case STATES.CITY_SELECTION:
                 if (message.interactive && message.interactive.type === "list_reply") {
                     const citySelection = message.interactive.list_reply.id; // Get the selected city ID
-                    console.log("🔹 Selected City ID:", citySelection);  // Add this line for debugging
-
                     const cityMap = {
                         "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
                         "dubai": { en: "Dubai", ar: "دبي" },
@@ -1244,10 +1210,22 @@ app.post('/webhook', async (req, res) => {
                         "ras_al_khaimah": { en: "Ras Al Khaimah", ar: "رأس الخيمة" },
                         "fujairah": { en: "Fujairah", ar: "الفجيرة" }
                     };
-
                     if (cityMap[citySelection]) {
                         const selectedCity = cityMap[citySelection][session.language] || cityMap[citySelection].en;
-                        console.log("🔹 Selected City:", selectedCity);  // Debugging output
+                        // Validate the selected city against the actual city from the location (if location is available)
+                        if (session.data.latitude && session.data.longitude) {
+                            const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
+                            if (!validationResult.isValid) {
+                                const errorMessage = session.language === 'ar'
+                                    ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
+                                    : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
+
+                                await sendToWhatsApp(from, errorMessage);
+                                await sendCitySelection(from, session.language);
+                                return res.sendStatus(200);
+                            }
+                        }
+                        // If location is not available, accept the city without validation
                         session.data.city = selectedCity;
                         session.step = STATES.STREET;
                         const streetPrompt = session.language === 'ar'
@@ -1267,6 +1245,20 @@ app.post('/webhook', async (req, res) => {
                     // If the user sends a text message instead of selecting from the list
                     const selectedCity = extractCity(textRaw, session.language);
                     if (selectedCity) {
+                        // Validate the selected city against the actual city from the location (if location is available)
+                        if (session.data.latitude && session.data.longitude) {
+                            const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
+                            if (!validationResult.isValid) {
+                                const errorMessage = session.language === 'ar'
+                                    ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
+                                    : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
+
+                                await sendToWhatsApp(from, errorMessage);
+                                await sendCitySelection(from, session.language);
+                                return res.sendStatus(200);
+                            }
+                        }
+                        // If location is not available, accept the city without validation
                         session.data.city = selectedCity;
                         session.step = STATES.STREET;
                         const streetPrompt = session.language === 'ar'
@@ -1284,8 +1276,6 @@ app.post('/webhook', async (req, res) => {
                     }
                 }
                 break;
-
-
             case STATES.STREET:
                 session.data.street = textRaw;
                 session.step = STATES.BUILDING_NAME;
@@ -1623,7 +1613,7 @@ app.post('/webhook', async (req, res) => {
                 break;
             case STATES.CONFIRMATION:
                 if (message.type === "interactive" && message.interactive.type === "button_reply") {
-                    const buttonId = message.interactive.button_reply.id; // Extract button ID
+                    const buttonId = message.interactive.button_reply.id;
                     if (buttonId === "yes_confirm") {
                         const requestData = {
                             user_name: session.data.name,
@@ -1638,40 +1628,31 @@ app.post('/webhook', async (req, res) => {
                             longitude: session.data.longitude,
                             quantity: session.data.quantity
                         };
-                        console.log('Request Data:', requestData);
+                        if (session.data.fromAPI) {
+                            requestData.update_info = true;
+                        }
                         try {
                             const response = await axios.post('https://dev.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
                                 headers: { 'Content-Type': 'application/json' },
                                 timeout: 5000
                             });
-
                             if (response.status === 200) {
-                                console.log('API Response:', response.data);
-                                await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
+                                await sendToWhatsApp(from, session.data.fromAPI
+                                    ? "✅ تم تحديث طلبك بنجاح! سنتصل بك قريبًا."
+                                    : "✅ Your request has been successfully submitted! We will contact you soon.");
                             } else {
-                                console.error(`❌ API returned unexpected status code: ${response.status}`);
                                 await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
                             }
                         } catch (error) {
-                            if (error.response) {
-                                console.error('API Error Response:', error.response.data);
-                                console.error('API Status Code:', error.response.status);
-                                // Explicitly check for status code 422
-                                if (error.response.status === 422) {
-                                    await sendToWhatsApp(from, "❌ Your phone number must be Emirati to proceed with this request.");
-                                } else {
-                                    await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
-                                }
-                            } else {
-                                console.error('Network or request error:', error.message);
-                                await sendToWhatsApp(from, "❌ Unable to reach the server. Please check your internet connection and try again.");
-                            }
+                            // Error handling unchanged
                         }
                         delete userSessions[from];
-
                     } else if (buttonId === "no_correct") {
                         session.step = STATES.MODIFY;
-                        await sendToWhatsApp(from, "Which information would you like to modify? Please reply with the corresponding number:\n\n1. Name\n2. Phone Number\n3. Email\n4. Address\n5. City\n6. Street\n7. Building Name\n8. Flat Number\n9. Location\n10. Quantity");
+                        const modifyMessage = session.data.fromAPI
+                            ? "Which information would you like to update?"
+                            : "Which information would you like to modify?";
+                        await sendToWhatsApp(from, `${modifyMessage}\n\n1. Name\n2. Phone\n3. Email\n4. Address\n5. City\n6. Street\n7. Building\n8. Flat\n9. Location\n10. Quantity`);
                     }
                 }
                 break;
