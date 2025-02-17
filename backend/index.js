@@ -930,7 +930,112 @@ const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
         };
     }
 };
+const checkUserRegistration = async (phoneNumber) => {
+    try {
+        const response = await axios.post(
+            'https://api.lootahbiofuels.com/api/v1/check-user',
+            {
+                phone_number: phoneNumber // Send the phone number to check
+            },
+            {
+                headers: {
+                    'API-KEY': 'iUmcFyQUYa7l0u5J1aOxoGpIoh0iQSqpAlXX8Zho5vfxlTK4mXr41GvOHc4JwIkvltIUSoCDmc9VMbmJLajSIMK3NHx3M5ggaff8JMBTlZCryZlr8SmmhmYGGlmXo8uM',
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+
+        // If the user is registered, return their details
+        if (response.data && response.data.status === "success") {
+            return {
+                isRegistered: true,
+                userData: response.data.user // Assuming the API returns user data
+            };
+        } else {
+            return {
+                isRegistered: false
+            };
+        }
+    } catch (error) {
+        console.error("❌ Error checking user registration:", error.response?.data || error.message);
+        return {
+            isRegistered: false
+        };
+    }
+};
 app.post('/webhook', async (req, res) => {
+    // try {
+    //     console.log("🔹 Incoming Webhook Data:", JSON.stringify(req.body, null, 2));
+
+    //     if (!req.body.entry || !Array.isArray(req.body.entry) || req.body.entry.length === 0) {
+    //         console.error("❌ Error: Missing or invalid 'entry' in webhook payload.");
+    //         return res.sendStatus(400);
+    //     }
+
+    //     const entry = req.body.entry[0];
+
+    //     if (!entry.changes || !Array.isArray(entry.changes) || entry.changes.length === 0) {
+    //         console.error("❌ Error: Missing or invalid 'changes' in webhook payload.");
+    //         return res.sendStatus(400);
+    //     }
+
+    //     const changes = entry.changes[0];
+    //     const value = changes.value;
+
+    //     // 🛑 Ignore non-message events (e.g., status updates, reactions)
+    //     if (!value?.messages || !Array.isArray(value.messages) || value.messages.length === 0) {
+    //         console.warn("⚠️ No messages found in webhook payload. Ignoring event.");
+    //         return res.sendStatus(200); // Acknowledge the webhook without error
+    //     }
+
+    //     const message = value.messages[0];
+
+    //     if (!message?.from) {
+    //         console.error("❌ Error: Missing 'from' field in message.");
+    //         return res.sendStatus(400);
+    //     }
+
+    //     const from = message.from;
+    //     const session = userSessions[from];
+
+    //     const textRaw = message.text?.body || "";
+    //     const text = textRaw.toLowerCase().trim();
+
+    //     let detectedLanguage = "en"; // Default to English
+    //     try {
+    //         const detected = langdetect.detect(textRaw);
+    //         if (Array.isArray(detected) && detected.length > 0) {
+    //             detectedLanguage = detected[0].lang;
+    //         }
+    //         if (detectedLanguage !== "ar" && detectedLanguage !== "en") {
+    //             detectedLanguage = "en"; // Default to English if not Arabic or English
+    //         }
+    //     } catch (error) {
+    //         console.log("⚠️ Language detection failed. Defaulting to English.", error);
+    //     }
+
+    //     if (!userSessions[from]) {
+    //         userSessions[from] = {
+    //             step: STATES.WELCOME,
+    //             data: { phone: from },
+    //             language: detectedLanguage,
+    //             inRequest: false
+    //         };
+
+    //         const welcomeMessage = await getOpenAIResponse(
+    //             "Generate a WhatsApp welcome message for Lootah Biofuels.",
+    //             "",
+    //             detectedLanguage
+    //         );
+
+    //         await sendInteractiveButtons(from, welcomeMessage, [
+    //             { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
+    //             { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
+    //         ]);
+
+    //         return res.sendStatus(200);
+    //     }
     try {
         console.log("🔹 Incoming Webhook Data:", JSON.stringify(req.body, null, 2));
 
@@ -962,7 +1067,7 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(400);
         }
 
-        const from = message.from;
+        const from = message.from; // WhatsApp phone number
         const session = userSessions[from];
 
         const textRaw = message.text?.body || "";
@@ -981,24 +1086,41 @@ app.post('/webhook', async (req, res) => {
             console.log("⚠️ Language detection failed. Defaulting to English.", error);
         }
 
+        // Check if the user is new
         if (!userSessions[from]) {
+            // Verify if the user is registered
+            const userCheck = await checkUserRegistration(from);
+
+            if (userCheck.isRegistered) {
+                // User is registered
+                const welcomeMessage = detectedLanguage === 'ar'
+                    ? `مرحباً ${userCheck.userData.name}! 👋 كيف يمكنني مساعدتك اليوم؟`
+                    : `Welcome back, ${userCheck.userData.name}! 👋 How can I assist you today?`;
+
+                await sendInteractiveButtons(from, welcomeMessage, [
+                    { type: "reply", reply: { id: "change_address", title: detectedLanguage === 'ar' ? 'تغيير العنوان' : 'Change Address' } },
+                    { type: "reply", reply: { id: "new_request", title: detectedLanguage === 'ar' ? 'طلب جديد' : 'New Request' } }
+                ]);
+            } else {
+                // User is not registered
+                const welcomeMessage = detectedLanguage === 'ar'
+                    ? 'مرحباً! يبدو أنك غير مسجل. هل ترغب في التسجيل الآن؟'
+                    : 'Hello! It seems you are not registered. Would you like to register now?';
+
+                await sendInteractiveButtons(from, welcomeMessage, [
+                    { type: "reply", reply: { id: "register", title: detectedLanguage === 'ar' ? 'التسجيل' : 'Register' } },
+                    { type: "reply", reply: { id: "contact_us", title: detectedLanguage === 'ar' ? 'اتصل بنا' : 'Contact Us' } }
+                ]);
+            }
+
+            // Initialize session
             userSessions[from] = {
                 step: STATES.WELCOME,
                 data: { phone: from },
                 language: detectedLanguage,
-                inRequest: false
+                inRequest: false,
+                isRegistered: userCheck.isRegistered // Track registration status
             };
-
-            const welcomeMessage = await getOpenAIResponse(
-                "Generate a WhatsApp welcome message for Lootah Biofuels.",
-                "",
-                detectedLanguage
-            );
-
-            await sendInteractiveButtons(from, welcomeMessage, [
-                { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
-                { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
-            ]);
 
             return res.sendStatus(200);
         }
@@ -1022,70 +1144,115 @@ app.post('/webhook', async (req, res) => {
 
         // Handle messages based on the current state
         switch (session.step) {
+            // case STATES.WELCOME:
+            //     if (message.type === "text") {
+            //         const isRequestStart = await detectRequestStart(textRaw);
+            //         if (isRequestStart) {
+            //             session.inRequest = true;
+            //             const extractedData = await extractInformationFromText(textRaw, session.language);
+
+            //             // Initialize session data with extracted information
+            //             session.data = {
+            //                 ...session.data, // Keep existing data including phone from WhatsApp
+            //                 ...extractedData,
+            //                 phone: extractedData.phone || session.data.phone // Only overwrite if new phone found
+            //             };
+
+            //             // Debugging: Log extracted data
+            //             console.log("Extracted data:", extractedData);
+
+            //             // Check for missing fields
+            //             const missingFields = getMissingFields(session.data);
+
+            //             if (missingFields.length === 0) {
+            //                 session.step = STATES.CONFIRMATION;
+            //                 await sendOrderSummary(from, session);
+            //             } else {
+            //                 session.step = `ASK_${missingFields[0].toUpperCase()}`;
+            //                 await askForNextMissingField(session, from);
+            //             }
+            //         } else {
+            //             const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+            //             const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+
+            //             await sendInteractiveButtons(from, reply, [
+            //                 { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+            //                 { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+            //             ]);
+            //         }
+            //     } else if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+            //         const buttonId = message.interactive.button_reply.id;
+
+            //         if (buttonId === "contact_us") {
+            //             await sendToWhatsApp(from, getContactMessage(session.language));
+            //         } else if (buttonId === "new_request") {
+            //             session.inRequest = true; // Set inRequest to true
+            //             session.step = STATES.NAME;
+            //             await sendToWhatsApp(from, getNameMessage(session.language));
+            //         } else {
+            //             await sendToWhatsApp(from, getInvalidOptionMessage(session.language));
+            //         }
+            //     }
+            //     break;
             case STATES.WELCOME:
-                if (message.type === "text") {
-                    const isRequestStart = await detectRequestStart(textRaw);
-                    if (isRequestStart) {
-                        session.inRequest = true;
-                        const extractedData = await extractInformationFromText(textRaw, session.language);
-
-                        // Initialize session data with extracted information
-                        session.data = {
-                            ...session.data, // Keep existing data including phone from WhatsApp
-                            ...extractedData,
-                            phone: extractedData.phone || session.data.phone // Only overwrite if new phone found
-                        };
-
-                        // Debugging: Log extracted data
-                        console.log("Extracted data:", extractedData);
-
-                        // Check for missing fields
-                        const missingFields = getMissingFields(session.data);
-
-                        if (missingFields.length === 0) {
-                            session.step = STATES.CONFIRMATION;
-                            await sendOrderSummary(from, session);
-                        } else {
-                            session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                            await askForNextMissingField(session, from);
-                        }
-                    } else {
-                        const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-                        const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-
-                        await sendInteractiveButtons(from, reply, [
-                            { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-                            { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-                        ]);
-                    }
-                } else if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+                if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                     const buttonId = message.interactive.button_reply.id;
 
-                    if (buttonId === "contact_us") {
-                        await sendToWhatsApp(from, getContactMessage(session.language));
+                    if (buttonId === "change_address") {
+                        session.step = STATES.ADDRESS;
+                        await sendToWhatsApp(from, getAddressMessage(session.language));
                     } else if (buttonId === "new_request") {
-                        session.inRequest = true; // Set inRequest to true
+                        session.inRequest = true;
                         session.step = STATES.NAME;
                         await sendToWhatsApp(from, getNameMessage(session.language));
+                    } else if (buttonId === "register") {
+                        session.step = STATES.NAME;
+                        await sendToWhatsApp(from, getNameMessage(session.language));
+                    } else if (buttonId === "contact_us") {
+                        await sendToWhatsApp(from, getContactMessage(session.language));
                     } else {
                         await sendToWhatsApp(from, getInvalidOptionMessage(session.language));
                     }
                 }
                 break;
 
+            // case STATES.NAME:
+            //     if (!textRaw) {
+            //         await sendToWhatsApp(from, getNameMessage(session.language));
+            //     } else {
+            //         if (textRaw.trim().length > 0) {
+            //             session.data.name = textRaw;
+            //             session.step = STATES.EMAIL;
+            //             await sendToWhatsApp(from, getEmailMessage(session.language));
+            //         } else {
+            //             const errorMsg = session.language === 'ar'
+            //                 ? "❌ يرجى تقديم اسم صحيح"
+            //                 : "❌ Please provide a valid full name";
+            //             await sendToWhatsApp(from, errorMsg);
+            //         }
+            //     }
+            //     break;
             case STATES.NAME:
-                if (!textRaw) {
-                    await sendToWhatsApp(from, getNameMessage(session.language));
+                if (session.isRegistered) {
+                    // Skip name collection for registered users
+                    session.data.name = userCheck.userData.name;
+                    session.step = STATES.EMAIL;
+                    await sendToWhatsApp(from, getEmailMessage(session.language));
                 } else {
-                    if (textRaw.trim().length > 0) {
-                        session.data.name = textRaw;
-                        session.step = STATES.EMAIL;
-                        await sendToWhatsApp(from, getEmailMessage(session.language));
+                    // Collect name for unregistered users
+                    if (!textRaw) {
+                        await sendToWhatsApp(from, getNameMessage(session.language));
                     } else {
-                        const errorMsg = session.language === 'ar'
-                            ? "❌ يرجى تقديم اسم صحيح"
-                            : "❌ Please provide a valid full name";
-                        await sendToWhatsApp(from, errorMsg);
+                        if (textRaw.trim().length > 0) {
+                            session.data.name = textRaw;
+                            session.step = STATES.EMAIL;
+                            await sendToWhatsApp(from, getEmailMessage(session.language));
+                        } else {
+                            const errorMsg = session.language === 'ar'
+                                ? "❌ يرجى تقديم اسم صحيح"
+                                : "❌ Please provide a valid full name";
+                            await sendToWhatsApp(from, errorMsg);
+                        }
                     }
                 }
                 break;
