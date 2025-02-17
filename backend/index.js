@@ -941,7 +941,7 @@ const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
 
     } catch (error) {
         console.error("🌐 Geocoding API error:", error.message);
-        return { isValid: false, actualCity: "Unknown" };
+        return { isValid: true, actualCity: "Unknown" };
     }
 };
 
@@ -1231,6 +1231,8 @@ app.post('/webhook', async (req, res) => {
 
                     console.log("🔹 Selected city:", selectedCity);
                     session.data.city = selectedCity;
+                    userSessions[from] = session;
+
 
                     // Location validation (if location is already provided)
                     if (session.data.latitude && session.data.longitude) {
