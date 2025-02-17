@@ -1234,6 +1234,7 @@ app.post('/webhook', async (req, res) => {
                 if (message.interactive && message.interactive.type === "list_reply") {
                     const citySelection = message.interactive.list_reply.id; // Get the selected city ID
                     console.log("🔹 Selected City ID:", citySelection);  // Add this line for debugging
+
                     const cityMap = {
                         "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
                         "dubai": { en: "Dubai", ar: "دبي" },
@@ -1243,6 +1244,7 @@ app.post('/webhook', async (req, res) => {
                         "ras_al_khaimah": { en: "Ras Al Khaimah", ar: "رأس الخيمة" },
                         "fujairah": { en: "Fujairah", ar: "الفجيرة" }
                     };
+
                     if (cityMap[citySelection]) {
                         const selectedCity = cityMap[citySelection][session.language] || cityMap[citySelection].en;
                         console.log("🔹 Selected City:", selectedCity);  // Debugging output
@@ -1282,6 +1284,7 @@ app.post('/webhook', async (req, res) => {
                     }
                 }
                 break;
+
 
             case STATES.STREET:
                 session.data.street = textRaw;
