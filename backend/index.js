@@ -899,6 +899,14 @@ function moveToNextStep(session, from) {  // ✅ Add parameters
 }
 const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
     try {
+        // If location is not available, return isValid: true
+        if (!latitude || !longitude) {
+            return {
+                isValid: true,
+                actualCity: null
+            };
+        }
+
         // Use a geocoding API to get the city name from the latitude and longitude
         const response = await axios.get(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
         const actualCity = response.data.city;
@@ -1168,23 +1176,25 @@ app.post('/webhook', async (req, res) => {
                         "fujairah": { en: "Fujairah", ar: "الفجيرة" }
                     };
 
-
                     if (cityMap[citySelection]) {
                         const selectedCity = cityMap[citySelection][session.language] || cityMap[citySelection].en;
 
-                        // Validate the selected city against the actual city from the location
-                        const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
+                        // Validate the selected city against the actual city from the location (if location is available)
+                        if (session.data.latitude && session.data.longitude) {
+                            const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
 
-                        if (!validationResult.isValid) {
-                            const errorMessage = session.language === 'ar'
-                                ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
-                                : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
+                            if (!validationResult.isValid) {
+                                const errorMessage = session.language === 'ar'
+                                    ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
+                                    : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
 
-                            await sendToWhatsApp(from, errorMessage);
-                            await sendCitySelection(from, session.language);
-                            return res.sendStatus(200);
+                                await sendToWhatsApp(from, errorMessage);
+                                await sendCitySelection(from, session.language);
+                                return res.sendStatus(200);
+                            }
                         }
 
+                        // If location is not available, accept the city without validation
                         session.data.city = selectedCity;
                         session.step = STATES.STREET;
 
@@ -1205,19 +1215,22 @@ app.post('/webhook', async (req, res) => {
                     // If the user sends a text message instead of selecting from the list
                     const selectedCity = extractCity(textRaw, session.language);
                     if (selectedCity) {
-                        // Validate the selected city against the actual city from the location
-                        const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
+                        // Validate the selected city against the actual city from the location (if location is available)
+                        if (session.data.latitude && session.data.longitude) {
+                            const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
 
-                        if (!validationResult.isValid) {
-                            const errorMessage = session.language === 'ar'
-                                ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
-                                : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
+                            if (!validationResult.isValid) {
+                                const errorMessage = session.language === 'ar'
+                                    ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
+                                    : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
 
-                            await sendToWhatsApp(from, errorMessage);
-                            await sendCitySelection(from, session.language);
-                            return res.sendStatus(200);
+                                await sendToWhatsApp(from, errorMessage);
+                                await sendCitySelection(from, session.language);
+                                return res.sendStatus(200);
+                            }
                         }
 
+                        // If location is not available, accept the city without validation
                         session.data.city = selectedCity;
                         session.step = STATES.STREET;
 
