@@ -1451,7 +1451,7 @@ app.post('/webhook', async (req, res) => {
                 }
 
                 if (session.data.city) {
-                    moveToNextStep();
+                    moveToNextStep(session, from);
                     return res.sendStatus(200);
                 }
 
@@ -1468,7 +1468,18 @@ app.post('/webhook', async (req, res) => {
                     if (cityMap[citySelection]) {
                         session.data.city = cityMap[citySelection][session.language] || cityMap[citySelection].en;
                         console.log("City set to:", session.data.city);
-                        moveToNextStep(session, from);  // ✅ Pass parameters
+
+                        // If the user has already shared a location, validate it
+                        if (session.data.latitude && session.data.longitude) {
+                            const validation = await validateCityAndLocation(session.data.latitude, session.data.longitude, session.data.city);
+
+                            if (!validation.isValid) {
+                                await sendToWhatsApp(from, `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`);
+                                return res.sendStatus(200);
+                            }
+                        }
+
+                        moveToNextStep(session, from);
                     } else {
                         await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
                         await sendCitySelection(from, session.language);
@@ -1482,7 +1493,18 @@ app.post('/webhook', async (req, res) => {
                     if (selectedCity) {
                         session.data.city = selectedCity;
                         console.log("City set to:", selectedCity);
-                        moveToNextStep(session, from);  // ✅ Pass parameters
+
+                        // Validate against detected location
+                        if (session.data.latitude && session.data.longitude) {
+                            const validation = await validateCityAndLocation(session.data.latitude, session.data.longitude, session.data.city);
+
+                            if (!validation.isValid) {
+                                await sendToWhatsApp(from, `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`);
+                                return res.sendStatus(200);
+                            }
+                        }
+
+                        moveToNextStep(session, from);
                     } else {
                         await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
                         await sendCitySelection(from, session.language);
@@ -1494,6 +1516,7 @@ app.post('/webhook', async (req, res) => {
                     await sendCitySelection(from, session.language);
                 }
                 break;
+
 
 
             case "ASK_STREET":
