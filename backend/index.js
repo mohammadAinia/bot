@@ -930,28 +930,7 @@ const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
         };
     }
 };
-const checkUserRegistration = async (phoneNumber) => {
-    try {
-        const response = await axios.get('https://api.lootahbiofuels.com/api/v1/check-user', {
-            headers: {
-                'API-KEY': 'iUmcFyQUYa7l0u5J1aOxoGpIoh0iQSqpAlXX8Zho5vfxlTK4mXr41GvOHc4JwIkvltIUSoCDmc9VMbmJLajSIMK3NHx3M5ggaff8JMBTlZCryZlr8SmmhmYGGlmXo8uM',
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-            data: {
-                phone_number: phoneNumber
-            }
-        });
 
-        if (response.status === 200 && response.data) {
-            return response.data; // Assuming the API returns user data if registered
-        }
-        return null; // User not registered or API error
-    } catch (error) {
-        console.error('Error checking user registration:', error);
-        return null;
-    }
-};
 
 app.post('/webhook', async (req, res) => {
     try {
@@ -1012,29 +991,16 @@ app.post('/webhook', async (req, res) => {
                 inRequest: false
             };
 
-            // Check if the user is registered
-            const userData = await checkUserRegistration(from);
-            if (userData) {
-                // User is registered, welcome them by name
-                const welcomeMessage = `Welcome back, ${userData.name}!`;
-                await sendToWhatsApp(from, welcomeMessage);
+            const welcomeMessage = await getOpenAIResponse(
+                "Generate a WhatsApp welcome message for Lootah Biofuels.",
+                "",
+                detectedLanguage
+            );
 
-                // Proceed with the workflow
-                session.step = STATES.ADDRESS;
-                await sendToWhatsApp(from, "Would you like to change your address?");
-            } else {
-                // User is not registered, continue with the existing workflow
-                const welcomeMessage = await getOpenAIResponse(
-                    "Generate a WhatsApp welcome message for Lootah Biofuels.",
-                    "",
-                    detectedLanguage
-                );
-
-                await sendInteractiveButtons(from, welcomeMessage, [
-                    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
-                    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
-                ]);
-            }
+            await sendInteractiveButtons(from, welcomeMessage, [
+                { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
+                { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
+            ]);
 
             return res.sendStatus(200);
         }
@@ -1199,27 +1165,10 @@ app.post('/webhook', async (req, res) => {
                 }
                 break;
 
-            // case STATES.ADDRESS:
-            //     session.data.address = textRaw;
-            //     session.step = STATES.CITY_SELECTION;
-            //     return await sendCitySelection(from, session.language); // ✅ Ask user to select city
             case STATES.ADDRESS:
-                if (textRaw.toLowerCase().includes("yes")) {
-                    // User wants to change the address, ask for new address information
-                    session.step = STATES.ADDRESS_INPUT;
-                    await sendToWhatsApp(from, "Please provide your new address.");
-                } else {
-                    // User does not want to change the address, proceed to quantity
-                    session.step = STATES.QUANTITY;
-                    await sendToWhatsApp(from, "Please provide the quantity (in liters).");
-                }
-                break;
-
-            case STATES.ADDRESS_INPUT:
                 session.data.address = textRaw;
-                session.step = STATES.QUANTITY;
-                await sendToWhatsApp(from, "Please provide the quantity (in liters).");
-                break;
+                session.step = STATES.CITY_SELECTION;
+                return await sendCitySelection(from, session.language); // ✅ Ask user to select city
             case STATES.CITY_SELECTION:
                 if (message.interactive && message.interactive.type === "list_reply") {
                     const citySelection = message.interactive.list_reply.id; // Get the selected city ID
@@ -1759,65 +1708,6 @@ app.post('/webhook', async (req, res) => {
                     }
                 }
                 break;
-
-            // case STATES.CONFIRMATION:
-            //     if (message.type === "interactive" && message.interactive.type === "button_reply") {
-            //         const buttonId = message.interactive.button_reply.id; // Extract button ID
-
-            //         if (buttonId === "yes_confirm") {
-            //             const requestData = {
-            //                 user_name: session.data.name,
-            //                 email: session.data.email,
-            //                 phone_number: session.data.phone,
-            //                 city: session.data.city,
-            //                 address: session.data.address,
-            //                 street: session.data.street,
-            //                 building_name: session.data.building_name,
-            //                 flat_no: session.data.flat_no,
-            //                 latitude: session.data.latitude,
-            //                 longitude: session.data.longitude,
-            //                 quantity: session.data.quantity
-            //             };
-
-            //             console.log('Request Data:', requestData);
-
-            //             try {
-            //                 const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
-            //                     headers: { 'Content-Type': 'application/json' },
-            //                     timeout: 5000
-            //                 });
-
-            //                 if (response.status === 200) {
-            //                     console.log('API Response:', response.data);
-            //                     await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
-            //                 } else {
-            //                     console.error(`❌ API returned unexpected status code: ${response.status}`);
-            //                     await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
-            //                 }
-            //             } catch (error) {
-            //                 if (error.response) {
-            //                     console.error('API Error Response:', error.response.data);
-            //                     console.error('API Status Code:', error.response.status);
-
-            //                     // Explicitly check for status code 422
-            //                     if (error.response.status === 422) {
-            //                         await sendToWhatsApp(from, "❌ Your phone number must be Emirati to proceed with this request.");
-            //                     } else {
-            //                         await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
-            //                     }
-            //                 } else {
-            //                     console.error('Network or request error:', error.message);
-            //                     await sendToWhatsApp(from, "❌ Unable to reach the server. Please check your internet connection and try again.");
-            //                 }
-            //             }
-            //             delete userSessions[from];
-
-            //         } else if (buttonId === "no_correct") {
-            //             session.step = STATES.MODIFY;
-            //             await sendToWhatsApp(from, "Which information would you like to modify? Please reply with the corresponding number:\n\n1. Name\n2. Phone Number\n3. Email\n4. Address\n5. City\n6. Street\n7. Building Name\n8. Flat Number\n9. Location\n10. Quantity");
-            //         }
-            //     }
-            //     break;
 
             case STATES.MODIFY:
                 // Convert any Arabic digits in the text to English digits
