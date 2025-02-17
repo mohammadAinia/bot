@@ -903,26 +903,26 @@ const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
         if (!latitude || !longitude) {
             return { isValid: true, actualCity: null };
         }
-        
+
         // Get the city name from the geocoding API
         const response = await axios.get(
             `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
         );
         const actualCity = response.data.city;
-        
+
         // If no city is detected, accept the selection
         if (!actualCity) {
             console.warn("No city detected from reverse geocoding.");
             return { isValid: true, actualCity: null };
         }
-        
+
         // Normalize both city names
         const normalizedSelectedCity = selectedCity.toLowerCase().trim();
         const normalizedActualCity = actualCity.toLowerCase().trim();
-        
+
         // Allow a substring match: if one contains the other, it's considered valid.
         const isValid = normalizedActualCity.includes(normalizedSelectedCity) || normalizedSelectedCity.includes(normalizedActualCity);
-        
+
         return {
             isValid,
             actualCity: actualCity
@@ -1527,9 +1527,7 @@ app.post('/webhook', async (req, res) => {
                 }
                 // Handle text input
                 else if (message.type === "text") {
-                    console.log("Checking user response for city:", textRaw);
                     const selectedCity = extractCity(textRaw, session.language);
-
                     if (selectedCity) {
                         session.data.city = selectedCity;
                         console.log("City set to:", selectedCity);
