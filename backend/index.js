@@ -624,20 +624,18 @@ function extractCity(text, language = "en") {
         ar: ["دبي", "أبو ظبي", "الشارقة", "عجمان", "رأس الخيمة", "الفجيرة", "أم القيوين"]
     };
 
-    // Handle both list selections and text input
-    const normalizedText = text.normalize("NFKC").toLowerCase().trim()
-        .replace(/\s+/g, ' '); // Normalize spaces
+    const normalizedText = text.normalize("NFKC").toLowerCase().trim();
+    console.log("Normalized user text:", normalizedText);
 
     for (const city of cities[language]) {
-        // Create match pattern that handles spaces and diacritics
-        const normalizedCity = city.normalize("NFKC").toLowerCase().replace(/\s+/g, '[\\s]*');
-        const pattern = new RegExp(`\\b${normalizedCity}\\b`, 'i');
-
-        if (pattern.test(normalizedText)) {
+        const normalizedCity = city.normalize("NFKC").toLowerCase();
+        console.log("Checking city:", normalizedCity);
+        if (normalizedText.includes(normalizedCity) || normalizedText.includes(normalizedCity.replace(/\s/g, ""))) {
             console.log("Matched city:", city);
             return city;
         }
     }
+    console.log("No city matched.");
     return null;
 }
 
@@ -901,23 +899,35 @@ function moveToNextStep(session, from) {  // ✅ Add parameters
 }
 const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
     try {
-        if (!latitude || !longitude) return { isValid: true, actualCity: null };
+        // If location is not available, accept the city without validation
+        if (!latitude || !longitude) {
+            return {
+                isValid: true,
+                actualCity: null
+            };
+        }
 
+        // Use a geocoding API to get the city name from the latitude and longitude
         const response = await axios.get(
             `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
         );
+        const actualCity = response.data.city;
 
-        // Broad match for UAE cities
-        const actualCity = response.data.city.toLowerCase();
-        const expectedCity = selectedCity.toLowerCase();
+        // Normalize city names for comparison
+        const normalizedSelectedCity = selectedCity.toLowerCase().trim();
+        const normalizedActualCity = actualCity.toLowerCase().trim();
 
+        // Return both the validation result and the actual city name
         return {
-            isValid: actualCity.includes(expectedCity) || expectedCity.includes(actualCity),
-            actualCity: response.data.city
+            isValid: normalizedSelectedCity === normalizedActualCity,
+            actualCity: actualCity
         };
     } catch (error) {
-        console.error("Geocoding error:", error);
-        return { isValid: true, actualCity: null }; // Fail open
+        console.error("❌ Error validating city and location:", error);
+        return {
+            isValid: true, // Fail open
+            actualCity: null
+        };
     }
 };
 app.post('/webhook', async (req, res) => {
@@ -1461,38 +1471,37 @@ app.post('/webhook', async (req, res) => {
                     return res.sendStatus(200);
                 }
 
-                // Handle button replies
-                if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-                    const citySelection = message.interactive.button_reply.id;
+                const cityMap = {
+                    "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
+                    "dubai": { en: "Dubai", ar: "دبي" },
+                    "sharjah": { en: "Sharjah", ar: "الشارقة" },
+                    "ajman": { en: "Ajman", ar: "عجمان" },
+                    "umm_al_quwain": { en: "Umm Al Quwain", ar: "أم القيوين" },
+                    "ras_al_khaimah": { en: "Ras Al Khaimah", ar: "رأس الخيمة" },
+                    "fujairah": { en: "Fujairah", ar: "الفجيرة" }
+                };
 
-                    // Updated cityMap to include all cities from sendCitySelection
-                    const cityMap = {
-                        "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
-                        "dubai": { en: "Dubai", ar: "دبي" },
-                        "sharjah": { en: "Sharjah", ar: "الشارقة" },
-                        "ajman": { en: "Ajman", ar: "عجمان" },
-                        "umm_al_quwain": { en: "Umm Al Quwain", ar: "أم القيوين" },
-                        "ras_al_khaimah": { en: "Ras Al Khaimah", ar: "رأس الخيمة" },
-                        "fujairah": { en: "Fujairah", ar: "الفجيرة" }
-                    };
+                if (message.interactive && message.interactive.type === "button_reply") {
+                    const citySelection = message.interactive.button_reply.id;
 
                     if (cityMap[citySelection]) {
                         session.data.city = cityMap[citySelection][session.language] || cityMap[citySelection].en;
-                        console.log("City set to:", session.data.city);
 
-                        // If the user has already shared a location, validate it
+                        // Validate location if available
                         if (session.data.latitude && session.data.longitude) {
-                            const validation = await validateCityAndLocation(
+                            const validationResult = await validateCityAndLocation(
                                 session.data.latitude,
                                 session.data.longitude,
                                 session.data.city
                             );
 
-                            if (!validation.isValid) {
-                                await sendToWhatsApp(
-                                    from,
-                                    `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`
-                                );
+                            if (!validationResult.isValid) {
+                                const errorMessage = session.language === 'ar'
+                                    ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${session.data.city}*.`
+                                    : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${session.data.city}*.`;
+
+                                await sendToWhatsApp(from, errorMessage);
+                                await sendCitySelection(from, session.language);
                                 return res.sendStatus(200);
                             }
                         }
@@ -1503,44 +1512,43 @@ app.post('/webhook', async (req, res) => {
                         await sendCitySelection(from, session.language);
                     }
                 }
-                // Handle text input
                 else if (message.type === "text") {
-                    console.log("Checking user response for city:", textRaw);
                     const selectedCity = extractCity(textRaw, session.language);
 
                     if (selectedCity) {
                         session.data.city = selectedCity;
-                        console.log("City set to:", selectedCity);
 
-                        // Validate against detected location
+                        // Validate location if available
                         if (session.data.latitude && session.data.longitude) {
-                            const validation = await validateCityAndLocation(
+                            const validationResult = await validateCityAndLocation(
                                 session.data.latitude,
                                 session.data.longitude,
                                 session.data.city
                             );
 
-                            if (!validation.isValid) {
-                                await sendToWhatsApp(
-                                    from,
-                                    `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`
-                                );
+                            if (!validationResult.isValid) {
+                                const errorMessage = session.language === 'ar'
+                                    ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${session.data.city}*.`
+                                    : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${session.data.city}*.`;
+
+                                await sendToWhatsApp(from, errorMessage);
+                                await sendCitySelection(from, session.language);
                                 return res.sendStatus(200);
                             }
                         }
 
                         moveToNextStep(session, from);
                     } else {
-                        await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
+                        await sendToWhatsApp(from, "❌ Please select a city from the provided options.");
                         await sendCitySelection(from, session.language);
                     }
                 }
-                // Handle invalid input
                 else {
                     await sendToWhatsApp(from, "❌ Invalid input. Please select a city from the options.");
                     await sendCitySelection(from, session.language);
                 }
                 break;
+
 
 
 
