@@ -1233,6 +1233,7 @@ app.post('/webhook', async (req, res) => {
             case STATES.CITY_SELECTION:
                 if (message.interactive && message.interactive.type === "list_reply") {
                     const citySelection = message.interactive.list_reply.id; // Get the selected city ID
+                    console.log("🔹 Selected City ID:", citySelection);  // Add this line for debugging
                     const cityMap = {
                         "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
                         "dubai": { en: "Dubai", ar: "دبي" },
@@ -1244,20 +1245,7 @@ app.post('/webhook', async (req, res) => {
                     };
                     if (cityMap[citySelection]) {
                         const selectedCity = cityMap[citySelection][session.language] || cityMap[citySelection].en;
-                        // Validate the selected city against the actual city from the location (if location is available)
-                        if (session.data.latitude && session.data.longitude) {
-                            const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
-                            if (!validationResult.isValid) {
-                                const errorMessage = session.language === 'ar'
-                                    ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
-                                    : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
-
-                                await sendToWhatsApp(from, errorMessage);
-                                await sendCitySelection(from, session.language);
-                                return res.sendStatus(200);
-                            }
-                        }
-                        // If location is not available, accept the city without validation
+                        console.log("🔹 Selected City:", selectedCity);  // Debugging output
                         session.data.city = selectedCity;
                         session.step = STATES.STREET;
                         const streetPrompt = session.language === 'ar'
@@ -1277,20 +1265,6 @@ app.post('/webhook', async (req, res) => {
                     // If the user sends a text message instead of selecting from the list
                     const selectedCity = extractCity(textRaw, session.language);
                     if (selectedCity) {
-                        // Validate the selected city against the actual city from the location (if location is available)
-                        if (session.data.latitude && session.data.longitude) {
-                            const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
-                            if (!validationResult.isValid) {
-                                const errorMessage = session.language === 'ar'
-                                    ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
-                                    : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
-
-                                await sendToWhatsApp(from, errorMessage);
-                                await sendCitySelection(from, session.language);
-                                return res.sendStatus(200);
-                            }
-                        }
-                        // If location is not available, accept the city without validation
                         session.data.city = selectedCity;
                         session.step = STATES.STREET;
                         const streetPrompt = session.language === 'ar'
@@ -1308,6 +1282,7 @@ app.post('/webhook', async (req, res) => {
                     }
                 }
                 break;
+
             case STATES.STREET:
                 session.data.street = textRaw;
                 session.step = STATES.BUILDING_NAME;
