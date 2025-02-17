@@ -943,13 +943,14 @@ async function checkUserRegistration(phoneNumber) {
             }
         });
 
-        if (response.status === 200 && response.data) {
-            return response.data; // Assuming the API returns user data if registered
+        // Check if the response indicates the user is registered
+        if (response.status === 200 && response.data && response.data.isRegistered) {
+            return response.data; // Return user data if registered
         }
-        return null;
+        return null; // Return null if the user is not registered
     } catch (error) {
         console.error('Error checking user registration:', error);
-        return null;
+        return null; // Return null in case of an error
     }
 }
 
@@ -1011,7 +1012,7 @@ app.post('/webhook', async (req, res) => {
             // Set the session to handle the response
             userSessions[from] = {
                 step: STATES.UPDATE_INFO,
-                data: userData,
+                data: { ...userData, isRegistered: true }, // Mark the user as registered
                 language: detectedLanguage,
                 inRequest: false
             };
@@ -1022,7 +1023,7 @@ app.post('/webhook', async (req, res) => {
         if (!userSessions[from]) {
             userSessions[from] = {
                 step: STATES.WELCOME,
-                data: { phone: from },
+                data: { phone: from, isRegistered: false }, // Mark the user as not registered
                 language: detectedLanguage,
                 inRequest: false
             };
