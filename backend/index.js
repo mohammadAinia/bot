@@ -901,35 +901,43 @@ const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
     try {
         // If location is not available, accept the city without validation
         if (!latitude || !longitude) {
-            return {
-                isValid: true,
-                actualCity: null
-            };
+            return { isValid: true, actualCity: null };
         }
-
-        // Use a geocoding API to get the city name from the latitude and longitude
+        
+        // Get the city name from the geocoding API
         const response = await axios.get(
             `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
         );
         const actualCity = response.data.city;
-
-        // Normalize city names for comparison
+        
+        // If no city is detected, accept the selection
+        if (!actualCity) {
+            console.warn("No city detected from reverse geocoding.");
+            return { isValid: true, actualCity: null };
+        }
+        
+        // Normalize both city names
         const normalizedSelectedCity = selectedCity.toLowerCase().trim();
         const normalizedActualCity = actualCity.toLowerCase().trim();
-
-        // Return both the validation result and the actual city name
+        
+        // Allow a substring match: if one contains the other, it's considered valid.
+        const isValid = normalizedActualCity.includes(normalizedSelectedCity) || normalizedSelectedCity.includes(normalizedActualCity);
+        
         return {
-            isValid: normalizedSelectedCity === normalizedActualCity,
+            isValid,
             actualCity: actualCity
         };
     } catch (error) {
         console.error("❌ Error validating city and location:", error);
+        // Fail open if there's an error
         return {
-            isValid: true, // Fail open
+            isValid: true,
             actualCity: null
         };
     }
 };
+
+
 app.post('/webhook', async (req, res) => {
     try {
         console.log("🔹 Incoming Webhook Data:", JSON.stringify(req.body, null, 2));
@@ -1477,20 +1485,46 @@ app.post('/webhook', async (req, res) => {
 
                 // Handle button replies
                 if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-                    let citySelection = message.interactive.button_reply.id.toLowerCase().replace(/\s/g, "_");
+                    const citySelection = message.interactive.button_reply.id;
 
-                    console.log("Received button ID:", citySelection); // Debugging log
+                    // Updated cityMap to include all cities from sendCitySelection
+                    const cityMap = {
+                        "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
+                        "dubai": { en: "Dubai", ar: "دبي" },
+                        "sharjah": { en: "Sharjah", ar: "الشارقة" },
+                        "ajman": { en: "Ajman", ar: "عجمان" },
+                        "umm_al_quwain": { en: "Umm Al Quwain", ar: "أم القيوين" },
+                        "ras_al_khaimah": { en: "Ras Al Khaimah", ar: "رأس الخيمة" },
+                        "fujairah": { en: "Fujairah", ar: "الفجيرة" }
+                    };
 
                     if (cityMap[citySelection]) {
                         session.data.city = cityMap[citySelection][session.language] || cityMap[citySelection].en;
                         console.log("City set to:", session.data.city);
+
+                        // If the user has already shared a location, validate it
+                        if (session.data.latitude && session.data.longitude) {
+                            const validation = await validateCityAndLocation(
+                                session.data.latitude,
+                                session.data.longitude,
+                                session.data.city
+                            );
+
+                            if (!validation.isValid) {
+                                await sendToWhatsApp(
+                                    from,
+                                    `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`
+                                );
+                                return res.sendStatus(200);
+                            }
+                        }
+
                         moveToNextStep(session, from);
                     } else {
                         await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
                         await sendCitySelection(from, session.language);
                     }
                 }
-
                 // Handle text input
                 else if (message.type === "text") {
                     console.log("Checking user response for city:", textRaw);
