@@ -930,6 +930,29 @@ const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
         };
     }
 };
+async function checkUserRegistration(phoneNumber) {
+    try {
+        const response = await axios.get('https://dev.lootahbiofuels.com/api/v1/check-user', {
+            headers: {
+                'API-KEY': 'iUmcFyQUYa7l0u5J1aOxoGpIoh0iQSqpAlXX8Zho5vfxlTK4mXr41GvOHc4JwIkvltIUSoCDmc9VMbmJLajSIMK3NHx3M5ggaff8JMBTlZCryZlr8SmmhmYGGlmXo8uM',
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            data: {
+                phone_number: phoneNumber
+            }
+        });
+
+        // Check if the response indicates the user is registered
+        if (response.status === 200 && response.data && response.data.isRegistered) {
+            return response.data; // Return user data if registered
+        }
+        return null; // Return null if the user is not registered
+    } catch (error) {
+        console.error('Error checking user registration:', error);
+        return null; // Return null in case of an error
+    }
+}
 
 
 
@@ -940,27 +963,34 @@ app.post('/webhook', async (req, res) => {
             console.error("❌ Error: Missing or invalid 'entry' in webhook payload.");
             return res.sendStatus(400);
         }
+
         const entry = req.body.entry[0];
         if (!entry.changes || !Array.isArray(entry.changes) || entry.changes.length === 0) {
             console.error("❌ Error: Missing or invalid 'changes' in webhook payload.");
             return res.sendStatus(400);
         }
+
         const changes = entry.changes[0];
         const value = changes.value;
-        // 🛑 Ignore non-message events (e.g., status updates, reactions)
+
+        // Ignore non-message events (e.g., status updates, reactions)
         if (!value?.messages || !Array.isArray(value.messages) || value.messages.length === 0) {
             console.warn("⚠️ No messages found in webhook payload. Ignoring event.");
             return res.sendStatus(200); // Acknowledge the webhook without error
         }
+
         const message = value.messages[0];
         if (!message?.from) {
             console.error("❌ Error: Missing 'from' field in message.");
             return res.sendStatus(400);
         }
+
         const from = message.from;
         const session = userSessions[from];
         const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
+
+        // Detect language
         let detectedLanguage = "en"; // Default to English
         try {
             const detected = langdetect.detect(textRaw);
@@ -973,10 +1003,35 @@ app.post('/webhook', async (req, res) => {
         } catch (error) {
             console.log("⚠️ Language detection failed. Defaulting to English.", error);
         }
+
+        // Check if the user is registered
+        const userData = await checkUserRegistration(from);
+        if (userData) {
+            // User is registered, welcome them by name
+            const welcomeMessage = `Welcome back, ${userData.name}! How can we assist you today?`;
+            await sendToWhatsApp(from, welcomeMessage);
+
+            // Ask if they want to change their information
+            await sendInteractiveButtons(from, "Would you like to update your information?", [
+                { type: "reply", reply: { id: "yes_update", title: "Yes" } },
+                { type: "reply", reply: { id: "no_update", title: "No" } }
+            ]);
+
+            // Set the session to handle the response
+            userSessions[from] = {
+                step: STATES.UPDATE_INFO,
+                data: { ...userData, isRegistered: true }, // Mark the user as registered
+                language: detectedLanguage,
+                inRequest: false
+            };
+            return res.sendStatus(200);
+        }
+
+        // If the user is not registered, continue with the existing workflow
         if (!userSessions[from]) {
             userSessions[from] = {
                 step: STATES.WELCOME,
-                data: { phone: from },
+                data: { phone: from, isRegistered: false }, // Mark the user as not registered
                 language: detectedLanguage,
                 inRequest: false
             };
@@ -991,23 +1046,23 @@ app.post('/webhook', async (req, res) => {
             ]);
             return res.sendStatus(200);
         }
-        const classification = await isQuestionOrRequest(textRaw);
-        if (classification === "question") {
-            const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-            if (session.inRequest) {
-                await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
-            } else {
-                const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-                await sendInteractiveButtons(from, reply, [
-                    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-                    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-                ]);
-            }
-            return res.sendStatus(200);
-        }
         let missingFields; // Declare the variable outside the switch statement
         // Handle messages based on the current state
         switch (session.step) {
+            case STATES.UPDATE_INFO:
+                if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+                    const buttonId = message.interactive.button_reply.id;
+                    if (buttonId === "yes_update") {
+                        // User wants to update information, ask for the new information
+                        session.step = STATES.MODIFY;
+                        await sendToWhatsApp(from, "Which information would you like to modify? Please reply with the corresponding number:\n\n1. Name\n2. Phone Number\n3. Email\n4. Address\n5. City\n6. Street\n7. Building Name\n8. Flat Number\n9. Location\n10. Quantity");
+                    } else if (buttonId === "no_update") {
+                        // User does not want to update information, proceed with the request
+                        session.step = STATES.QUANTITY;
+                        await sendToWhatsApp(from, getQuantityMessage(session.language));
+                    }
+                }
+                break;
             case STATES.WELCOME:
                 if (message.type === "text") {
                     const isRequestStart = await detectRequestStart(textRaw);
