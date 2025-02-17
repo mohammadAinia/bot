@@ -1029,12 +1029,15 @@ app.post('/webhook', async (req, res) => {
                         session.inRequest = true;
                         const extractedData = await extractInformationFromText(textRaw, session.language);
 
-                        // Preserve existing phone number unless new one is extracted
+                        // Initialize session data with extracted information
                         session.data = {
                             ...session.data, // Keep existing data including phone from WhatsApp
                             ...extractedData,
                             phone: extractedData.phone || session.data.phone // Only overwrite if new phone found
                         };
+
+                        // Debugging: Log extracted data
+                        console.log("Extracted data:", extractedData);
 
                         // Check for missing fields
                         const missingFields = getMissingFields(session.data);
@@ -1164,93 +1167,93 @@ app.post('/webhook', async (req, res) => {
                 session.data.address = textRaw;
                 session.step = STATES.CITY_SELECTION;
                 return await sendCitySelection(from, session.language); // ✅ Ask user to select city
-            case STATES.CITY_SELECTION:
-                if (message.interactive && message.interactive.type === "list_reply") {
-                    const citySelection = message.interactive.list_reply.id; // Get the selected city ID
-
-                    const cityMap = {
-                        "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
-                        "dubai": { en: "Dubai", ar: "دبي" },
-                        "sharjah": { en: "Sharjah", ar: "الشارقة" },
-                        "ajman": { en: "Ajman", ar: "عجمان" },
-                        "umm_al_quwain": { en: "Umm Al Quwain", ar: "أم القيوين" },
-                        "ras_al_khaimah": { en: "Ras Al Khaimah", ar: "رأس الخيمة" },
-                        "fujairah": { en: "Fujairah", ar: "الفجيرة" }
-                    };
-
-                    if (cityMap[citySelection]) {
-                        const selectedCity = cityMap[citySelection][session.language] || cityMap[citySelection].en;
-
-                        // Validate the selected city against the actual city from the location (if location is available)
-                        if (session.data.latitude && session.data.longitude) {
-                            const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
-
-                            if (!validationResult.isValid) {
-                                const errorMessage = session.language === 'ar'
-                                    ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
-                                    : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
-
-                                await sendToWhatsApp(from, errorMessage);
-                                await sendCitySelection(from, session.language);
-                                return res.sendStatus(200);
+                case STATES.CITY_SELECTION:
+                    if (message.interactive && message.interactive.type === "list_reply") {
+                        const citySelection = message.interactive.list_reply.id; // Get the selected city ID
+                
+                        const cityMap = {
+                            "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
+                            "dubai": { en: "Dubai", ar: "دبي" },
+                            "sharjah": { en: "Sharjah", ar: "الشارقة" },
+                            "ajman": { en: "Ajman", ar: "عجمان" },
+                            "umm_al_quwain": { en: "Umm Al Quwain", ar: "أم القيوين" },
+                            "ras_al_khaimah": { en: "Ras Al Khaimah", ar: "رأس الخيمة" },
+                            "fujairah": { en: "Fujairah", ar: "الفجيرة" }
+                        };
+                
+                        if (cityMap[citySelection]) {
+                            const selectedCity = cityMap[citySelection][session.language] || cityMap[citySelection].en;
+                
+                            // Validate the selected city against the actual city from the location (if location is available)
+                            if (session.data.latitude && session.data.longitude) {
+                                const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
+                
+                                if (!validationResult.isValid) {
+                                    const errorMessage = session.language === 'ar'
+                                        ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
+                                        : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
+                
+                                    await sendToWhatsApp(from, errorMessage);
+                                    await sendCitySelection(from, session.language);
+                                    return res.sendStatus(200);
+                                }
                             }
+                
+                            // If location is not available, accept the city without validation
+                            session.data.city = selectedCity;
+                            session.step = STATES.STREET;
+                
+                            const streetPrompt = session.language === 'ar'
+                                ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
+                                : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
+                
+                            await sendToWhatsApp(from, streetPrompt);
+                        } else {
+                            const invalidSelectionMessage = session.language === 'ar'
+                                ? "❌ اختيار غير صالح. يرجى الاختيار من الخيارات المتاحة."
+                                : "❌ Invalid selection. Please choose from the provided options.";
+                
+                            await sendToWhatsApp(from, invalidSelectionMessage);
+                            await sendCitySelection(from, session.language);
                         }
-
-                        // If location is not available, accept the city without validation
-                        session.data.city = selectedCity;
-                        session.step = STATES.STREET;
-
-                        const streetPrompt = session.language === 'ar'
-                            ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
-                            : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
-
-                        await sendToWhatsApp(from, streetPrompt);
                     } else {
-                        const invalidSelectionMessage = session.language === 'ar'
-                            ? "❌ اختيار غير صالح. يرجى الاختيار من الخيارات المتاحة."
-                            : "❌ Invalid selection. Please choose from the provided options.";
-
-                        await sendToWhatsApp(from, invalidSelectionMessage);
-                        await sendCitySelection(from, session.language);
-                    }
-                } else {
-                    // If the user sends a text message instead of selecting from the list
-                    const selectedCity = extractCity(textRaw, session.language);
-                    if (selectedCity) {
-                        // Validate the selected city against the actual city from the location (if location is available)
-                        if (session.data.latitude && session.data.longitude) {
-                            const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
-
-                            if (!validationResult.isValid) {
-                                const errorMessage = session.language === 'ar'
-                                    ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
-                                    : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
-
-                                await sendToWhatsApp(from, errorMessage);
-                                await sendCitySelection(from, session.language);
-                                return res.sendStatus(200);
+                        // If the user sends a text message instead of selecting from the list
+                        const selectedCity = extractCity(textRaw, session.language);
+                        if (selectedCity) {
+                            // Validate the selected city against the actual city from the location (if location is available)
+                            if (session.data.latitude && session.data.longitude) {
+                                const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
+                
+                                if (!validationResult.isValid) {
+                                    const errorMessage = session.language === 'ar'
+                                        ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
+                                        : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
+                
+                                    await sendToWhatsApp(from, errorMessage);
+                                    await sendCitySelection(from, session.language);
+                                    return res.sendStatus(200);
+                                }
                             }
+                
+                            // If location is not available, accept the city without validation
+                            session.data.city = selectedCity;
+                            session.step = STATES.STREET;
+                
+                            const streetPrompt = session.language === 'ar'
+                                ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
+                                : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
+                
+                            await sendToWhatsApp(from, streetPrompt);
+                        } else {
+                            const selectCityMessage = session.language === 'ar'
+                                ? "❌ يرجى اختيار مدينة من الخيارات المتاحة."
+                                : "❌ Please select a city from the provided options.";
+                
+                            await sendToWhatsApp(from, selectCityMessage);
+                            await sendCitySelection(from, session.language);
                         }
-
-                        // If location is not available, accept the city without validation
-                        session.data.city = selectedCity;
-                        session.step = STATES.STREET;
-
-                        const streetPrompt = session.language === 'ar'
-                            ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
-                            : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
-
-                        await sendToWhatsApp(from, streetPrompt);
-                    } else {
-                        const selectCityMessage = session.language === 'ar'
-                            ? "❌ يرجى اختيار مدينة من الخيارات المتاحة."
-                            : "❌ Please select a city from the provided options.";
-
-                        await sendToWhatsApp(from, selectCityMessage);
-                        await sendCitySelection(from, session.language);
                     }
-                }
-                break;
+                    break;
             //
             case STATES.STREET:
                 session.data.street = textRaw;
