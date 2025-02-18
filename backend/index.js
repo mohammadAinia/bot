@@ -878,20 +878,20 @@ async function checkUserRegistration(phoneNumber) {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             },
-            params: { phone_number: phoneNumber } // Use params instead of data
-
+            params: { phone_number: phoneNumber }
         });
 
-        if (response.data && response.data.exists) {
-            return response.data.user; // Assuming the API returns user data if registered
+        if (response.data?.exists && response.data.user) {
+            return response.data.user; // Return user data if registered
         } else {
-            return null; // User is not registered
+            return null; // Explicitly return null if not registered
         }
     } catch (error) {
         console.error('Error checking user registration:', error);
         return null;
     }
 }
+
 
 app.post('/webhook', async (req, res) => {
     try {
@@ -937,19 +937,18 @@ app.post('/webhook', async (req, res) => {
         if (!userSessions[from]) {
             // Check if the user is registered
             const user = await checkUserRegistration(from);
-            if (user) {
-                // User is registered, welcome them by name
+        
+            if (user && user.name) {
+                // ✅ User is registered
                 const welcomeMessage = `Welcome back, ${user.name}!`;
                 await sendToWhatsApp(from, welcomeMessage);
-
-                // Ask if they want to change their information
+        
                 const changeInfoMessage = "Do you want to change your information?";
                 await sendInteractiveButtons(from, changeInfoMessage, [
                     { type: "reply", reply: { id: "yes_change", title: "Yes" } },
                     { type: "reply", reply: { id: "no_change", title: "No" } }
                 ]);
-
-                // Set session data
+        
                 userSessions[from] = {
                     step: STATES.CHANGE_INFO,
                     data: user,
@@ -957,13 +956,14 @@ app.post('/webhook', async (req, res) => {
                     inRequest: false
                 };
             } else {
-                // User is not registered, proceed with the existing workflow
+                // ❌ User is not registered - Send default welcome message
                 userSessions[from] = {
                     step: STATES.WELCOME,
                     data: { phone: from },
                     language: detectedLanguage,
                     inRequest: false
                 };
+        
                 const welcomeMessage = await getOpenAIResponse(
                     "Generate a WhatsApp welcome message for Lootah Biofuels.",
                     "",
@@ -976,6 +976,7 @@ app.post('/webhook', async (req, res) => {
             }
             return res.sendStatus(200);
         }
+        
         //
         const classification = await isQuestionOrRequest(textRaw);
         if (classification === "question") {
