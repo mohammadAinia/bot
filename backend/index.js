@@ -977,6 +977,7 @@ app.post('/webhook', async (req, res) => {
             }
             return res.sendStatus(200);
         }
+        //
         const classification = await isQuestionOrRequest(textRaw);
         if (classification === "question") {
             const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
