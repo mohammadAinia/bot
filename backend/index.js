@@ -1066,22 +1066,17 @@ session.lastTimestamp = Number(message.timestamp);
                     }
                 }
                 break;
-            case STATES.NAME:
-                if (!textRaw) {
-                    await sendToWhatsApp(from, getNameMessage(session.language));
-                } else {
-                    if (textRaw.trim().length > 0) {
-                        session.data.name = textRaw;
-                        session.step = STATES.EMAIL;
-                        await sendToWhatsApp(from, getEmailMessage(session.language));
-                    } else {
-                        const errorMsg = session.language === 'ar'
-                            ? "❌ يرجى تقديم اسم صحيح"
-                            : "❌ Please provide a valid full name";
-                        await sendToWhatsApp(from, errorMsg);
+                case STATES.NAME:
+                    if (!textRaw || textRaw.trim() === "") {
+                        await sendToWhatsApp(from, "❌ Please provide your name.");
+                        return res.sendStatus(200);
                     }
-                }
-                break;
+                    session.data.name = textRaw;
+                    session.step = STATES.EMAIL;
+                    userSessions[from] = session;  // ✅ Ensure session is updated immediately
+                    await sendToWhatsApp(from, getEmailMessage(session.language));
+                    break;
+                
             case STATES.PHONE_INPUT:
                 if (!isValidPhone(textRaw)) {
                     await sendToWhatsApp(from, getInvalidPhoneMessage(session.language));
