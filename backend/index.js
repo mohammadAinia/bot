@@ -917,15 +917,22 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(400);
         }
         const from = message.from;
-        const session = userSessions[from];
+// Ensure session exists
+if (!userSessions[from]) {
+    userSessions[from] = { lastTimestamp: 0 }; // Initialize if missing
+}
 
-        // Before processing, check if the new message is recent:
-        if (session.lastTimestamp && Number(message.timestamp) <= session.lastTimestamp) {
-            console.log(`Ignoring out-of-order message for user ${from}`);
-            return res.sendStatus(200);
-        }
-        session.lastTimestamp = Number(message.timestamp);
-                const textRaw = message.text?.body || "";
+const session = userSessions[from];
+
+if (session.lastTimestamp && Number(message.timestamp) <= session.lastTimestamp) {
+    console.log(`Ignoring out-of-order message for user ${from}`);
+    return res.sendStatus(200);
+}
+
+session.lastTimestamp = Number(message.timestamp);
+
+        
+        const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
         let detectedLanguage = "en";
 
