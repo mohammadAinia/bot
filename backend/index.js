@@ -370,7 +370,9 @@ const STATES = {
     LONGITUDE: 13,
     QUANTITY: 6,
     CONFIRMATION: 5,
-    MODIFY: "modify"  // New state for modification
+    MODIFY: "modify",  // New state for modification
+    CHANGE_INFO: "change_info",
+    PROCESS_REQUEST_VIA_SENTENCE: "PROCESS_REQUEST_VIA_SENTENCE", // New state
 };
 
 const sendUpdatedSummary = async (to, session) => {
@@ -932,76 +934,6 @@ const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
     }
 };
 
-//with email
-// async function checkUserRegistrationByEmail(email) {
-//     try {
-//         const response = await axios.get('https://dev.lootahbiofuels.com/api/v1/check-user', {
-//             headers: {
-//                 'API-KEY': 'iUmcFyQUYa7l0u5J1aOxoGpIoh0iQSqpAlXX8Zho5vfxlTK4mXr41GvOHc4JwIkvltIUSoCDmc9VMbmJLajSIMK3NHx3M5ggaff8JMBTlZCryZlr8SmmhmYGGlmXo8uM',
-//                 'Accept': 'application/json',
-//                 'Content-Type': 'application/json'
-//             },
-//             params: { email: email } // Inquire via email instead of phone number
-//         });
-
-//         if (response.data?.exists && response.data.user) {
-//             return response.data.user; // Return user data if registered
-//         } else {
-//             return null; // Explicitly return null if not registered
-//         }
-//     } catch (error) {
-//         console.error('Error checking user registration:', error);
-//         return null;
-//     }
-// }
-
-//with 966532218805
-// async function checkUserRegistration(phoneNumber) {
-//     try {
-//         // Remove any non-numeric characters
-//         const cleanedNumber = phoneNumber.replace(/\D/g, '');
-
-//         console.log(`🔹 Checking user registration for phone number: ${cleanedNumber}`);
-
-//         const response = await axios.get('https://dev.lootahbiofuels.com/api/v1/check-user', {
-//             headers: {
-//                 'API-KEY': 'iUmcFyQUYa7l0u5J1aOxoGpIoh0iQSqpAlXX8Zho5vfxlTK4mXr41GvOHc4JwIkvltIUSoCDmc9VMbmJLajSIMK3NHx3M5ggaff8JMBTlZCryZlr8SmmhmYGGlmXo8uM',
-//                 'Accept': 'application/json',
-//                 'Content-Type': 'application/json'
-//             },
-//             params: { phone_number: cleanedNumber }
-//         });
-
-//         console.log('🔹 API Response:', response.data);
-
-//         if (response.data?.exists && response.data.user) {
-//             const user = {
-//                 id: response.data.user.id,
-//                 name: response.data.user.first_name || 'User', // Use first_name or a default value
-//                 email: response.data.user.email,
-//                 phone: response.data.user.phone_number,
-//                 city: response.data.addresses?.city,
-//                 address: response.data.addresses?.address,
-//                 street: response.data.addresses?.street,
-//                 building_name: response.data.addresses?.building_name,
-//                 flat_no: response.data.addresses?.flat_no,
-//                 latitude: response.data.addresses?.latitude,
-//                 longitude: response.data.addresses?.longitude
-//             };
-//             return user;
-//         } else {
-//             return null; // Explicitly return null if not registered
-//         }
-//     } catch (error) {
-//         console.error('❌ Error checking user registration:', error);
-//         if (error.response) {
-//             console.error('❌ API Error Response:', error.response.data);
-//             console.error('❌ API Status Code:', error.response.status);
-//         }
-//         return null;
-//     }
-// }
-
 // with 532218805
 async function checkUserRegistration(phoneNumber) {
     try {
@@ -1144,6 +1076,7 @@ app.post('/webhook', async (req, res) => {
         }
         session.lastTimestamp = Number(message.timestamp);
 
+        // Handle button clicks
         if (message.type === "interactive" && message.interactive?.type === "button_reply") {
             const buttonId = message.interactive.button_reply.id;
             if (buttonId === "new_request") {
@@ -1163,8 +1096,61 @@ app.post('/webhook', async (req, res) => {
                 return res.sendStatus(200);
             }
         }
-        
 
+        // Handle requests initiated via sentences
+        const isRequestStart = await detectRequestStart(textRaw);
+        if (isRequestStart) {
+            session.inRequest = true;
+            session.step = STATES.PROCESS_REQUEST_VIA_SENTENCE;
+            const extractedData = await extractInformationFromText(textRaw, session.language);
+            session.data = {
+                ...session.data,
+                ...extractedData,
+                phone: extractedData.phone || session.data.phone
+            };
+
+            // If the user is registered, ask if they want to change their information
+            if (session.data && session.data.name) {
+                await sendInteractiveButtons(from, "Do you want to change your information?", [
+                    { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                    { type: "reply", reply: { id: "no_change", title: "No" } }
+                ]);
+                session.step = STATES.CHANGE_INFO;
+            } else {
+                // If the user is new, start collecting information immediately
+                const missingFields = getMissingFields(session.data);
+                if (missingFields.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                    await askForNextMissingField(session, from);
+                }
+            }
+            return res.sendStatus(200);
+        }
+
+        // Handle the case where the user provides information in a sentence
+        if (session.inRequest && textRaw) {
+            const extractedData = await extractInformationFromText(textRaw, session.language);
+            session.data = {
+                ...session.data,
+                ...extractedData,
+                phone: extractedData.phone || session.data.phone
+            };
+
+            const missingFields = getMissingFields(session.data);
+            if (missingFields.length === 0) {
+                session.step = STATES.CONFIRMATION;
+                await sendOrderSummary(from, session);
+            } else {
+                session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                await askForNextMissingField(session, from);
+            }
+            return res.sendStatus(200);
+        }
+
+        // Handle questions
         const classification = await isQuestionOrRequest(textRaw);
         if (classification === "question") {
             const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
@@ -1181,6 +1167,20 @@ app.post('/webhook', async (req, res) => {
         }
 
         switch (session.step) {
+            case STATES.PROCESS_REQUEST_VIA_SENTENCE:
+                // If the user is registered, ask if they want to change their information
+                if (session.data && session.data.name) {
+                    await sendInteractiveButtons(from, "Do you want to change your information?", [
+                        { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                        { type: "reply", reply: { id: "no_change", title: "No" } }
+                    ]);
+                    session.step = STATES.CHANGE_INFO;
+                } else {
+                    // If the user is new, start collecting information immediately
+                    session.step = STATES.NAME;
+                    await sendToWhatsApp(from, "Please provide your name.");
+                }
+                break;
             case STATES.CHANGE_INFO:
                 if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                     const buttonId = message.interactive.button_reply.id;
