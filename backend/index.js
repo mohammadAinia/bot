@@ -1429,32 +1429,35 @@ app.post('/webhook', async (req, res) => {
                     await askForNextMissingField(session, from);
                 }
                 break;
-            case STATES.QUANTITY:
-                console.log("🔹 Entered QUANTITY state for user:", from);
-                console.log("🔹 textRaw:", textRaw);
-                if (!textRaw || textRaw.trim() === "") {
-                    console.log("🔹 No quantity provided. Asking for quantity.");
-                    await sendToWhatsApp(from, getQuantityMessage(session.language));
-                    return res.sendStatus(200);
-                }
-                if (isNaN(textRaw)) {
-                    console.log("🔹 Invalid quantity provided. Asking for valid quantity.");
-                    await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
-                    return res.sendStatus(200);
-                }
-                console.log("🔹 Valid quantity provided:", textRaw);
-                session.data.quantity = textRaw;
-                // Reuse the `missingFields` variable declared outside the switch statement
-                missingFields = getMissingFields(session.data);
-                console.log("🔹 Missing fields after quantity:", missingFields);
-                if (missingFields.length === 0) {
-                    session.step = STATES.CONFIRMATION;
-                    await sendOrderSummary(from, session);
-                } else {
-                    session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                    await askForNextMissingField(session, from);
-                }
-                break;
+                case STATES.QUANTITY:
+                    console.log("🔹 Entered QUANTITY state for user:", from);
+                    console.log("🔹 textRaw:", textRaw);
+                    if (!textRaw || textRaw.trim() === "") {
+                        console.log("🔹 No quantity provided. Asking for quantity.");
+                        await sendToWhatsApp(from, getQuantityMessage(session.language));
+                        return res.sendStatus(200);
+                    }
+                    if (isNaN(textRaw)) {
+                        console.log("🔹 Invalid quantity provided. Asking for valid quantity.");
+                        await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
+                        return res.sendStatus(200);
+                    }
+                    console.log("🔹 Valid quantity provided:", textRaw);
+                    session.data.quantity = textRaw;
+                
+                    // Initialize missingFields after setting the quantity
+                    const missingFields = getMissingFields(session.data);
+                    console.log("🔹 Missing fields after quantity:", missingFields);
+                
+                    if (missingFields.length === 0) {
+                        session.step = STATES.CONFIRMATION;
+                        await sendOrderSummary(from, session);
+                    } else {
+                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                        await askForNextMissingField(session, from);
+                    }
+                    break;
+                
             case "ASK_NAME":
                 // If the user hasn't provided a name yet, ask for it
                 if (!textRaw) {
