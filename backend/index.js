@@ -918,7 +918,14 @@ app.post('/webhook', async (req, res) => {
         }
         const from = message.from;
         const session = userSessions[from];
-        const textRaw = message.text?.body || "";
+
+        // Before processing, check if the new message is recent:
+        if (session.lastTimestamp && Number(message.timestamp) <= session.lastTimestamp) {
+            console.log(`Ignoring out-of-order message for user ${from}`);
+            return res.sendStatus(200);
+        }
+        session.lastTimestamp = Number(message.timestamp);
+                const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
         let detectedLanguage = "en";
 
@@ -1142,7 +1149,13 @@ app.post('/webhook', async (req, res) => {
             case STATES.ADDRESS:
                 session.data.address = textRaw;
                 session.step = STATES.CITY_SELECTION;
-                return await sendCitySelection(from, session.language); // ✅ Ask user to select city
+                userSessions[from] = session;
+                console.log(`Session updated for ${from}:`, session);
+                return await sendCitySelection(from, session.language);
+                
+                
+
+
                 case STATES.CITY_SELECTION:
                     console.log(`City selection triggered for user ${from}. Message type: ${message.type}, content:`, textRaw);
                     if (message.type === "text") {
