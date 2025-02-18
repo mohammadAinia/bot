@@ -1161,34 +1161,41 @@ session.lastTimestamp = Number(message.timestamp);
                 
                 case STATES.CITY_SELECTION:
                     console.log(`City selection triggered for user ${from}. Message type: ${message.type}, content:`, textRaw);
-                    if (message.type === "text") {
-                        const selectedCity = textRaw.trim();
-                        console.log(`User provided city: ${selectedCity}`);
-                        if (selectedCity) {
-                            session.data.city = selectedCity;
-                            session.step = STATES.STREET; // Transition to the next step
-                            userSessions[from] = session; // Ensure session is updated
-                            console.log(`Session updated for ${from}:`, session);
+                    // if (message.type === "text") {
+                    //     const selectedCity = textRaw.trim();
+                    //     console.log(`User provided city: ${selectedCity}`);
+                    //     if (selectedCity) {
+                    //         session.data.city = selectedCity;
+                    //         session.step = STATES.STREET; // Transition to the next step
+                    //         userSessions[from] = session; // Ensure session is updated
+                    //         console.log(`Session updated for ${from}:`, session);
                 
-                            const streetPrompt = session.language === 'ar'
-                                ? `✅ لقد أدخلت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
-                                : `✅ You entered *${session.data.city}*.\n\n🏠 Please provide the street name.`;
-                            await sendToWhatsApp(from, streetPrompt);
-                        } else {
-                            const errorMessage = session.language === 'ar'
-                                ? "❌ يرجى إدخال اسم مدينة صحيح."
-                                : "❌ Please enter a valid city name.";
-                            await sendToWhatsApp(from, errorMessage);
-                            await sendCitySelection(from, session.language); // Ask again
-                        }
-                    } else {
-                        const errorMessage = session.language === 'ar'
-                            ? "❌ يرجى إدخال اسم المدينة كنص."
-                            : "❌ Please enter the city name as text.";
-                        await sendToWhatsApp(from, errorMessage);
-                        await sendCitySelection(from, session.language); // Ask again
-                    }
-                    break;
+                    //         const streetPrompt = session.language === 'ar'
+                    //             ? `✅ لقد أدخلت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
+                    //             : `✅ You entered *${session.data.city}*.\n\n🏠 Please provide the street name.`;
+                    //         await sendToWhatsApp(from, streetPrompt);
+                    //     } else {
+                    //         const errorMessage = session.language === 'ar'
+                    //             ? "❌ يرجى إدخال اسم مدينة صحيح."
+                    //             : "❌ Please enter a valid city name.";
+                    //         await sendToWhatsApp(from, errorMessage);
+                    //         await sendCitySelection(from, session.language); // Ask again
+                    //     }
+                    // } else {
+                    //     const errorMessage = session.language === 'ar'
+                    //         ? "❌ يرجى إدخال اسم المدينة كنص."
+                    //         : "❌ Please enter the city name as text.";
+                    //     await sendToWhatsApp(from, errorMessage);
+                    //     await sendCitySelection(from, session.language); // Ask again
+                    // }
+                    // break;
+                    session.data.city = textRaw;
+                    session.step = STATES.STREET; // Ensure transition to city selection
+                    userSessions[from] = session;
+                    
+                    await sendToWhatsApp(from, "🌍 Please select your street.");
+                    
+                    break; // <--- This prevents unintended fall-through
                 
                   
                     case STATES.STREET:
