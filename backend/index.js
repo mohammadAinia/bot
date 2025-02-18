@@ -1176,32 +1176,22 @@ if (isRequestStart) {
                     await sendToWhatsApp(from, "Please provide your name.");
                 }
                 break;
-            // case STATES.CHANGE_INFO:
-            //     if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-            //         const buttonId = message.interactive.button_reply.id;
-            //         if (buttonId === "yes_change") {
-            //             session.step = STATES.NAME;
-            //             await sendToWhatsApp(from, "Please provide your new name.");
-            //         } else if (buttonId === "no_change") {
-            //             session.step = STATES.QUANTITY;
-            //             await sendToWhatsApp(from, "Please provide the quantity (in liters).");
-            //         }
-            //     }
-            //     break;
-            case STATES.CHANGE_INFO:
-    if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-        const buttonId = message.interactive.button_reply.id;
-        if (buttonId === "yes_change") {
-            // User wants to change information, start collecting updated details
-            session.step = STATES.NAME;
-            await sendToWhatsApp(from, "Please provide your new name.");
-        } else if (buttonId === "no_change") {
-            // User does not want to change information, proceed to ask for quantity
-            session.step = STATES.QUANTITY;
-            await sendToWhatsApp(from, "Please provide the quantity (in liters).");
-        }
-    }
-    break;
+
+                case STATES.CHANGE_INFO:
+                    if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+                        const buttonId = message.interactive.button_reply.id;
+                        if (buttonId === "yes_change") {
+                            // User wants to change information, start collecting updated details
+                            session.step = STATES.NAME;
+                            await sendToWhatsApp(from, "Please provide your new name.");
+                        } else if (buttonId === "no_change") {
+                            // User does not want to change information, set a flag to skip missing fields
+                            session.skipMissingFields = true; // Add this flag
+                            session.step = STATES.QUANTITY;
+                            await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+                        }
+                    }
+                    break;
             case STATES.WELCOME:
                 if (message.type === "text") {
                     const isRequestStart = await detectRequestStart(textRaw);
@@ -1730,30 +1720,37 @@ if (isRequestStart) {
                     await askForNextMissingField(session, from);
                 }
                 break;
-            case "ASK_QUANTITY":
-                // If the user hasn't provided a quantity yet, ask for it
-                if (!textRaw) {
-                    await sendToWhatsApp(from, "🔢 Please provide the quantity (in liters).");
-                    return res.sendStatus(200); // Exit and wait for the user's response
-                }
-                // Validate the quantity after the user provides it
-                if (isNaN(textRaw) || textRaw.trim() === "") {
-                    await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
-                    return res.sendStatus(200); // Exit and wait for the user to correct their input
-                }
-                // If the quantity is valid, store it and proceed to the next step
-                session.data.quantity = textRaw;
-
-                // Check for other missing fields
-                const missingFieldsQuantity = getMissingFields(session.data);
-                if (missingFieldsQuantity.length === 0) {
-                    session.step = STATES.CONFIRMATION;
-                    await sendOrderSummary(from, session);
-                } else {
-                    session.step = `ASK_${missingFieldsQuantity[0].toUpperCase()}`;
-                    await askForNextMissingField(session, from);
-                }
-                break;
+                case "ASK_QUANTITY":
+                    // If the user hasn't provided a quantity yet, ask for it
+                    if (!textRaw) {
+                        await sendToWhatsApp(from, "🔢 Please provide the quantity (in liters).");
+                        return res.sendStatus(200); // Exit and wait for the user's response
+                    }
+                    // Validate the quantity after the user provides it
+                    if (isNaN(textRaw) || textRaw.trim() === "") {
+                        await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
+                        return res.sendStatus(200); // Exit and wait for the user to correct their input
+                    }
+                    // If the quantity is valid, store it
+                    session.data.quantity = textRaw;
+                
+                    // Check if we should skip missing fields (user chose not to change information)
+                    if (session.skipMissingFields) {
+                        // Skip all other fields and send the order summary
+                        session.step = STATES.CONFIRMATION;
+                        await sendOrderSummary(from, session);
+                    } else {
+                        // Proceed to check for other missing fields
+                        const missingFields = getMissingFields(session.data);
+                        if (missingFields.length === 0) {
+                            session.step = STATES.CONFIRMATION;
+                            await sendOrderSummary(from, session);
+                        } else {
+                            session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                            await askForNextMissingField(session, from);
+                        }
+                    }
+                    break;
             case STATES.CONFIRMATION:
                 if (message.type === "interactive" && message.interactive.type === "button_reply") {
                     const buttonId = message.interactive.button_reply.id; // Extract button ID
@@ -1968,7 +1965,18 @@ if (isRequestStart) {
 
 
 
-
+            // case STATES.CHANGE_INFO:
+            //     if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+            //         const buttonId = message.interactive.button_reply.id;
+            //         if (buttonId === "yes_change") {
+            //             session.step = STATES.NAME;
+            //             await sendToWhatsApp(from, "Please provide your new name.");
+            //         } else if (buttonId === "no_change") {
+            //             session.step = STATES.QUANTITY;
+            //             await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+            //         }
+            //     }
+            //     break;
 
 
 
