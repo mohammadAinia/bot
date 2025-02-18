@@ -1103,9 +1103,18 @@ if (!session) {
     // NEW SESSION: Check if the user is registered
     const user = await checkUserRegistration(from);
     if (user && user.name) {
-        // ✅ User is registered: send welcome back message and options
-        const welcomeMessage = `Welcome back, ${user.name}!`;
-        await sendToWhatsApp(from, welcomeMessage);
+
+            // ✅ User is registered: Generate a personalized welcome message
+    let welcomeMessage = await getOpenAIResponse(
+        `Welcome back, ${user.name}. Generate a WhatsApp welcome message for Lootah Biofuels.`,
+        "",
+        detectedLanguage
+    );
+        
+            await sendInteractiveButtons(from, welcomeMessage, [
+                { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
+                { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
+            ]);
 
         const changeInfoMessage = "Do you want to change your information?";
         await sendInteractiveButtons(from, changeInfoMessage, [
