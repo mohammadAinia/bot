@@ -1097,70 +1097,57 @@ app.post('/webhook', async (req, res) => {
             console.log("⚠️ Language detection failed. Defaulting to English.", error);
         }
 
-        // Check if session exists; if not, it’s a new conversation.
         let session = userSessions[from];
-if (!session) {
-    // NEW SESSION: Check if the user is registered
-    const user = await checkUserRegistration(from);
-    if (user && user.name) {
+        if (!session) {
+            const user = await checkUserRegistration(from);
+            if (user && user.name) {
+                let welcomeMessage = await getOpenAIResponse(
+                    `Welcome back, ${user.name}. Generate a WhatsApp welcome message for Lootah Biofuels.`,
+                    "",
+                    detectedLanguage
+                );
+                await sendInteractiveButtons(from, welcomeMessage, [
+                    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
+                    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
+                ]);
+                await sendInteractiveButtons(from, "Do you want to change your information?", [
+                    { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                    { type: "reply", reply: { id: "no_change", title: "No" } }
+                ]);
+                userSessions[from] = {
+                    step: STATES.CHANGE_INFO,
+                    data: user,
+                    language: detectedLanguage,
+                    inRequest: false,
+                    lastTimestamp: Number(message.timestamp)
+                };
+            } else {
+                userSessions[from] = {
+                    step: STATES.WELCOME,
+                    data: { phone: from },
+                    language: detectedLanguage,
+                    inRequest: false,
+                    lastTimestamp: Number(message.timestamp)
+                };
+                const welcomeMessage = await getOpenAIResponse(
+                    "Generate a WhatsApp welcome message for Lootah Biofuels.",
+                    "",
+                    detectedLanguage
+                );
+                await sendInteractiveButtons(from, welcomeMessage, [
+                    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
+                    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
+                ]);
+            }
+            return res.sendStatus(200);
+        }
 
-            // ✅ User is registered: Generate a personalized welcome message
-    let welcomeMessage = await getOpenAIResponse(
-        `Welcome back, ${user.name}. Generate a WhatsApp welcome message for Lootah Biofuels.`,
-        "",
-        detectedLanguage
-    );
-        
-            await sendInteractiveButtons(from, welcomeMessage, [
-                { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
-                { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
-            ]);
+        if (session.lastTimestamp && Number(message.timestamp) < session.lastTimestamp) {
+            console.log(`Ignoring out-of-order message for user ${from}`);
+            return res.sendStatus(200);
+        }
+        session.lastTimestamp = Number(message.timestamp);
 
-        const changeInfoMessage = "Do you want to change your information?";
-        await sendInteractiveButtons(from, changeInfoMessage, [
-            { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-            { type: "reply", reply: { id: "no_change", title: "No" } }
-        ]);
-
-        // Initialize session with registration data
-        userSessions[from] = {
-            step: STATES.CHANGE_INFO,
-            data: user,
-            language: detectedLanguage,
-            inRequest: false,
-            lastTimestamp: Number(message.timestamp)
-        };
-    } else {
-        // ❌ User is not registered: send default welcome message
-        userSessions[from] = {
-            step: STATES.WELCOME,
-            data: { phone: from },
-            language: detectedLanguage,
-            inRequest: false,
-            lastTimestamp: Number(message.timestamp)
-        };
-
-        const welcomeMessage = await getOpenAIResponse(
-            "Generate a WhatsApp welcome message for Lootah Biofuels.",
-            "",
-            detectedLanguage
-        );
-        await sendInteractiveButtons(from, welcomeMessage, [
-            { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
-            { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
-        ]);
-    }
-    return res.sendStatus(200);
-}
-
-// For existing sessions, perform the out-of-order check.
-if (session.lastTimestamp && Number(message.timestamp) < session.lastTimestamp) {
-    console.log(`Ignoring out-of-order message for user ${from}`);
-    return res.sendStatus(200);
-}
-// Update the timestamp
-session.lastTimestamp = Number(message.timestamp);
-        //
         const classification = await isQuestionOrRequest(textRaw);
         if (classification === "question") {
             const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
@@ -1175,18 +1162,15 @@ session.lastTimestamp = Number(message.timestamp);
             }
             return res.sendStatus(200);
         }
-        let missingFields; // Declare the variable outside the switch statement
-        // Handle messages based on the current state
+
         switch (session.step) {
             case STATES.CHANGE_INFO:
                 if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                     const buttonId = message.interactive.button_reply.id;
                     if (buttonId === "yes_change") {
-                        // User wants to change information, proceed to ask for new information
                         session.step = STATES.NAME;
                         await sendToWhatsApp(from, "Please provide your new name.");
                     } else if (buttonId === "no_change") {
-                        // User does not want to change information, proceed to request quantity
                         session.step = STATES.QUANTITY;
                         await sendToWhatsApp(from, "Please provide the quantity (in liters).");
                     }
