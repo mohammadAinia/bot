@@ -1098,37 +1098,32 @@ app.post('/webhook', async (req, res) => {
         }
 
         // Handle requests initiated via sentences
-        const isRequestStart = await detectRequestStart(textRaw);
-        if (isRequestStart) {
-            session.inRequest = true;
-            session.step = STATES.PROCESS_REQUEST_VIA_SENTENCE;
-            const extractedData = await extractInformationFromText(textRaw, session.language);
-            session.data = {
-                ...session.data,
-                ...extractedData,
-                phone: extractedData.phone || session.data.phone
-            };
+// Handle requests initiated via sentences
+const isRequestStart = await detectRequestStart(textRaw);
+if (isRequestStart) {
+    session.inRequest = true;
+    session.step = STATES.PROCESS_REQUEST_VIA_SENTENCE;
 
-            // If the user is registered, ask if they want to change their information
-            if (session.data && session.data.name) {
-                await sendInteractiveButtons(from, "Do you want to change your information?", [
-                    { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                    { type: "reply", reply: { id: "no_change", title: "No" } }
-                ]);
-                session.step = STATES.CHANGE_INFO;
-            } else {
-                // If the user is new, start collecting information immediately
-                const missingFields = getMissingFields(session.data);
-                if (missingFields.length === 0) {
-                    session.step = STATES.CONFIRMATION;
-                    await sendOrderSummary(from, session);
-                } else {
-                    session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                    await askForNextMissingField(session, from);
-                }
-            }
-            return res.sendStatus(200);
+    // If the user is registered, ask if they want to change their information
+    if (session.data && session.data.name) {
+        await sendInteractiveButtons(from, "Do you want to change your information?", [
+            { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+            { type: "reply", reply: { id: "no_change", title: "No" } }
+        ]);
+        session.step = STATES.CHANGE_INFO; // Move to the CHANGE_INFO state
+    } else {
+        // If the user is new, start collecting information immediately
+        const missingFields = getMissingFields(session.data);
+        if (missingFields.length === 0) {
+            session.step = STATES.CONFIRMATION;
+            await sendOrderSummary(from, session);
+        } else {
+            session.step = `ASK_${missingFields[0].toUpperCase()}`;
+            await askForNextMissingField(session, from);
         }
+    }
+    return res.sendStatus(200);
+}
 
         // Handle the case where the user provides information in a sentence
         if (session.inRequest && textRaw) {
@@ -1181,18 +1176,32 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(from, "Please provide your name.");
                 }
                 break;
+            // case STATES.CHANGE_INFO:
+            //     if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+            //         const buttonId = message.interactive.button_reply.id;
+            //         if (buttonId === "yes_change") {
+            //             session.step = STATES.NAME;
+            //             await sendToWhatsApp(from, "Please provide your new name.");
+            //         } else if (buttonId === "no_change") {
+            //             session.step = STATES.QUANTITY;
+            //             await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+            //         }
+            //     }
+            //     break;
             case STATES.CHANGE_INFO:
-                if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-                    const buttonId = message.interactive.button_reply.id;
-                    if (buttonId === "yes_change") {
-                        session.step = STATES.NAME;
-                        await sendToWhatsApp(from, "Please provide your new name.");
-                    } else if (buttonId === "no_change") {
-                        session.step = STATES.QUANTITY;
-                        await sendToWhatsApp(from, "Please provide the quantity (in liters).");
-                    }
-                }
-                break;
+    if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+        const buttonId = message.interactive.button_reply.id;
+        if (buttonId === "yes_change") {
+            // User wants to change information, start collecting updated details
+            session.step = STATES.NAME;
+            await sendToWhatsApp(from, "Please provide your new name.");
+        } else if (buttonId === "no_change") {
+            // User does not want to change information, proceed to ask for quantity
+            session.step = STATES.QUANTITY;
+            await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+        }
+    }
+    break;
             case STATES.WELCOME:
                 if (message.type === "text") {
                     const isRequestStart = await detectRequestStart(textRaw);
