@@ -1185,20 +1185,6 @@ if (isRequestStart) {
                     }
                 } //
                 break;
-                case STATES.CHANGE_INFO:
-                    if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-                        const buttonId = message.interactive.button_reply.id;
-                        if (buttonId === "yes_change") {
-                            session.step = STATES.NAME;
-                            await sendToWhatsApp(from, "Please provide your new name.");
-                        } else if (buttonId === "no_change") {
-                            // Set flag to skip missing fields
-                            // session.skipMissingFields = true; // <-- Add this line
-                            session.step = STATES.QUANTITY;
-                            await sendToWhatsApp(from, "Please provide the quantity (in liters).");
-                        }
-                    }
-                    break;
 
                 case STATES.CHANGE_INFO:
                     if (message.type === "interactive" && message.interactive?.type === "button_reply") {
@@ -3089,34 +3075,34 @@ app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PO
 //                     await askForNextMissingField(session, from);
 //                 }
 //                 break;
-//                 case STATES.QUANTITY:
-//                     console.log("🔹 Entered QUANTITY state for user:", from);
-//                     console.log("🔹 textRaw:", textRaw);
-//                     if (!textRaw || textRaw.trim() === "") {
-//                         console.log("🔹 No quantity provided. Asking for quantity.");
-//                         await sendToWhatsApp(from, getQuantityMessage(session.language));
-//                         return res.sendStatus(200);
-//                     }
-//                     if (isNaN(textRaw)) {
-//                         console.log("🔹 Invalid quantity provided. Asking for valid quantity.");
-//                         await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
-//                         return res.sendStatus(200);
-//                     }
-//                     console.log("🔹 Valid quantity provided:", textRaw);
-//                     session.data.quantity = textRaw;
+                // case STATES.QUANTITY:
+                //     console.log("🔹 Entered QUANTITY state for user:", from);
+                //     console.log("🔹 textRaw:", textRaw);
+                //     if (!textRaw || textRaw.trim() === "") {
+                //         console.log("🔹 No quantity provided. Asking for quantity.");
+                //         await sendToWhatsApp(from, getQuantityMessage(session.language));
+                //         return res.sendStatus(200);
+                //     }
+                //     if (isNaN(textRaw)) {
+                //         console.log("🔹 Invalid quantity provided. Asking for valid quantity.");
+                //         await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
+                //         return res.sendStatus(200);
+                //     }
+                //     console.log("🔹 Valid quantity provided:", textRaw);
+                //     session.data.quantity = textRaw;
                 
-//                     // Initialize missingFields after setting the quantity
-//                     const missingFields = getMissingFields(session.data);
-//                     console.log("🔹 Missing fields after quantity:", missingFields);
+                //     // Initialize missingFields after setting the quantity
+                //     const missingFields = getMissingFields(session.data);
+                //     console.log("🔹 Missing fields after quantity:", missingFields);
                 
-//                     if (missingFields.length === 0) {
-//                         session.step = STATES.CONFIRMATION;
-//                         await sendOrderSummary(from, session);
-//                     } else {
-//                         session.step = `ASK_${missingFields[0].toUpperCase()}`;
-//                         await askForNextMissingField(session, from);
-//                     }
-//                     break;
+                //     if (missingFields.length === 0) {
+                //         session.step = STATES.CONFIRMATION;
+                //         await sendOrderSummary(from, session);
+                //     } else {
+                //         session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                //         await askForNextMissingField(session, from);
+                //     }
+                //     break;
                 
 //             case "ASK_NAME":
 //                 // If the user hasn't provided a name yet, ask for it
