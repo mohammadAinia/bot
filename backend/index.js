@@ -1104,26 +1104,14 @@ if (!session) {
     const user = await checkUserRegistration(from);
     if (user && user.name) {
         // ✅ User is registered: send welcome back message and options
-// Check if user is registered
-const user = await checkUserRegistration(from);
+        const welcomeMessage = `Welcome back, ${user.name}!`;
+        await sendToWhatsApp(from, welcomeMessage);
 
-let welcomeMessage = "Welcome to Lootah Biofuels!"; // Default welcome message
-
-if (user && user.first_name) {
-    // If the user is registered, personalize the welcome message with their first name
-    welcomeMessage = `Welcome back, ${user.first_name}!`;
-}
-
-await sendInteractiveButtons(from, welcomeMessage, [
-    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
-    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
-]);
-
-        // const changeInfoMessage = "Do you want to change your information?";
-        // await sendInteractiveButtons(from, changeInfoMessage, [
-        //     { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-        //     { type: "reply", reply: { id: "no_change", title: "No" } }
-        // ]);
+        const changeInfoMessage = "Do you want to change your information?";
+        await sendInteractiveButtons(from, changeInfoMessage, [
+            { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+            { type: "reply", reply: { id: "no_change", title: "No" } }
+        ]);
 
         // Initialize session with registration data
         userSessions[from] = {
@@ -1195,60 +1183,52 @@ session.lastTimestamp = Number(message.timestamp);
                     }
                 }
                 break;
-                case STATES.WELCOME:
-                    if (message.type === "text") {
-                        const isRequestStart = await detectRequestStart(textRaw);
-                        if (isRequestStart) {
-                            session.inRequest = true;
-                            const extractedData = await extractInformationFromText(textRaw, session.language);
-                            // Initialize session data with extracted information
-                            session.data = {
-                                ...session.data, // Keep existing data including phone from WhatsApp
-                                ...extractedData,
-                                phone: extractedData.phone || session.data.phone // Only overwrite if new phone found
-                            };
-                            // Debugging: Log extracted data
-                            console.log("Extracted data:", extractedData);
-                            // Check for missing fields
-                            const missingFields = getMissingFields(session.data);
-                            if (missingFields.length === 0) {
-                                session.step = STATES.CONFIRMATION;
-                                await sendOrderSummary(from, session);
-                            } else {
-                                session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                                await askForNextMissingField(session, from);
-                            }
+            case STATES.WELCOME:
+                if (message.type === "text") {
+                    const isRequestStart = await detectRequestStart(textRaw);
+                    if (isRequestStart) {
+                        session.inRequest = true;
+                        const extractedData = await extractInformationFromText(textRaw, session.language);
+                        // Initialize session data with extracted information
+                        session.data = {
+                            ...session.data, // Keep existing data including phone from WhatsApp
+                            ...extractedData,
+                            phone: extractedData.phone || session.data.phone // Only overwrite if new phone found
+                        };
+                        // Debugging: Log extracted data
+                        console.log("Extracted data:", extractedData);
+                        // Check for missing fields
+                        const missingFields = getMissingFields(session.data);
+                        if (missingFields.length === 0) {
+                            session.step = STATES.CONFIRMATION;
+                            await sendOrderSummary(from, session);
                         } else {
-                            const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-                            const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-                
-                            await sendInteractiveButtons(from, reply, [
-                                { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-                                { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-                            ]);
+                            session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                            await askForNextMissingField(session, from);
                         }
-                    } else if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-                        const buttonId = message.interactive.button_reply.id;
-                
-                        if (buttonId === "contact_us") {
-                            await sendToWhatsApp(from, getContactMessage(session.language));
-                        } else if (buttonId === "new_request") {
-                            session.inRequest = true; // Set inRequest to true
-                            session.step = STATES.NAME;
-                            await sendToWhatsApp(from, getNameMessage(session.language));
-                
-                            // Ask if the user wants to change their information
-                            const changeInfoMessage = "Do you want to change your information?";
-                            await sendInteractiveButtons(from, changeInfoMessage, [
-                                { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                                { type: "reply", reply: { id: "no_change", title: "No" } }
-                            ]);
-                        } else {
-                            await sendToWhatsApp(from, getInvalidOptionMessage(session.language));
-                        }
+                    } else {
+                        const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+                        const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+
+                        await sendInteractiveButtons(from, reply, [
+                            { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+                            { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+                        ]);
                     }
-                    break;
-                
+                } else if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+                    const buttonId = message.interactive.button_reply.id;
+
+                    if (buttonId === "contact_us") {
+                        await sendToWhatsApp(from, getContactMessage(session.language));
+                    } else if (buttonId === "new_request") {
+                        session.inRequest = true; // Set inRequest to true
+                        session.step = STATES.NAME;
+                        await sendToWhatsApp(from, getNameMessage(session.language));
+                    } else {
+                        await sendToWhatsApp(from, getInvalidOptionMessage(session.language));
+                    }
+                }
+                break;
             case STATES.NAME:
                 if (!textRaw) {
                     await sendToWhatsApp(from, getNameMessage(session.language));
