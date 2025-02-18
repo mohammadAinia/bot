@@ -931,17 +931,66 @@ const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
         };
     }
 };
+//with 532218805
+// async function checkUserRegistration(phoneNumber) {
+//     try {
+//         // Remove any non-numeric characters
+//         let cleanedNumber = phoneNumber.replace(/\D/g, '');
+
+//         // Remove country code if it's Saudi (+966 or 966) or UAE (+971 or 971)
+//         if (cleanedNumber.startsWith('966')) {
+//             cleanedNumber = cleanedNumber.slice(3); // Remove Saudi country code
+//         } else if (cleanedNumber.startsWith('971')) {
+//             cleanedNumber = cleanedNumber.slice(3); // Remove UAE country code
+//         }
+
+//         const response = await axios.get('https://dev.lootahbiofuels.com/api/v1/check-user', {
+//             headers: {
+//                 'API-KEY': 'iUmcFyQUYa7l0u5J1aOxoGpIoh0iQSqpAlXX8Zho5vfxlTK4mXr41GvOHc4JwIkvltIUSoCDmc9VMbmJLajSIMK3NHx3M5ggaff8JMBTlZCryZlr8SmmhmYGGlmXo8uM',
+//                 'Accept': 'application/json',
+//                 'Content-Type': 'application/json'
+//             },
+//             params: { phone_number: cleanedNumber }
+//         });
+
+//         if (response.data?.exists && response.data.user) {
+//             return response.data.user; // Return user data if registered
+//         } else {
+//             return null; // Explicitly return null if not registered
+//         }
+//     } catch (error) {
+//         console.error('Error checking user registration:', error);
+//         return null;
+//     }
+// }
+//with email
+// async function checkUserRegistrationByEmail(email) {
+//     try {
+//         const response = await axios.get('https://dev.lootahbiofuels.com/api/v1/check-user', {
+//             headers: {
+//                 'API-KEY': 'iUmcFyQUYa7l0u5J1aOxoGpIoh0iQSqpAlXX8Zho5vfxlTK4mXr41GvOHc4JwIkvltIUSoCDmc9VMbmJLajSIMK3NHx3M5ggaff8JMBTlZCryZlr8SmmhmYGGlmXo8uM',
+//                 'Accept': 'application/json',
+//                 'Content-Type': 'application/json'
+//             },
+//             params: { email: email } // Inquire via email instead of phone number
+//         });
+
+//         if (response.data?.exists && response.data.user) {
+//             return response.data.user; // Return user data if registered
+//         } else {
+//             return null; // Explicitly return null if not registered
+//         }
+//     } catch (error) {
+//         console.error('Error checking user registration:', error);
+//         return null;
+//     }
+// }
+
+//with 966532218805
 async function checkUserRegistration(phoneNumber) {
     try {
         // Remove any non-numeric characters
-        let cleanedNumber = phoneNumber.replace(/\D/g, '');
-
-        // Remove country code if it's Saudi (+966 or 966) or UAE (+971 or 971)
-        if (cleanedNumber.startsWith('966')) {
-            cleanedNumber = cleanedNumber.slice(3); // Remove Saudi country code
-        } else if (cleanedNumber.startsWith('971')) {
-            cleanedNumber = cleanedNumber.slice(3); // Remove UAE country code
-        }
+        const cleanedNumber = phoneNumber.replace(/\D/g, '');
 
         const response = await axios.get('https://dev.lootahbiofuels.com/api/v1/check-user', {
             headers: {
@@ -949,7 +998,7 @@ async function checkUserRegistration(phoneNumber) {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             },
-            params: { email: "Mmyyttt@gmail.com" }
+            params: { phone_number: cleanedNumber }
         });
 
         if (response.data?.exists && response.data.user) {
@@ -962,6 +1011,8 @@ async function checkUserRegistration(phoneNumber) {
         return null;
     }
 }
+
+
 
 app.post('/webhook', async (req, res) => {
     try {
