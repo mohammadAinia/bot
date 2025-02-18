@@ -917,21 +917,6 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(400);
         }
         const from = message.from;
-// Ensure session exists
-if (!userSessions[from]) {
-    userSessions[from] = { lastTimestamp: 0 }; // Initialize if missing
-}
-
-const session = userSessions[from];
-
-if (session.lastTimestamp && Number(message.timestamp) <= session.lastTimestamp) {
-    console.log(`Ignoring out-of-order message for user ${from}`);
-    return res.sendStatus(200);
-}
-
-session.lastTimestamp = Number(message.timestamp);
-
-        
         const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
         let detectedLanguage = "en";
@@ -948,36 +933,40 @@ session.lastTimestamp = Number(message.timestamp);
             console.log("⚠️ Language detection failed. Defaulting to English.", error);
         }
 
-        if (!userSessions[from]) {
-            // Check if the user is registered
+        // Check if session exists; if not, it’s a new conversation.
+        let session = userSessions[from];
+        if (!session) {
+            // NEW SESSION: Check if the user is registered
             const user = await checkUserRegistration(from);
-        
             if (user && user.name) {
-                // ✅ User is registered
+                // ✅ User is registered: send welcome back message and options
                 const welcomeMessage = `Welcome back, ${user.name}!`;
                 await sendToWhatsApp(from, welcomeMessage);
-        
+
                 const changeInfoMessage = "Do you want to change your information?";
                 await sendInteractiveButtons(from, changeInfoMessage, [
                     { type: "reply", reply: { id: "yes_change", title: "Yes" } },
                     { type: "reply", reply: { id: "no_change", title: "No" } }
                 ]);
-        
+
+                // Initialize session with registration data
                 userSessions[from] = {
                     step: STATES.CHANGE_INFO,
                     data: user,
                     language: detectedLanguage,
-                    inRequest: false
+                    inRequest: false,
+                    lastTimestamp: Number(message.timestamp)
                 };
             } else {
-                // ❌ User is not registered - Send default welcome message
+                // ❌ User is not registered: send default welcome message
                 userSessions[from] = {
                     step: STATES.WELCOME,
                     data: { phone: from },
                     language: detectedLanguage,
-                    inRequest: false
+                    inRequest: false,
+                    lastTimestamp: Number(message.timestamp)
                 };
-        
+
                 const welcomeMessage = await getOpenAIResponse(
                     "Generate a WhatsApp welcome message for Lootah Biofuels.",
                     "",
@@ -990,6 +979,14 @@ session.lastTimestamp = Number(message.timestamp);
             }
             return res.sendStatus(200);
         }
+
+        // For existing sessions, perform the out-of-order check.
+        if (session.lastTimestamp && Number(message.timestamp) <= session.lastTimestamp) {
+            console.log(`Ignoring out-of-order message for user ${from}`);
+            return res.sendStatus(200);
+        }
+        // Update timestamp
+        session.lastTimestamp = Number(message.timestamp);
         
         //
         const classification = await isQuestionOrRequest(textRaw);
