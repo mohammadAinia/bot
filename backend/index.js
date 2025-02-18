@@ -1151,6 +1151,8 @@ app.post('/webhook', async (req, res) => {
                             // Accept the city without any validation
                             session.data.city = selectedCity;
                             session.step = STATES.STREET;
+                            userSessions[from] = session; // Ensure session is stored!
+
                 
                             const streetPrompt = session.language === 'ar'
                                 ? `✅ لقد أدخلت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
@@ -1176,11 +1178,12 @@ app.post('/webhook', async (req, res) => {
                         await sendCitySelection(from, session.language); // Ask for city again
                     }
                     break;
-            case STATES.STREET:
-                session.data.street = textRaw;
-                session.step = STATES.BUILDING_NAME;
-                await sendToWhatsApp(from, getBuildingMessage(session.language)); // Ask for building name
-                break;
+                    case STATES.STREET:
+                        session.data.street = textRaw.trim();
+                        session.step = STATES.BUILDING;
+                        await sendToWhatsApp(from, "🏢 Please provide the building name.");
+                        break;
+                    
             case STATES.BUILDING_NAME:
                 if (!textRaw || textRaw.trim() === "") {
                     // If no building name is provided, ask for it again
