@@ -650,32 +650,22 @@ function extractCity(text, language = "en") {
 
 
 
-function getMissingFields(sessionData) {
-    // Define fields in the desired sequence
+function getMissingFields(session) {
+    // If skipMissingFields is enabled, only check quantity
+    if (session.skipMissingFields) {
+        return session.data.quantity ? [] : ['quantity'];
+    }
+
     const orderedFields = [
-        'name',
-        'phone',
-        'email',
-        'latitude',
-        'longitude',
-        'address',
-        'city',
-        'street',
-        'building_name',
-        'flat_no',
-        'quantity'
+        'name', 'phone', 'email', 'latitude', 'longitude',
+        'address', 'city', 'street', 'building_name', 'flat_no', 'quantity'
     ];
 
     const missingFields = [];
-
-    // Check fields in specified order
     orderedFields.forEach(field => {
-        const value = sessionData[field];
-        if (value === null ||
-            value === undefined ||
-            (typeof value === "string" &&
-                (value.trim() === "" || value.trim().toLowerCase() === "null"))
-        ) {
+        const value = session.data[field];
+        if (value === null || value === undefined || 
+            (typeof value === "string" && (value.trim() === "" || value.trim().toLowerCase() === "null"))) {
             missingFields.push(field);
         }
     });
@@ -685,7 +675,6 @@ function getMissingFields(sessionData) {
         missingFields.push('location');
     }
 
-    // Remove technical fields and preserve order
     return missingFields
         .filter(field => !['latitude', 'longitude'].includes(field))
         .sort((a, b) => orderedFields.indexOf(a) - orderedFields.indexOf(b));
@@ -1193,6 +1182,8 @@ if (isRequestStart) {
                             session.step = STATES.NAME;
                             await sendToWhatsApp(from, "Please provide your new name.");
                         } else if (buttonId === "no_change") {
+                            // Set flag to skip other fields
+                            session.skipMissingFields = true; // <-- Uncommented
                             session.step = STATES.QUANTITY;
                             await sendToWhatsApp(from, "Please provide the quantity (in liters).");
                         }
