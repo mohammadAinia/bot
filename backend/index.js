@@ -1147,14 +1147,23 @@ app.post('/webhook', async (req, res) => {
         if (message.type === "interactive" && message.interactive?.type === "button_reply") {
             const buttonId = message.interactive.button_reply.id;
             if (buttonId === "new_request") {
-                await sendInteractiveButtons(from, "Do you want to change your information?", [
-                    { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                    { type: "reply", reply: { id: "no_change", title: "No" } }
-                ]);
-                session.step = STATES.CHANGE_INFO;
+                if (!session.data || !session.data.name) {  // Check if the user doesn't have any data
+                    // Start collecting information immediately if the user is new and doesn't have data
+                    session.inRequest = true;
+                    session.step = STATES.NAME;
+                    await sendToWhatsApp(from, "Please provide your name.");
+                } else {
+                    // Proceed to ask if the user wants to change information if they already have data
+                    await sendInteractiveButtons(from, "Do you want to change your information?", [
+                        { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                        { type: "reply", reply: { id: "no_change", title: "No" } }
+                    ]);
+                    session.step = STATES.CHANGE_INFO;
+                }
                 return res.sendStatus(200);
             }
         }
+        
 
         const classification = await isQuestionOrRequest(textRaw);
         if (classification === "question") {
