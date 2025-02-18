@@ -1150,9 +1150,14 @@ session.lastTimestamp = Number(message.timestamp);
                     }
                 }
                 break;
-            case STATES.ADDRESS:
-                session.data.address = textRaw;
-
+                case STATES.ADDRESS:
+                    session.data.address = textRaw;
+                    session.step = STATES.CITY_SELECTION; // Ensure transition to city selection
+                    userSessions[from] = session;
+                    
+                    await sendToWhatsApp(from, "🌍 Please select your city.");
+                    
+                    break; // <--- This prevents unintended fall-through
                 
                 case STATES.CITY_SELECTION:
                     console.log(`City selection triggered for user ${from}. Message type: ${message.type}, content:`, textRaw);
@@ -1184,6 +1189,7 @@ session.lastTimestamp = Number(message.timestamp);
                         await sendCitySelection(from, session.language); // Ask again
                     }
                     break;
+                
                   
                     case STATES.STREET:
                         console.log(`Street step triggered for user ${from}. Message type: ${message.type}, content:`, textRaw);
