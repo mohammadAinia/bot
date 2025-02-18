@@ -1183,7 +1183,7 @@ if (isRequestStart) {
                         session.step = `ASK_${missingFields[0].toUpperCase()}`;
                         await askForNextMissingField(session, from);
                     }
-                }
+                } //
                 break;
                 case STATES.CHANGE_INFO:
                     if (message.type === "interactive" && message.interactive?.type === "button_reply") {
