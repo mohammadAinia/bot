@@ -1144,40 +1144,34 @@ app.post('/webhook', async (req, res) => {
                 session.step = STATES.CITY_SELECTION;
                 return await sendCitySelection(from, session.language); // ✅ Ask user to select city
                 case STATES.CITY_SELECTION:
-                    // If the user sends a text message, treat it as the city name
+                    console.log(`City selection triggered for user ${from}. Message type: ${message.type}, content:`, textRaw);
                     if (message.type === "text") {
-                        const selectedCity = textRaw.trim(); // Directly use the user's input as the city name
+                        const selectedCity = textRaw.trim();
+                        console.log(`User provided city: ${selectedCity}`);
                         if (selectedCity) {
-                            // Accept the city without any validation
                             session.data.city = selectedCity;
                             session.step = STATES.STREET;
-                            userSessions[from] = session; // Ensure session is stored!
-
-                
+                            userSessions[from] = session; // ensure session is updated
                             const streetPrompt = session.language === 'ar'
                                 ? `✅ لقد أدخلت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
                                 : `✅ You entered *${session.data.city}*.\n\n🏠 Please provide the street name.`;
-                
                             await sendToWhatsApp(from, streetPrompt);
                         } else {
-                            // If the user sends an empty message, ask them to enter a valid city name
                             const errorMessage = session.language === 'ar'
                                 ? "❌ يرجى إدخال اسم مدينة صحيح."
                                 : "❌ Please enter a valid city name.";
-                
                             await sendToWhatsApp(from, errorMessage);
-                            await sendCitySelection(from, session.language); // Ask for city again
+                            await sendCitySelection(from, session.language); // ask again
                         }
                     } else {
-                        // If the user sends something other than text (e.g., an image, location, etc.)
                         const errorMessage = session.language === 'ar'
                             ? "❌ يرجى إدخال اسم المدينة كنص."
                             : "❌ Please enter the city name as text.";
-                
                         await sendToWhatsApp(from, errorMessage);
-                        await sendCitySelection(from, session.language); // Ask for city again
+                        await sendCitySelection(from, session.language); // ask again
                     }
                     break;
+                  
                     case STATES.STREET:
                         session.data.street = textRaw.trim();
                         session.step = STATES.BUILDING;
