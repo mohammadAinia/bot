@@ -1420,12 +1420,12 @@ app.post('/webhook', async (req, res) => {
                     return res.sendStatus(200);
                 }
                 session.data.flat_no = textRaw;
-                missingFields = getMissingFields(session.data); // Reuse the variable
-                if (missingFields.length === 0) {
+                const missingFields2 = getMissingFields(session.data); // Reuse the variable
+                if (missingFields2.length === 0) {
                     session.step = STATES.CONFIRMATION;
                     await sendOrderSummary(from, session);
                 } else {
-                    session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                    session.step = `ASK_${missingFields2[0].toUpperCase()}`;
                     await askForNextMissingField(session, from);
                 }
                 break;
