@@ -1106,7 +1106,6 @@ app.post('/webhook', async (req, res) => {
 const isRequestStart = await detectRequestStart(textRaw);
 if (isRequestStart) {
     session.inRequest = true;
-    session.step = STATES.PROCESS_REQUEST_VIA_SENTENCE;
 
     // If the user is registered, ask if they want to change their information
     if (session.data && session.data.name) {
@@ -1114,7 +1113,7 @@ if (isRequestStart) {
             { type: "reply", reply: { id: "yes_change", title: "Yes" } },
             { type: "reply", reply: { id: "no_change", title: "No" } }
         ]);
-        session.step = STATES.CHANGE_INFO; // Move to the CHANGE_INFO state
+        session.step = STATES.CHANGE_INFO;
     } else {
         // If the user is new, start collecting information immediately
         const missingFields = getMissingFields(session.data);
@@ -1194,7 +1193,7 @@ if (isRequestStart) {
                             await sendToWhatsApp(from, "Please provide your new name.");
                         } else if (buttonId === "no_change") {
                             // Set flag to skip missing fields
-                            session.skipMissingFields = true; // <-- Add this line
+                            // session.skipMissingFields = true; // <-- Add this line
                             session.step = STATES.QUANTITY;
                             await sendToWhatsApp(from, "Please provide the quantity (in liters).");
                         }
