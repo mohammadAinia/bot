@@ -1186,16 +1186,15 @@ if (isRequestStart) {
                     }
                 }
                 break;
-                case STATES.CHANGE_INFO_VIA_SENTENCE:
+                case STATES.CHANGE_INFO:
                     if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                         const buttonId = message.interactive.button_reply.id;
                         if (buttonId === "yes_change") {
-                            // User wants to change information, start collecting updated details
                             session.step = STATES.NAME;
                             await sendToWhatsApp(from, "Please provide your new name.");
                         } else if (buttonId === "no_change") {
-                            // User does not want to change information, set a flag to skip missing fields
-                            session.skipMissingFields = true; // Add this flag
+                            // Set flag to skip missing fields
+                            session.skipMissingFields = true; // <-- Add this line
                             session.step = STATES.QUANTITY;
                             await sendToWhatsApp(from, "Please provide the quantity (in liters).");
                         }
