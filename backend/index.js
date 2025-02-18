@@ -872,15 +872,14 @@ const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
 };
 async function checkUserRegistration(phoneNumber) {
     try {
-        const response = await axios.get('https://api.lootahbiofuels.com/api/v1/check-user', {
+        const response = await axios.get('https://dev.lootahbiofuels.com/api/v1/check-user', {
             headers: {
                 'API-KEY': 'iUmcFyQUYa7l0u5J1aOxoGpIoh0iQSqpAlXX8Zho5vfxlTK4mXr41GvOHc4JwIkvltIUSoCDmc9VMbmJLajSIMK3NHx3M5ggaff8JMBTlZCryZlr8SmmhmYGGlmXo8uM',
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             },
-            data: {
-                phone_number: phoneNumber
-            }
+            params: { phone_number: phoneNumber } // Use params instead of data
+
         });
 
         if (response.data && response.data.exists) {
