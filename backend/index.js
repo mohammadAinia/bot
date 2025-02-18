@@ -949,7 +949,7 @@ async function checkUserRegistration(phoneNumber) {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             },
-            params: { phone_number: cleanedNumber }
+            params: { email: "mmyyttt@gmail.com" }
         });
 
         if (response.data?.exists && response.data.user) {
@@ -962,6 +962,28 @@ async function checkUserRegistration(phoneNumber) {
         return null;
     }
 }
+// async function checkUserRegistrationByEmail(email) {
+//     try {
+//         const response = await axios.get('https://dev.lootahbiofuels.com/api/v1/check-user', {
+//             headers: {
+//                 'API-KEY': 'iUmcFyQUYa7l0u5J1aOxoGpIoh0iQSqpAlXX8Zho5vfxlTK4mXr41GvOHc4JwIkvltIUSoCDmc9VMbmJLajSIMK3NHx3M5ggaff8JMBTlZCryZlr8SmmhmYGGlmXo8uM',
+//                 'Accept': 'application/json',
+//                 'Content-Type': 'application/json'
+//             },
+//             params: { email: email } // Inquire via email instead of phone number
+//         });
+
+//         if (response.data?.exists && response.data.user) {
+//             return response.data.user; // Return user data if registered
+//         } else {
+//             return null; // Explicitly return null if not registered
+//         }
+//     } catch (error) {
+//         console.error('Error checking user registration:', error);
+//         return null;
+//     }
+// }
+
 
 
 app.post('/webhook', async (req, res) => {
