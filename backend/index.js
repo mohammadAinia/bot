@@ -1182,6 +1182,10 @@ if (isRequestStart) {
                             session.step = STATES.NAME;
                             await sendToWhatsApp(from, "Please provide your new name.");
                         } else if (buttonId === "no_change") {
+                            // Ensure session.data is initialized
+                            if (!session.data) {
+                                session.data = {};
+                            }
                             // Set flag to skip other fields
                             session.skipMissingFields = true; // <-- Uncommented
                             session.step = STATES.QUANTITY;
@@ -1448,6 +1452,12 @@ if (isRequestStart) {
                         return res.sendStatus(200);
                     }
                     console.log("🔹 Valid quantity provided:", textRaw);
+                    
+                    // Ensure session.data is initialized
+                    if (!session.data) {
+                        session.data = {};
+                    }
+                    
                     session.data.quantity = textRaw;
                 
                     // Initialize missingFields after setting the quantity
