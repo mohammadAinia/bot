@@ -992,6 +992,8 @@ async function checkUserRegistration(phoneNumber) {
         // Remove any non-numeric characters
         const cleanedNumber = phoneNumber.replace(/\D/g, '');
 
+        console.log(`🔹 Checking user registration for phone number: ${cleanedNumber}`);
+
         const response = await axios.get('https://dev.lootahbiofuels.com/api/v1/check-user', {
             headers: {
                 'API-KEY': 'iUmcFyQUYa7l0u5J1aOxoGpIoh0iQSqpAlXX8Zho5vfxlTK4mXr41GvOHc4JwIkvltIUSoCDmc9VMbmJLajSIMK3NHx3M5ggaff8JMBTlZCryZlr8SmmhmYGGlmXo8uM',
@@ -1001,13 +1003,32 @@ async function checkUserRegistration(phoneNumber) {
             params: { phone_number: cleanedNumber }
         });
 
+        console.log('🔹 API Response:', response.data);
+
         if (response.data?.exists && response.data.user) {
-            return response.data.user; // Return user data if registered
+            const user = {
+                id: response.data.user.id,
+                name: response.data.user.first_name || 'User', // Use first_name or a default value
+                email: response.data.user.email,
+                phone: response.data.user.phone_number,
+                city: response.data.addresses?.city,
+                address: response.data.addresses?.address,
+                street: response.data.addresses?.street,
+                building_name: response.data.addresses?.building_name,
+                flat_no: response.data.addresses?.flat_no,
+                latitude: response.data.addresses?.latitude,
+                longitude: response.data.addresses?.longitude
+            };
+            return user;
         } else {
             return null; // Explicitly return null if not registered
         }
     } catch (error) {
-        console.error('Error checking user registration:', error);
+        console.error('❌ Error checking user registration:', error);
+        if (error.response) {
+            console.error('❌ API Error Response:', error.response.data);
+            console.error('❌ API Status Code:', error.response.status);
+        }
         return null;
     }
 }
