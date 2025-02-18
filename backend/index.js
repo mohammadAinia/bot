@@ -933,13 +933,23 @@ const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
 };
 async function checkUserRegistration(phoneNumber) {
     try {
+        // Remove any non-numeric characters
+        let cleanedNumber = phoneNumber.replace(/\D/g, '');
+
+        // Remove country code if it's Saudi (+966 or 966) or UAE (+971 or 971)
+        if (cleanedNumber.startsWith('966')) {
+            cleanedNumber = cleanedNumber.slice(3); // Remove Saudi country code
+        } else if (cleanedNumber.startsWith('971')) {
+            cleanedNumber = cleanedNumber.slice(3); // Remove UAE country code
+        }
+
         const response = await axios.get('https://dev.lootahbiofuels.com/api/v1/check-user', {
             headers: {
                 'API-KEY': 'iUmcFyQUYa7l0u5J1aOxoGpIoh0iQSqpAlXX8Zho5vfxlTK4mXr41GvOHc4JwIkvltIUSoCDmc9VMbmJLajSIMK3NHx3M5ggaff8JMBTlZCryZlr8SmmhmYGGlmXo8uM',
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             },
-            params: { phone_number: phoneNumber }
+            params: { phone_number: cleanedNumber }
         });
 
         if (response.data?.exists && response.data.user) {
