@@ -1110,12 +1110,8 @@ app.post('/webhook', async (req, res) => {
                     { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
                     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
                 ]);
-                await sendInteractiveButtons(from, "Do you want to change your information?", [
-                    { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                    { type: "reply", reply: { id: "no_change", title: "No" } }
-                ]);
                 userSessions[from] = {
-                    step: STATES.CHANGE_INFO,
+                    step: STATES.WELCOME,
                     data: user,
                     language: detectedLanguage,
                     inRequest: false,
@@ -1147,6 +1143,18 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(200);
         }
         session.lastTimestamp = Number(message.timestamp);
+
+        if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+            const buttonId = message.interactive.button_reply.id;
+            if (buttonId === "new_request") {
+                await sendInteractiveButtons(from, "Do you want to change your information?", [
+                    { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                    { type: "reply", reply: { id: "no_change", title: "No" } }
+                ]);
+                session.step = STATES.CHANGE_INFO;
+                return res.sendStatus(200);
+            }
+        }
 
         const classification = await isQuestionOrRequest(textRaw);
         if (classification === "question") {
