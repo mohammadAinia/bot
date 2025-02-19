@@ -1092,8 +1092,8 @@ app.post('/webhook', async (req, res) => {
                 // Start the request flow
                 session.inRequest = true;
 
-                // Extract information from the user's sentence
-                const extractedInfo = extractInfoFromSentence(textRaw);
+                // Extract information from the user's sentence using the existing function
+                const extractedInfo = await extractInformationFromText(textRaw, session.language);
 
                 // Update session data with extracted information
                 session.data = { ...session.data, ...extractedInfo };
