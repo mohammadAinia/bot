@@ -618,7 +618,8 @@ async function extractInformationFromText(text, language = "en") {
       "building_name": "The user's building name or null",
       "flat_no": "The user's flat number or null",
       "latitude": "The user's latitude or null",
-      "longitude": "The user's longitude or null"
+      "longitude": "The user's longitude or null",
+      "quantity": "The user's quantity (in liters) or null"
     }
     
     If any information is missing, assign null to that field.
@@ -1081,6 +1082,7 @@ app.post('/webhook', async (req, res) => {
             const classification = await isQuestionOrRequest(textRaw);
 
             if (classification === "question") {
+                // Handle questions
                 const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
                 const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
                 await sendInteractiveButtons(from, reply, [
@@ -1092,30 +1094,24 @@ app.post('/webhook', async (req, res) => {
                 // Start the request flow
                 session.inRequest = true;
 
-                // Extract information from the user's sentence using the existing function
+                // Extract information from the user's sentence
                 const extractedInfo = await extractInformationFromText(textRaw, session.language);
 
                 // Update session data with extracted information
                 session.data = { ...session.data, ...extractedInfo };
 
-                // Check if the user is registered
-                if (session.data && session.data.name) {
-                    // Registered user: Ask if they want to change their information
-                    await sendInteractiveButtons(from, "Do you want to change your information?", [
-                        { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                        { type: "reply", reply: { id: "no_change", title: "No" } }
-                    ]);
-                    session.step = STATES.CHANGE_INFO;
+                // Check if all required fields are present
+                const missingFields = getMissingFields(session.data);
+
+                if (missingFields.length === 0) {
+                    // If no missing fields, proceed to confirmation
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
                 } else {
-                    // New user: Ask for their name if not provided
-                    if (!session.data.name) {
-                        session.step = STATES.NAME;
-                        await sendToWhatsApp(from, "Please provide your name.");
-                    } else {
-                        session.step = STATES.QUANTITY;
-                        await sendToWhatsApp(from, "Please provide the quantity (in liters).");
-                    }
+                    // If missing fields, ask for the next missing field
+                    await askForNextMissingField(session, from);
                 }
+
                 return res.sendStatus(200);
             } else {
                 // Handle greetings or other inputs
