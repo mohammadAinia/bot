@@ -1576,7 +1576,7 @@ if (session.step === STATES.CHANGE_INFOO) {
                     }
                 
                     // Handle interactive button replies
-                    if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+                    if (message.type === "interactive" && message.interactive?.type === "list_reply") {
                         const citySelection = message.interactive.button_reply.id;
                         const cityMap = {
                             "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
@@ -1587,7 +1587,8 @@ if (session.step === STATES.CHANGE_INFOO) {
                             "ras_al_khaimah": { en: "Ras Al Khaimah", ar: "رأس الخيمة" },
                             "fujairah": { en: "Fujairah", ar: "الفجيرة" }
                         };
-                
+                        console.log(" before City set to:", session.data.city);
+
                         if (cityMap[citySelection]) {
                             session.data.city = cityMap[citySelection][session.language] || cityMap[citySelection].en;
                             console.log("City set to:", session.data.city);
