@@ -1129,14 +1129,14 @@ app.post('/webhook', async (req, res) => {
                         { type: "reply", reply: { id: "yes_change", title: "Yes" } },
                         { type: "reply", reply: { id: "no_change", title: "No" } }
                     ]);
-                    session.step = STATES.CHANGE_INFO;
+                    session.step = STATES.CHANGE_INFOO;
                 }
                 return res.sendStatus(200);
             }
         }
 
         // Handle CHANGE_INFO state
-        if (session.step === STATES.CHANGE_INFO) {
+        if (session.step === STATES.CHANGE_INFOO) {
             if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                 const buttonId = message.interactive.button_reply.id;
                 if (buttonId === "yes_change") {
