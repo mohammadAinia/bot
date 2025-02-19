@@ -1140,9 +1140,27 @@ app.post('/webhook', async (req, res) => {
             if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                 const buttonId = message.interactive.button_reply.id;
                 if (buttonId === "yes_change") {
-                    // Start by asking for the name
-                    session.step = STATES.NAME;
-                    await sendToWhatsApp(from, "Please provide your name.");
+                    // Extract information from the user's message
+                    const extractedData = await extractInformationFromText(textRaw, session.language);
+                    if (Object.keys(extractedData).length > 0) {
+                        // Update session data with extracted information
+                        session.data = { ...session.data, ...extractedData };
+                        session.tempData = extractedData; // Store extracted data temporarily
+
+                        // Check if all required fields are filled
+                        const missingFields = getMissingFields(session.data);
+                        if (missingFields.length > 0) {
+                            session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                            await askForNextMissingField(session, from);
+                        } else {
+                            session.step = STATES.QUANTITY;
+                            await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+                        }
+                    } else {
+                        // If no data is extracted, ask for the name
+                        session.step = STATES.NAME;
+                        await sendToWhatsApp(from, "Please provide your name.");
+                    }
                 } else if (buttonId === "no_change") {
                     // Skip to quantity
                     session.step = STATES.QUANTITY;
