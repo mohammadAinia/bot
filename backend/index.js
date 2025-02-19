@@ -1510,7 +1510,7 @@ if (session.step === STATES.CHANGE_INFOO) {
                 break;
             case "ASK_LOCATION":
                 // If the user hasn't shared their location yet, ask for it
-                if (!message.location) {
+                if (message.location) {
                     // Send a message with a button to share location
                     await sendInteractiveButtons(from, getLocationMessage(session.language), [
                         {
@@ -1538,6 +1538,7 @@ if (session.step === STATES.CHANGE_INFOO) {
                         session.step = STATES.CONFIRMATION;
                         await sendOrderSummary(from, session);
                     } else {
+                        console.log(session.data.latitude , session.data.latitude)
                         session.step = `ASK_${missingFields[0].toUpperCase()}`;
                         await askForNextMissingField(session, from);
                     }
