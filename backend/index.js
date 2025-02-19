@@ -492,15 +492,7 @@ const sendInteractiveButtons = async (to, message, buttons) => {
         console.error("❌ Failed to send interactive buttons:", error.response?.data || error.message);
     }
 };
-function extractQuantity(text) {
-    // Match both Western Arabic (0-9) and Eastern Arabic (٠-٩) numerals
-    const match = text.match(/[\d\u0660-\u0669]+/);
-    if (match) {
-        // Convert Eastern Arabic numerals to Western Arabic numerals
-        return convertArabicNumbers(match[0]);
-    }
-    return null;
-}
+
 
 function convertArabicNumbers(arabicNumber) {
     const arabicToWestern = {
@@ -565,6 +557,15 @@ const sendCitySelection = async (to, language) => {
     }
 };
 
+function extractQuantity(text) {
+    // Match both Western Arabic (0-9) and Eastern Arabic (٠-٩) numerals
+    const match = text.match(/[\d\u0660-\u0669]+/);
+    if (match) {
+        // Convert Eastern Arabic numerals to Western Arabic numerals
+        return convertArabicNumbers(match[0]);
+    }
+    return null;
+}
 
 function extractCity(text, language = "en") {
     const cities = {
@@ -1108,7 +1109,7 @@ app.post('/webhook', async (req, res) => {
                         { type: "reply", reply: { id: "yes_change", title: "Yes" } },
                         { type: "reply", reply: { id: "no_change", title: "No" } }
                     ]);
-                    session.step = STATES.CHANGE_INFOO;
+                    session.step = STATES.CHANGE_INFOO; // Use CHANGE_INFOO for registered users
                 } else {
                     // New user: Proceed to collect missing fields
                     const missingFields = getMissingFields(session.data);
@@ -1167,8 +1168,14 @@ app.post('/webhook', async (req, res) => {
                     }
                 } else if (buttonId === "no_change") {
                     // User does not want to change their information
-                    session.step = STATES.CONFIRMATION;
-                    await sendOrderSummary(from, session);
+                    // Proceed to ask for quantity if not already provided
+                    if (!session.data.quantity) {
+                        session.step = STATES.QUANTITY;
+                        await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+                    } else {
+                        session.step = STATES.CONFIRMATION;
+                        await sendOrderSummary(from, session);
+                    }
                 }
             }
             return res.sendStatus(200);
