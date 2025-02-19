@@ -1092,6 +1092,12 @@ app.post('/webhook', async (req, res) => {
                 // Start the request flow
                 session.inRequest = true;
 
+                // Extract information from the user's sentence
+                const extractedInfo = extractInfoFromSentence(textRaw);
+
+                // Update session data with extracted information
+                session.data = { ...session.data, ...extractedInfo };
+
                 // Check if the user is registered
                 if (session.data && session.data.name) {
                     // Registered user: Ask if they want to change their information
@@ -1101,9 +1107,14 @@ app.post('/webhook', async (req, res) => {
                     ]);
                     session.step = STATES.CHANGE_INFO;
                 } else {
-                    // New user: Ask for their name
-                    session.step = STATES.NAME;
-                    await sendToWhatsApp(from, "Please provide your name.");
+                    // New user: Ask for their name if not provided
+                    if (!session.data.name) {
+                        session.step = STATES.NAME;
+                        await sendToWhatsApp(from, "Please provide your name.");
+                    } else {
+                        session.step = STATES.QUANTITY;
+                        await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+                    }
                 }
                 return res.sendStatus(200);
             } else {
