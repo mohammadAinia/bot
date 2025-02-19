@@ -982,7 +982,25 @@ async function checkUserRegistration(phoneNumber) {
     }
 }
 
+async function getAddressFromCoordinates(latitude, longitude) {
+    try {
+        const response = await axios.get(`https://nominatim.openstreetmap.org/reverse`, {
+            params: {
+                lat: latitude,
+                lon: longitude,
+                format: "json"
+            }
+        });
 
+        if (response.data && response.data.display_name) {
+            return response.data.display_name; // Extract full address
+        }
+        return null;
+    } catch (error) {
+        console.error("❌ Reverse Geocoding Error:", error);
+        return null;
+    }
+}
 
 app.post('/webhook', async (req, res) => {
     try {
@@ -1251,61 +1269,52 @@ if (session.step === STATES.CHANGE_INFOO) {
                 session.step = STATES.LONGITUDE;
                 await sendToWhatsApp(from, getLocationMessage(session.language)); // Ask for location
                 break;
-            case STATES.LONGITUDE:
-                if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-                    const buttonId = message.interactive.button_reply.id;
-                    if (buttonId === "send_site") {
-                        // Send a message with a button to share location
-                        await sendInteractiveButtons(from, getLocationMessage(session.language), [
-                            {
-                                type: "location_request",
-                                title: getButtonTitle("send_site", session.language) // "Send Location" button
-                            }
-                        ]);
-                    }
-                } else if (message.location) {
-                    const { latitude, longitude } = message.location;
-                    // Validate UAE location
-                    const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
-                    if (
-                        latitude >= UAE_BOUNDS.minLat &&
-                        latitude <= UAE_BOUNDS.maxLat &&
-                        longitude >= UAE_BOUNDS.minLng &&
-                        longitude <= UAE_BOUNDS.maxLng
-                    ) {
-                        // Check if the selected city matches the location
-                        if (session.data.city) {
-                            const isValidCity = await validateCityAndLocation(latitude, longitude, session.data.city);
-                            if (!isValidCity) {
-                                await sendToWhatsApp(from, getInvalidCityMessage(session.language));
+                case STATES.LONGITUDE:
+                    if (message.location) {
+                        const { latitude, longitude } = message.location;
+                
+                        // Validate UAE location
+                        const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
+                        if (
+                            latitude >= UAE_BOUNDS.minLat &&
+                            latitude <= UAE_BOUNDS.maxLat &&
+                            longitude >= UAE_BOUNDS.minLng &&
+                            longitude <= UAE_BOUNDS.maxLng
+                        ) {
+                            // Reverse Geocode to get address
+                            const address = await getAddressFromCoordinates(latitude, longitude);
+                            if (!address) {
+                                await sendToWhatsApp(from, "❌ Unable to retrieve your address. Please try again.");
                                 return res.sendStatus(200);
                             }
+                
+                            session.data.latitude = latitude;
+                            session.data.longitude = longitude;
+                            session.data.address = address; // Auto-fill address
+                            session.step = STATES.CITY; // Proceed to city selection
+                
+                            return await sendCitySelection(from, session.language); // ✅ Ask user to select city
+                        } else {
+                            await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
                         }
-                        session.data.latitude = latitude;
-                        session.data.longitude = longitude;
-                        session.step = STATES.ADDRESS;
-                        await sendToWhatsApp(from, getAddressMessage(session.language));
                     } else {
-                        await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
+                        if (!session.locationPromptSent) {
+                            await sendInteractiveButtons(from, getLocationMessage(session.language), [
+                                {
+                                    type: "location_request",
+                                    title: getButtonTitle("send_site", session.language) // "Send Location" button
+                                }
+                            ]);
+                            session.locationPromptSent = true;
+                        }
                     }
-                } else {
-                    if (!session.locationPromptSent) {
-                        // Send a message with a button to share location
-                        await sendInteractiveButtons(from, getLocationMessage(session.language), [
-                            {
-                                type: "location_request",
-                                title: getButtonTitle("send_site", session.language) // "Send Location" button
-                            }
-                        ]);
-                        session.locationPromptSent = true;
-                    }
-                }
-                break;
-                case STATES.ADDRESS:
-                    session.data.address = textRaw;
-                    session.step = STATES.CITY;
-                    return await sendCitySelection(from, session.language); // ✅ Ask user to select city
                     break;
+                
+                // case STATES.ADDRESS:
+                //     session.data.address = textRaw;
+                //     session.step = STATES.CITY;
+                //     return await sendCitySelection(from, session.language); // ✅ Ask user to select city
+                //     break;
                 case STATES.CITY:
                     if (message.interactive && message.interactive.type === "list_reply") {
                         const citySelection = message.interactive.list_reply.id; // Get the selected city ID
