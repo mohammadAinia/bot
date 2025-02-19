@@ -992,8 +992,8 @@ async function getAddressFromCoordinates(latitude, longitude) {
             }
         });
 
-        if (response.data && response.data.display_name) {
-            return response.data.display_name; // Extract full address
+        if (response.data && response.data.address) {
+            return response.data.address; // Return full address object
         }
         return null;
     } catch (error) {
@@ -1001,6 +1001,13 @@ async function getAddressFromCoordinates(latitude, longitude) {
         return null;
     }
 }
+
+// Function to extract street name from Nominatim response
+function extractStreetName(address) {
+    if (!address) return null;
+    return address.road || address.street || address.neighbourhood || address.suburb || null;
+}
+
 
 app.post('/webhook', async (req, res) => {
     try {
@@ -1270,134 +1277,105 @@ if (session.step === STATES.CHANGE_INFOO) {
                 await sendToWhatsApp(from, getLocationMessage(session.language)); // Ask for location
                 break;
                 case STATES.LONGITUDE:
-                    if (message.location) {
-                        const { latitude, longitude } = message.location;
+    if (message.location) {
+        const { latitude, longitude } = message.location;
+
+        // Validate UAE location
+        const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
+        if (
+            latitude >= UAE_BOUNDS.minLat &&
+            latitude <= UAE_BOUNDS.maxLat &&
+            longitude >= UAE_BOUNDS.minLng &&
+            longitude <= UAE_BOUNDS.maxLng
+        ) {
+            // Reverse Geocode to get address
+            const address = await getAddressFromCoordinates(latitude, longitude);
+            if (!address) {
+                await sendToWhatsApp(from, "❌ Unable to retrieve your address. Please try again.");
+                return res.sendStatus(200);
+            }
+
+            session.data.latitude = latitude;
+            session.data.longitude = longitude;
+            session.data.address = address; // Auto-fill address
+            session.step = STATES.CITY; // Proceed to city selection
+
+            return await sendCitySelection(from, session.language); // ✅ Ask user to select city
+        } else {
+            await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
+        }
+    } else {
+        if (!session.locationPromptSent) {
+            await sendInteractiveButtons(from, getLocationMessage(session.language), [
+                {
+                    type: "location_request",
+                    title: getButtonTitle("send_site", session.language) // "Send Location" button
+                }
+            ]);
+            session.locationPromptSent = true;
+        }
+    }
+    break;
+
+    case STATES.CITY:
+        if (message.interactive && message.interactive.type === "list_reply") {
+            const citySelection = message.interactive.list_reply.id; // Get selected city ID
+            const cityMap = {
+                "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
+                "dubai": { en: "Dubai", ar: "دبي" },
+                "sharjah": { en: "Sharjah", ar: "الشارقة" },
+                "ajman": { en: "Ajman", ar: "عجمان" },
+                "umm_al_quwain": { en: "Umm Al Quwain", ar: "أم القيوين" },
+                "ras_al_khaimah": { en: "Ras Al Khaimah", ar: "رأس الخيمة" },
+                "fujairah": { en: "Fujairah", ar: "الفجيرة" }
+            };
+    
+            if (cityMap[citySelection]) {
+                const selectedCity = cityMap[citySelection][session.language] || cityMap[citySelection].en;
                 
-                        // Validate UAE location
-                        const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
-                        if (
-                            latitude >= UAE_BOUNDS.minLat &&
-                            latitude <= UAE_BOUNDS.maxLat &&
-                            longitude >= UAE_BOUNDS.minLng &&
-                            longitude <= UAE_BOUNDS.maxLng
-                        ) {
-                            // Reverse Geocode to get address
-                            const address = await getAddressFromCoordinates(latitude, longitude);
-                            if (!address) {
-                                await sendToWhatsApp(from, "❌ Unable to retrieve your address. Please try again.");
-                                return res.sendStatus(200);
-                            }
-                
-                            session.data.latitude = latitude;
-                            session.data.longitude = longitude;
-                            session.data.address = address; // Auto-fill address
-                            session.step = STATES.CITY; // Proceed to city selection
-                
-                            return await sendCitySelection(from, session.language); // ✅ Ask user to select city
-                        } else {
-                            await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
-                        }
-                    } else {
-                        if (!session.locationPromptSent) {
-                            await sendInteractiveButtons(from, getLocationMessage(session.language), [
-                                {
-                                    type: "location_request",
-                                    title: getButtonTitle("send_site", session.language) // "Send Location" button
-                                }
-                            ]);
-                            session.locationPromptSent = true;
-                        }
+                // Validate the city using the actual location if available
+                if (session.data.latitude && session.data.longitude) {
+                    const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
+                    if (!validationResult.isValid) {
+                        const errorMessage = session.language === 'ar'
+                            ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
+                            : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;    
+    
+                        await sendToWhatsApp(from, errorMessage);
+                        await sendCitySelection(from, session.language);
+                        return res.sendStatus(200);
                     }
-                    break;
-                
-                // case STATES.ADDRESS:
-                //     session.data.address = textRaw;
-                //     session.step = STATES.CITY;
-                //     return await sendCitySelection(from, session.language); // ✅ Ask user to select city
-                //     break;
-                case STATES.CITY:
-                    if (message.interactive && message.interactive.type === "list_reply") {
-                        const citySelection = message.interactive.list_reply.id; // Get the selected city ID
-                        const cityMap = {
-                            "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
-                            "dubai": { en: "Dubai", ar: "دبي" },
-                            "sharjah": { en: "Sharjah", ar: "الشارقة" },
-                            "ajman": { en: "Ajman", ar: "عجمان" },
-                            "umm_al_quwain": { en: "Umm Al Quwain", ar: "أم القيوين" },
-                            "ras_al_khaimah": { en: "Ras Al Khaimah", ar: "رأس الخيمة" },
-                            "fujairah": { en: "Fujairah", ar: "الفجيرة" }
-                        };
-                        if (cityMap[citySelection]) {
-                            const selectedCity = cityMap[citySelection][session.language] || cityMap[citySelection].en;
-                            // Validate the selected city against the actual city from the location (if location is available)
-                            if (session.data.latitude && session.data.longitude) {
-                                const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
-                                if (!validationResult.isValid) {
-                                    const errorMessage = session.language === 'ar'
-                                        ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
-                                        : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
+                }
     
-                                    await sendToWhatsApp(from, errorMessage);
-                                    await sendCitySelection(from, session.language);
-                                    return res.sendStatus(200);
-                                }
-                            }
-                            // If location is not available, accept the city without validation
-                            session.data.city = selectedCity;
-                            session.step = STATES.STREET;
-                            const streetPrompt = session.language === 'ar'
-                                ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
-                                : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
+                // Store the selected city
+                session.data.city = selectedCity;
     
-                            await sendToWhatsApp(from, streetPrompt);
-                        } else {
-                            const invalidSelectionMessage = session.language === 'ar'
-                                ? "❌ اختيار غير صالح. يرجى الاختيار من الخيارات المتاحة."
-                                : "❌ Invalid selection. Please choose from the provided options.";
-    
-                            await sendToWhatsApp(from, invalidSelectionMessage);
-                            await sendCitySelection(from, session.language);
-                        }
-                    } else {
-                        // If the user sends a text message instead of selecting from the list
-                        const selectedCity = extractCity(textRaw, session.language);
-                        if (selectedCity) {
-                            // Validate the selected city against the actual city from the location (if location is available)
-                            if (session.data.latitude && session.data.longitude) {
-                                const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
-                                if (!validationResult.isValid) {
-                                    const errorMessage = session.language === 'ar'
-                                        ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
-                                        : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
-    
-                                    await sendToWhatsApp(from, errorMessage);
-                                    await sendCitySelection(from, session.language);
-                                    return res.sendStatus(200);
-                                }
-                            }
-                            // If location is not available, accept the city without validation
-                            session.data.city = selectedCity;
-                            session.step = STATES.STREET;
-                            const streetPrompt = session.language === 'ar'
-                                ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
-                                : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
-    
-                            await sendToWhatsApp(from, streetPrompt);
-                        } else {
-                            const selectCityMessage = session.language === 'ar'
-                                ? "❌ يرجى اختيار مدينة من الخيارات المتاحة."
-                                : "❌ Please select a city from the provided options.";
-    
-                            await sendToWhatsApp(from, selectCityMessage);
-                            await sendCitySelection(from, session.language);
-                        }
+                // 📌 🏠 Automatically fetch the street name
+                if (session.data.latitude && session.data.longitude) {
+                    const address = await getAddressFromCoordinates(session.data.latitude, session.data.longitude);
+                    if (address) {
+                        session.data.street = extractStreetName(address); // Extract street name
                     }
-                    break;
-                case STATES.STREET:
-                    session.data.street = textRaw;
-                    session.step = STATES.BUILDING_NAME;
-                    await sendToWhatsApp(from, getBuildingMessage(session.language)); // Ask for building name
-                    break;
+                }
+    
+                session.step = STATES.BUILDING_NAME; // Skip STREET state
+    
+                const buildingPrompt = session.language === 'ar'
+                    ? `✅ لقد اخترت *${session.data.city}*.\n\n🏢 يرجى تقديم اسم المبنى.`
+                    : `✅ You selected *${session.data.city}*.\n\n🏢 Please provide the building name.`;
+    
+                await sendToWhatsApp(from, buildingPrompt);
+            } else {
+                const invalidSelectionMessage = session.language === 'ar'
+                    ? "❌ اختيار غير صالح. يرجى الاختيار من الخيارات المتاحة."
+                    : "❌ Invalid selection. Please choose from the provided options.";
+    
+                await sendToWhatsApp(from, invalidSelectionMessage);
+                await sendCitySelection(from, session.language);
+            }
+        }
+        break;
+    
                     
             case STATES.BUILDING_NAME:
                 if (!textRaw || textRaw.trim() === "") {
@@ -2111,7 +2089,144 @@ app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PO
 
 
 
+            // case STATES.LONGITUDE:
+            //     if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+            //         const buttonId = message.interactive.button_reply.id;
+            //         if (buttonId === "send_site") {
+            //             // Send a message with a button to share location
+            //             await sendInteractiveButtons(from, getLocationMessage(session.language), [
+            //                 {
+            //                     type: "location_request",
+            //                     title: getButtonTitle("send_site", session.language) // "Send Location" button
+            //                 }
+            //             ]);
+            //         }
+            //     } else if (message.location) {
+            //         const { latitude, longitude } = message.location;
+            //         // Validate UAE location
+            //         const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
+            //         if (
+            //             latitude >= UAE_BOUNDS.minLat &&
+            //             latitude <= UAE_BOUNDS.maxLat &&
+            //             longitude >= UAE_BOUNDS.minLng &&
+            //             longitude <= UAE_BOUNDS.maxLng
+            //         ) {
+            //             // Check if the selected city matches the location
+            //             if (session.data.city) {
+            //                 const isValidCity = await validateCityAndLocation(latitude, longitude, session.data.city);
+            //                 if (!isValidCity) {
+            //                     await sendToWhatsApp(from, getInvalidCityMessage(session.language));
+            //                     return res.sendStatus(200);
+            //                 }
+            //             }
+            //             session.data.latitude = latitude;
+            //             session.data.longitude = longitude;
+            //             session.step = STATES.ADDRESS;
+            //             await sendToWhatsApp(from, getAddressMessage(session.language));
+            //         } else {
+            //             await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
+            //         }
+            //     } else {
+            //         if (!session.locationPromptSent) {
+            //             // Send a message with a button to share location
+            //             await sendInteractiveButtons(from, getLocationMessage(session.language), [
+            //                 {
+            //                     type: "location_request",
+            //                     title: getButtonTitle("send_site", session.language) // "Send Location" button
+            //                 }
+            //             ]);
+            //             session.locationPromptSent = true;
+            //         }
+            //     }
+            //     break;
+            //     case STATES.ADDRESS:
+            //         session.data.address = textRaw;
+            //         session.step = STATES.CITY;
+            //         return await sendCitySelection(from, session.language); // ✅ Ask user to select city
+            //         break;
+            // case STATES.CITY:
+            //     if (message.interactive && message.interactive.type === "list_reply") {
+            //         const citySelection = message.interactive.list_reply.id; // Get the selected city ID
+            //         const cityMap = {
+            //             "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
+            //             "dubai": { en: "Dubai", ar: "دبي" },
+            //             "sharjah": { en: "Sharjah", ar: "الشارقة" },
+            //             "ajman": { en: "Ajman", ar: "عجمان" },
+            //             "umm_al_quwain": { en: "Umm Al Quwain", ar: "أم القيوين" },
+            //             "ras_al_khaimah": { en: "Ras Al Khaimah", ar: "رأس الخيمة" },
+            //             "fujairah": { en: "Fujairah", ar: "الفجيرة" }
+            //         };
+            //         if (cityMap[citySelection]) {
+            //             const selectedCity = cityMap[citySelection][session.language] || cityMap[citySelection].en;
+            //             // Validate the selected city against the actual city from the location (if location is available)
+            //             if (session.data.latitude && session.data.longitude) {
+            //                 const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
+            //                 if (!validationResult.isValid) {
+            //                     const errorMessage = session.language === 'ar'
+            //                         ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
+            //                         : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
 
+            //                     await sendToWhatsApp(from, errorMessage);
+            //                     await sendCitySelection(from, session.language);
+            //                     return res.sendStatus(200);
+            //                 }
+            //             }
+            //             // If location is not available, accept the city without validation
+            //             session.data.city = selectedCity;
+            //             session.step = STATES.STREET;
+            //             const streetPrompt = session.language === 'ar'
+            //                 ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
+            //                 : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
+
+            //             await sendToWhatsApp(from, streetPrompt);
+            //         } else {
+            //             const invalidSelectionMessage = session.language === 'ar'
+            //                 ? "❌ اختيار غير صالح. يرجى الاختيار من الخيارات المتاحة."
+            //                 : "❌ Invalid selection. Please choose from the provided options.";
+
+            //             await sendToWhatsApp(from, invalidSelectionMessage);
+            //             await sendCitySelection(from, session.language);
+            //         }
+            //     } else {
+            //         // If the user sends a text message instead of selecting from the list
+            //         const selectedCity = extractCity(textRaw, session.language);
+            //         if (selectedCity) {
+            //             // Validate the selected city against the actual city from the location (if location is available)
+            //             if (session.data.latitude && session.data.longitude) {
+            //                 const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
+            //                 if (!validationResult.isValid) {
+            //                     const errorMessage = session.language === 'ar'
+            //                         ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
+            //                         : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
+
+            //                     await sendToWhatsApp(from, errorMessage);
+            //                     await sendCitySelection(from, session.language);
+            //                     return res.sendStatus(200);
+            //                 }
+            //             }
+            //             // If location is not available, accept the city without validation
+            //             session.data.city = selectedCity;
+            //             session.step = STATES.STREET;
+            //             const streetPrompt = session.language === 'ar'
+            //                 ? `✅ لقد اخترت *${session.data.city}*.\n\n🏠 يرجى تقديم اسم الشارع.`
+            //                 : `✅ You selected *${session.data.city}*.\n\n🏠 Please provide the street name.`;
+
+            //             await sendToWhatsApp(from, streetPrompt);
+            //         } else {
+            //             const selectCityMessage = session.language === 'ar'
+            //                 ? "❌ يرجى اختيار مدينة من الخيارات المتاحة."
+            //                 : "❌ Please select a city from the provided options.";
+
+            //             await sendToWhatsApp(from, selectCityMessage);
+            //             await sendCitySelection(from, session.language);
+            //         }
+            //     }
+            //     break;
+            // case STATES.STREET:
+            //     session.data.street = textRaw;
+            //     session.step = STATES.BUILDING_NAME;
+            //     await sendToWhatsApp(from, getBuildingMessage(session.language)); // Ask for building name
+            //     break;
 
 
 
