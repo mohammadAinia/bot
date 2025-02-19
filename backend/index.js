@@ -1108,7 +1108,7 @@ app.post('/webhook', async (req, res) => {
                         { type: "reply", reply: { id: "yes_change", title: "Yes" } },
                         { type: "reply", reply: { id: "no_change", title: "No" } }
                     ]);
-                    session.step = STATES.CHANGE_INFO;
+                    session.step = STATES.CHANGE_INFOO;
                 } else {
                     // New user: Proceed to collect missing fields
                     const missingFields = getMissingFields(session.data);
@@ -1145,7 +1145,7 @@ app.post('/webhook', async (req, res) => {
                         { type: "reply", reply: { id: "yes_change", title: "Yes" } },
                         { type: "reply", reply: { id: "no_change", title: "No" } }
                     ]);
-                    session.step = STATES.CHANGE_INFOO;
+                    session.step = STATES.CHANGE_INFO;
                 }
                 return res.sendStatus(200);
             }
