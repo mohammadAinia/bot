@@ -492,7 +492,15 @@ const sendInteractiveButtons = async (to, message, buttons) => {
         console.error("❌ Failed to send interactive buttons:", error.response?.data || error.message);
     }
 };
-
+function extractQuantity(text) {
+    // Match both Western Arabic (0-9) and Eastern Arabic (٠-٩) numerals
+    const match = text.match(/[\d\u0660-\u0669]+/);
+    if (match) {
+        // Convert Eastern Arabic numerals to Western Arabic numerals
+        return convertArabicNumbers(match[0]);
+    }
+    return null;
+}
 
 function convertArabicNumbers(arabicNumber) {
     const arabicToWestern = {
@@ -557,15 +565,6 @@ const sendCitySelection = async (to, language) => {
     }
 };
 
-function extractQuantity(text) {
-    // Match both Western Arabic (0-9) and Eastern Arabic (٠-٩) numerals
-    const match = text.match(/[\d\u0660-\u0669]+/);
-    if (match) {
-        // Convert Eastern Arabic numerals to Western Arabic numerals
-        return convertArabicNumbers(match[0]);
-    }
-    return null;
-}
 
 function extractCity(text, language = "en") {
     const cities = {
@@ -988,187 +987,199 @@ async function checkUserRegistration(phoneNumber) {
 app.post('/webhook', async (req, res) => {
     try {
         console.log("🔹 Incoming Webhook Data:", JSON.stringify(req.body, null, 2));
-        
         if (!req.body.entry || !Array.isArray(req.body.entry) || req.body.entry.length === 0) {
-          console.error("❌ Error: Missing or invalid 'entry' in webhook payload.");
-          return res.sendStatus(400);
+            console.error("❌ Error: Missing or invalid 'entry' in webhook payload.");
+            return res.sendStatus(400);
         }
-        
+
         const entry = req.body.entry[0];
         if (!entry.changes || !Array.isArray(entry.changes) || entry.changes.length === 0) {
-          console.error("❌ Error: Missing or invalid 'changes' in webhook payload.");
-          return res.sendStatus(400);
+            console.error("❌ Error: Missing or invalid 'changes' in webhook payload.");
+            return res.sendStatus(400);
         }
-        
+
         const changes = entry.changes[0];
         const value = changes.value;
         if (!value?.messages || !Array.isArray(value.messages) || value.messages.length === 0) {
-          console.warn("⚠️ No messages found in webhook payload. Ignoring event.");
-          return res.sendStatus(200);
+            console.warn("⚠️ No messages found in webhook payload. Ignoring event.");
+            return res.sendStatus(200);
         }
-        
+
         const message = value.messages[0];
         if (!message?.from) {
-          console.error("❌ Error: Missing 'from' field in message.");
-          return res.sendStatus(400);
+            console.error("❌ Error: Missing 'from' field in message.");
+            return res.sendStatus(400);
         }
-        
+
         const from = message.from;
         console.log(`Processing message from ${from}. Current session:`, userSessions[from]);
-        
+
         const textRaw = message.text?.body || "";
         const text = textRaw.toLowerCase().trim();
         let detectedLanguage = "en";
-        
+
         try {
-          const detected = langdetect.detect(textRaw);
-          if (Array.isArray(detected) && detected.length > 0) {
-            detectedLanguage = detected[0].lang;
-          }
-          if (detectedLanguage !== "ar" && detectedLanguage !== "en") {
-            detectedLanguage = "en";
-          }
+            const detected = langdetect.detect(textRaw);
+            if (Array.isArray(detected) && detected.length > 0) {
+                detectedLanguage = detected[0].lang;
+            }
+            if (detectedLanguage !== "ar" && detectedLanguage !== "en") {
+                detectedLanguage = "en";
+            }
         } catch (error) {
-          console.log("⚠️ Language detection failed. Defaulting to English.", error);
+            console.log("⚠️ Language detection failed. Defaulting to English.", error);
         }
-        
+
         let session = userSessions[from];
         if (!session) {
-          const user = await checkUserRegistration(from);
-          if (user && user.name) {
-            let welcomeMessage = await getOpenAIResponse(
-              `Welcome back, ${user.name}. Generate a WhatsApp welcome message for Lootah Biofuels.`,
-              "",
-              detectedLanguage
-            );
-            await sendInteractiveButtons(from, welcomeMessage, [
-              { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
-              { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
-            ]);
-            userSessions[from] = {
-              step: STATES.WELCOME,
-              data: user,
-              language: detectedLanguage,
-              inRequest: false,
-              lastTimestamp: Number(message.timestamp)
-            };
-          } else {
-            userSessions[from] = {
-              step: STATES.WELCOME,
-              data: { phone: from },
-              language: detectedLanguage,
-              inRequest: false,
-              lastTimestamp: Number(message.timestamp)
-            };
-            const welcomeMessage = await getOpenAIResponse(
-              "Generate a WhatsApp welcome message for Lootah Biofuels.",
-              "",
-              detectedLanguage
-            );
-            await sendInteractiveButtons(from, welcomeMessage, [
-              { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
-              { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
-            ]);
-          }
-          return res.sendStatus(200);
-        }
-        
-        if (session.lastTimestamp && Number(message.timestamp) < session.lastTimestamp) {
-          console.log(`Ignoring out-of-order message for user ${from}`);
-          return res.sendStatus(200);
-        }
-        session.lastTimestamp = Number(message.timestamp);
-        
-        // If user is in the welcome state and sends a text message
-        if (session.step === STATES.WELCOME && message.type === "text") {
-          const classification = await isQuestionOrRequest(textRaw);
-          if (classification === "question") {
-            // Handle questions
-            const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-            const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-            await sendInteractiveButtons(from, reply, [
-              { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-              { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-            ]);
-            return res.sendStatus(200);
-          } else if (classification === "request") {
-            // Start the request flow
-            session.inRequest = true;
-            const extractedInfo = await extractInformationFromText(textRaw, session.language);
-            session.data = { ...session.data, ...extractedInfo };
             const user = await checkUserRegistration(from);
             if (user && user.name) {
-              // Registered user: Ask if they want to change their information
-              await sendInteractiveButtons(from, "Do you want to change your information?", [
-                { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                { type: "reply", reply: { id: "no_change", title: "No" } }
-              ]);
-              session.step = STATES.CHANGE_INFOO;
+                let welcomeMessage = await getOpenAIResponse(
+                    `Welcome back, ${user.name}. Generate a WhatsApp welcome message for Lootah Biofuels.`,
+                    "",
+                    detectedLanguage
+                );
+                await sendInteractiveButtons(from, welcomeMessage, [
+                    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
+                    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
+                ]);
+                userSessions[from] = {
+                    step: STATES.WELCOME,
+                    data: user,
+                    language: detectedLanguage,
+                    inRequest: false,
+                    lastTimestamp: Number(message.timestamp)
+                };
             } else {
-              // New user: Proceed to collect missing fields
-              const missingFields = getMissingFields(session.data);
-              if (missingFields.length === 0) {
-                session.step = STATES.CONFIRMATION;
-                await sendOrderSummary(from, session);
-              } else {
-                await askForNextMissingField(session, from);
-              }
+                userSessions[from] = {
+                    step: STATES.WELCOME,
+                    data: { phone: from },
+                    language: detectedLanguage,
+                    inRequest: false,
+                    lastTimestamp: Number(message.timestamp)
+                };
+                const welcomeMessage = await getOpenAIResponse(
+                    "Generate a WhatsApp welcome message for Lootah Biofuels.",
+                    "",
+                    detectedLanguage
+                );
+                await sendInteractiveButtons(from, welcomeMessage, [
+                    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
+                    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
+                ]);
             }
             return res.sendStatus(200);
-          } else {
-            // For greetings or other inputs
-            const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-            await sendToWhatsApp(from, aiResponse);
-            return res.sendStatus(200);
-          }
         }
-        
-        // Handle interactive button replies (e.g., for new_request)
+
+        if (session.lastTimestamp && Number(message.timestamp) < session.lastTimestamp) {
+            console.log(`Ignoring out-of-order message for user ${from}`);
+            return res.sendStatus(200);
+        }
+        session.lastTimestamp = Number(message.timestamp);
+
+        // Handle text messages after the welcome message
+        if (session.step === STATES.WELCOME && message.type === "text") {
+            const classification = await isQuestionOrRequest(textRaw);
+
+            if (classification === "question") {
+                // Handle questions
+                const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+                const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+                await sendInteractiveButtons(from, reply, [
+                    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+                    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+                ]);
+                return res.sendStatus(200);
+            } else if (classification === "request") {
+                // Start the request flow
+                session.inRequest = true;
+
+                // Extract information from the user's sentence
+                const extractedInfo = await extractInformationFromText(textRaw, session.language);
+
+                // Update session data with extracted information
+                session.data = { ...session.data, ...extractedInfo };
+
+                // Check if the user is registered
+                const user = await checkUserRegistration(from);
+                if (user && user.name) {
+                    // Registered user: Ask if they want to change their information
+                    await sendInteractiveButtons(from, "Do you want to change your information?", [
+                        { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                        { type: "reply", reply: { id: "no_change", title: "No" } }
+                    ]);
+                    session.step = STATES.CHANGE_INFO;
+                } else {
+                    // New user: Proceed to collect missing fields
+                    const missingFields = getMissingFields(session.data);
+                    if (missingFields.length === 0) {
+                        // If no missing fields, proceed to confirmation
+                        session.step = STATES.CONFIRMATION;
+                        await sendOrderSummary(from, session);
+                    } else {
+                        // If missing fields, ask for the next missing field
+                        await askForNextMissingField(session, from);
+                    }
+                }
+                return res.sendStatus(200);
+            } else {
+                // Handle greetings or other inputs
+                const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+                await sendToWhatsApp(from, aiResponse);
+                return res.sendStatus(200);
+            }
+        }
+
+        // Handle interactive button replies
         if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-          const buttonId = message.interactive.button_reply.id;
-          if (buttonId === "new_request") {
-            if (!session.data || !session.data.name) {
-              session.inRequest = true;
-              session.step = STATES.NAME;
-              await sendToWhatsApp(from, "Please provide your name.");
-            } else {
-              await sendInteractiveButtons(from, "Do you want to change your information?", [
-                { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                { type: "reply", reply: { id: "no_change", title: "No" } }
-              ]);
-              session.step = STATES.CHANGE_INFO;
+            const buttonId = message.interactive.button_reply.id;
+            if (buttonId === "new_request") {
+                if (!session.data || !session.data.name) {
+                    // Start collecting information immediately if the user is new and doesn't have data
+                    session.inRequest = true;
+                    session.step = STATES.NAME;
+                    await sendToWhatsApp(from, "Please provide your name.");
+                } else {
+                    // Proceed to ask if the user wants to change information if they already have data
+                    await sendInteractiveButtons(from, "Do you want to change your information?", [
+                        { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                        { type: "reply", reply: { id: "no_change", title: "No" } }
+                    ]);
+                    session.step = STATES.CHANGE_INFOO;
+                }
+                return res.sendStatus(200);
+            }
+        }
+
+        // Handle CHANGE_INFO state
+        if (session.step === STATES.CHANGE_INFOO) {
+            if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+                const buttonId = message.interactive.button_reply.id;
+                if (buttonId === "yes_change") {
+                    // Update session data with extracted information
+                    session.data = { ...session.data, ...session.tempData };
+                    delete session.tempData; // Clear temporary data
+        
+                    // Ensure the phone number is not overwritten if already present
+                    if (!session.data.phone) {
+                        session.data.phone = from; // Use the WhatsApp number as the default phone number
+                    }
+        
+                    const missingFields = getMissingFields(session.data);
+                    if (missingFields.length > 0) {
+                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                        await askForNextMissingField(session, from);
+                    } else {
+                        session.step = STATES.QUANTITY;
+                        await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+                    }
+                } else if (buttonId === "no_change") {
+                    session.step = STATES.QUANTITY;
+                    await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+                }
             }
             return res.sendStatus(200);
-          }
         }
-        
-        // Handle CHANGE_INFOO state (registered users replying to change-info prompt)
-        if (session.step === STATES.CHANGE_INFOO) {
-          if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-            const buttonId = message.interactive.button_reply.id;
-            if (buttonId === "yes_change") {
-              const missingFields = getMissingFields(session.data);
-              if (missingFields.length > 0) {
-                session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                await askForNextMissingField(session, from);
-              } else {
-                session.step = STATES.CONFIRMATION;
-                await sendOrderSummary(from, session);
-              }
-            } else if (buttonId === "no_change") {
-              // Registered user who does not want to change info:
-              // Ask for quantity if it hasn't been provided; otherwise, move to confirmation.
-              if (!session.data.quantity) {
-                session.step = STATES.QUANTITY;
-                await sendToWhatsApp(from, "Please provide the quantity (in liters).");
-              } else {
-                session.step = STATES.CONFIRMATION;
-                await sendOrderSummary(from, session);
-              }
-            }
-          }
-          return res.sendStatus(200);
-        } 
 
         // Handle other states (e.g., NAME, QUANTITY, etc.)
         switch (session.step) {
