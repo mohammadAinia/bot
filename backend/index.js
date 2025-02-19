@@ -1082,27 +1082,11 @@ app.post('/webhook', async (req, res) => {
 
             if (classification === "question") {
                 const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-
-                // Validate the aiResponse length
-                if (!aiResponse || aiResponse.trim().length === 0) {
-                    console.error("❌ Error: Empty response from OpenAI.");
-                    await sendToWhatsApp(from, "Sorry, I couldn't generate a response. Please try again.");
-                    return res.sendStatus(200);
-                }
-
-                // Truncate the aiResponse to 1024 characters if it exceeds the limit
-                const truncatedResponse = aiResponse.length > 1024 ? aiResponse.substring(0, 1021) + "..." : aiResponse;
-
-                const reply = `${truncatedResponse}\n\n${getContinueMessage(session.language)}`;
-                try {
-                    await sendInteractiveButtons(from, reply, [
-                        { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-                        { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-                    ]);
-                } catch (error) {
-                    console.error("❌ Failed to send interactive buttons:", error);
-                    await sendToWhatsApp(from, "Sorry, something went wrong. Please try again.");
-                }
+                const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+                await sendInteractiveButtons(from, reply, [
+                    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+                    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+                ]);
                 return res.sendStatus(200);
             } else if (classification === "request") {
                 // Start the request flow
@@ -1156,9 +1140,9 @@ app.post('/webhook', async (req, res) => {
             if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                 const buttonId = message.interactive.button_reply.id;
                 if (buttonId === "yes_change") {
-                    // Start by asking for the name
+                    // Ask for updated information
                     session.step = STATES.NAME;
-                    await sendToWhatsApp(from, "Please provide your name.");
+                    await sendToWhatsApp(from, "Please provide your new name.");
                 } else if (buttonId === "no_change") {
                     // Skip to quantity
                     session.step = STATES.QUANTITY;
