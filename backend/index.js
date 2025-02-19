@@ -1577,7 +1577,7 @@ if (session.step === STATES.CHANGE_INFOO) {
                 
                     // Handle interactive button replies
                     if (message.type === "interactive" && message.interactive?.type === "list_reply") {
-                        const citySelection = message.interactive.button_reply.id;
+                        const citySelection = message.interactive.list_reply.id;
                         const cityMap = {
                             "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
                             "dubai": { en: "Dubai", ar: "دبي" },
