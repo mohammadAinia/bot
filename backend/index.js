@@ -1080,33 +1080,16 @@ app.post('/webhook', async (req, res) => {
         }
         session.lastTimestamp = Number(message.timestamp);
 
-        // Detect if the user is starting a request
-        const isRequestStart = await detectRequestStart(textRaw);
-        if (isRequestStart) {
-            session.inRequest = true;
-            session.step = STATES.CHANGE_INFO;
-            await sendInteractiveButtons(from, "Do you want to change your information?", [
-                { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                { type: "reply", reply: { id: "no_change", title: "No" } }
-            ]);
-            return res.sendStatus(200);
-        }
-
-        // Handle interactive button replies
-        if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-            const buttonId = message.interactive.button_reply.id;
-            if (buttonId === "new_request") {
-                if (!session.data || !session.data.name) {
-                    session.inRequest = true;
-                    session.step = STATES.NAME;
-                    await sendToWhatsApp(from, "Please provide your name.");
-                } else {
-                    await sendInteractiveButtons(from, "Do you want to change your information?", [
-                        { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                        { type: "reply", reply: { id: "no_change", title: "No" } }
-                    ]);
-                    session.step = STATES.CHANGE_INFO;
-                }
+        // Check if the user's message contains information
+        if (session.step === STATES.WELCOME && message.type === "text") {
+            const extractedData = await extractInformationFromText(textRaw, session.language);
+            if (Object.keys(extractedData).length > 0) {
+                session.step = STATES.CHANGE_INFO;
+                await sendInteractiveButtons(from, "Do you want to change your information?", [
+                    { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                    { type: "reply", reply: { id: "no_change", title: "No" } }
+                ]);
+                session.tempData = extractedData; // Store extracted data temporarily
                 return res.sendStatus(200);
             }
         }
@@ -1116,8 +1099,17 @@ app.post('/webhook', async (req, res) => {
             if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                 const buttonId = message.interactive.button_reply.id;
                 if (buttonId === "yes_change") {
-                    session.step = STATES.NAME;
-                    await sendToWhatsApp(from, "Please provide your new name.");
+                    // Update session data with extracted information
+                    session.data = { ...session.data, ...session.tempData };
+                    delete session.tempData; // Clear temporary data
+                    const missingFields = getMissingFields(session.data);
+                    if (missingFields.length > 0) {
+                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                        await askForNextMissingField(session, from);
+                    } else {
+                        session.step = STATES.QUANTITY;
+                        await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+                    }
                 } else if (buttonId === "no_change") {
                     session.step = STATES.QUANTITY;
                     await sendToWhatsApp(from, "Please provide the quantity (in liters).");
