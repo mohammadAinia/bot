@@ -1111,38 +1111,38 @@ app.post('/webhook', async (req, res) => {
         }
 
         // Handle CHANGE_INFO state
-// Handle CHANGE_INFO state
-if (session.step === STATES.CHANGE_INFOO) {
-    if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-        const buttonId = message.interactive.button_reply.id;
-        if (buttonId === "yes_change") {
-            // Update session data with extracted information
-            session.data = { ...session.data, ...session.tempData };
-            delete session.tempData; // Clear temporary data
+        if (session.step === STATES.CHANGE_INFOO) {
+            if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+                const buttonId = message.interactive.button_reply.id;
+                if (buttonId === "yes_change") {
+                    // Update session data with extracted information
+                    session.data = { ...session.data, ...session.tempData };
+                    delete session.tempData; // Clear temporary data
 
-            // Ensure the phone number is not overwritten if already present
-            if (!session.data.phone) {
-                session.data.phone = from; // Use the WhatsApp number as the default phone number
-            }
+                    // Ensure the phone number is not overwritten if already present
+                    if (!session.data.phone) {
+                        session.data.phone = from; // Use the WhatsApp number as the default phone number
+                    }
 
-            const missingFields = getMissingFields(session.data);
-            if (missingFields.length > 0) {
-                session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                await askForNextMissingField(session, from);
-            } else {
-                session.step = STATES.QUANTITY;
-                await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+                    const missingFields = getMissingFields(session.data);
+                    if (missingFields.length > 0) {
+                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                        await askForNextMissingField(session, from);
+                    } else {
+                        session.step = STATES.QUANTITY;
+                        await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+                    }
+                } else if (buttonId === "no_change") {
+                    session.step = STATES.QUANTITY;
+                    await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+                }
             }
-        } else if (buttonId === "no_change") {
-            session.step = STATES.QUANTITY;
-            await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+            return res.sendStatus(200);
         }
-    }
-    return res.sendStatus(200);
-}
-        
 
+        // Analyze the user's message first
         const classification = await isQuestionOrRequest(textRaw);
+
         if (classification === "question") {
             const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
             if (session.inRequest) {
@@ -1154,6 +1154,27 @@ if (session.step === STATES.CHANGE_INFOO) {
                     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
                 ]);
             }
+            return res.sendStatus(200);
+        } else if (classification === "request") {
+            session.inRequest = true;
+            const extractedData = await extractInformationFromText(textRaw, session.language);
+            session.data = { ...session.data, ...extractedData };
+            const missingFields = getMissingFields(session.data);
+            if (missingFields.length === 0) {
+                session.step = STATES.CONFIRMATION;
+                await sendOrderSummary(from, session);
+            } else {
+                session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                await askForNextMissingField(session, from);
+            }
+            return res.sendStatus(200);
+        } else if (classification === "greeting") {
+            const greetingResponse = await getOpenAIResponse("Generate a friendly greeting response.", "", session.language);
+            await sendToWhatsApp(from, greetingResponse);
+            return res.sendStatus(200);
+        } else {
+            // Handle other cases
+            await sendToWhatsApp(from, "I'm not sure how to help with that. Can you please clarify?");
             return res.sendStatus(200);
         }
 
