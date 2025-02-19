@@ -1043,7 +1043,7 @@ app.post('/webhook', async (req, res) => {
                     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
                 ]);
                 userSessions[from] = {
-                    step: STATES.CHANGE_INFO,
+                    step: STATES.WELCOME,
                     data: user,
                     language: detectedLanguage,
                     inRequest: false,
