@@ -535,10 +535,10 @@ const sendCitySelection = async (to, language) => {
                     text: cityPrompt
                 },
                 action: {
-                    button: language === 'ar' ? 'اختر المدينة' : 'Select City', // Button text
+                    button: language === 'ar' ? 'اختر المدينة' : 'Select City',
                     sections: [
                         {
-                            title: language === 'ar' ? 'المدن' : 'Cities', // Section title
+                            title: language === 'ar' ? 'المدن' : 'Cities',
                             rows: cityOptions.map(city => ({
                                 id: city.id,
                                 title: city.title
@@ -564,6 +564,27 @@ const sendCitySelection = async (to, language) => {
     }
 };
 
+
+function extractCity(text, language = "en") {
+    const cities = {
+        en: ["Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Ras Al Khaimah", "Fujairah", "Umm Al Quwain"],
+        ar: ["دبي", "أبو ظبي", "الشارقة", "عجمان", "رأس الخيمة", "الفجيرة", "أم القيوين"]
+    };
+
+    const normalizedText = text.normalize("NFKC").toLowerCase().trim();
+    console.log("Normalized user text:", normalizedText);
+
+    for (const city of cities[language]) {
+        const normalizedCity = city.normalize("NFKC").toLowerCase();
+        console.log("Checking city:", normalizedCity);
+        if (normalizedText.includes(normalizedCity) || normalizedText.includes(normalizedCity.replace(/\s/g, ""))) {
+            console.log("Matched city:", city);
+            return city;
+        }
+    }
+    console.log("No city matched.");
+    return null;
+}
 async function extractInformationFromText(text, language = "en") {
     const extractedData = {
         quantity: extractQuantity(text), // Extract quantity
@@ -619,32 +640,6 @@ async function extractInformationFromText(text, language = "en") {
         return extractedData; // Return at least the manually extracted data
     }
 }
-
-function extractCity(text, language = "en") {
-    const cities = {
-        en: ["Dubai", "Abu Dhabi", "Sharjah", "Ajman", "Ras Al Khaimah", "Fujairah", "Umm Al Quwain"],
-        ar: ["دبي", "أبو ظبي", "الشارقة", "عجمان", "رأس الخيمة", "الفجيرة", "أم القيوين"]
-    };
-
-    const normalizedText = text.normalize("NFKC").toLowerCase().trim();
-    console.log("Normalized user text:", normalizedText);
-
-    for (const city of cities[language]) {
-        const normalizedCity = city.normalize("NFKC").toLowerCase();
-        console.log("Checking city:", normalizedCity);
-        if (normalizedText.includes(normalizedCity) || normalizedText.includes(normalizedCity.replace(/\s/g, ""))) {
-            console.log("Matched city:", city);
-            return city;
-        }
-    }
-    console.log("No city matched.");
-    return null;
-}
-
-
-
-
-
 function getMissingFields(sessionData) {
     // Define fields in the desired sequence
     const orderedFields = [
@@ -1047,7 +1042,7 @@ app.post('/webhook', async (req, res) => {
                     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
                 ]);
                 userSessions[from] = {
-                    step: STATES.WELCOME,
+                    step: STATES.CHANGE_INFO,
                     data: user,
                     language: detectedLanguage,
                     inRequest: false,
@@ -1547,87 +1542,92 @@ if (session.step === STATES.CHANGE_INFO) {
                     await askForNextMissingField(session, from);
                 }
                 break;
-            case "ASK_CITY":
-                if (!session) {
-                    console.error("❌ Session is not defined.");
-                    await sendToWhatsApp(from, "❌ An error occurred. Please try again.");
-                    return res.sendStatus(200);
-                }
-                if (session.data.city) {
-                    moveToNextStep(session, from);
-                    return res.sendStatus(200);
-                }
-                // Handle button replies
-                if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-                    const citySelection = message.interactive.button_reply.id;
-                    // Updated cityMap to include all cities from sendCitySelection
-                    const cityMap = {
-                        "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
-                        "dubai": { en: "Dubai", ar: "دبي" },
-                        "sharjah": { en: "Sharjah", ar: "الشارقة" },
-                        "ajman": { en: "Ajman", ar: "عجمان" },
-                        "umm_al_quwain": { en: "Umm Al Quwain", ar: "أم القيوين" },
-                        "ras_al_khaimah": { en: "Ras Al Khaimah", ar: "رأس الخيمة" },
-                        "fujairah": { en: "Fujairah", ar: "الفجيرة" }
-                    };
-                    if (cityMap[citySelection]) {
-                        session.data.city = cityMap[citySelection][session.language] || cityMap[citySelection].en;
-                        console.log("City set to:", session.data.city);
-                        // If the user has already shared a location, validate it
-                        if (session.data.latitude && session.data.longitude) {
-                            const validation = await validateCityAndLocation(
-                                session.data.latitude,
-                                session.data.longitude,
-                                session.data.city
-                            );
-                            if (!validation.isValid) {
-                                await sendToWhatsApp(
-                                    from,
-                                    `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`
-                                );
-                                return res.sendStatus(200);
-                            }
-                        }
+                case "ASK_CITY":
+                    if (!session) {
+                        console.error("❌ Session is not defined.");
+                        await sendToWhatsApp(from, "❌ An error occurred. Please try again.");
+                        return res.sendStatus(200);
+                    }
+                    if (session.data.city) {
                         moveToNextStep(session, from);
-                    } else {
-                        await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
+                        return res.sendStatus(200);
+                    }
+                
+                    // Handle interactive button replies
+                    if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+                        const citySelection = message.interactive.button_reply.id;
+                        const cityMap = {
+                            "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
+                            "dubai": { en: "Dubai", ar: "دبي" },
+                            "sharjah": { en: "Sharjah", ar: "الشارقة" },
+                            "ajman": { en: "Ajman", ar: "عجمان" },
+                            "umm_al_quwain": { en: "Umm Al Quwain", ar: "أم القيوين" },
+                            "ras_al_khaimah": { en: "Ras Al Khaimah", ar: "رأس الخيمة" },
+                            "fujairah": { en: "Fujairah", ar: "الفجيرة" }
+                        };
+                
+                        if (cityMap[citySelection]) {
+                            session.data.city = cityMap[citySelection][session.language] || cityMap[citySelection].en;
+                            console.log("City set to:", session.data.city);
+                
+                            // Validate against detected location (if available)
+                            if (session.data.latitude && session.data.longitude) {
+                                const validation = await validateCityAndLocation(
+                                    session.data.latitude,
+                                    session.data.longitude,
+                                    session.data.city
+                                );
+                                if (!validation.isValid) {
+                                    await sendToWhatsApp(
+                                        from,
+                                        `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`
+                                    );
+                                    return res.sendStatus(200);
+                                }
+                            }
+                
+                            moveToNextStep(session, from);
+                        } else {
+                            await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
+                            await sendCitySelection(from, session.language);
+                        }
+                    }
+                    // Handle text input
+                    else if (message.type === "text") {
+                        console.log("Checking user response for city:", textRaw);
+                        const selectedCity = extractCity(textRaw, session.language);
+                        if (selectedCity) {
+                            session.data.city = selectedCity;
+                            console.log("City set to:", selectedCity);
+                
+                            // Validate against detected location (if available)
+                            if (session.data.latitude && session.data.longitude) {
+                                const validation = await validateCityAndLocation(
+                                    session.data.latitude,
+                                    session.data.longitude,
+                                    session.data.city
+                                );
+                                if (!validation.isValid) {
+                                    await sendToWhatsApp(
+                                        from,
+                                        `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`
+                                    );
+                                    return res.sendStatus(200);
+                                }
+                            }
+                
+                            moveToNextStep(session, from);
+                        } else {
+                            await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
+                            await sendCitySelection(from, session.language);
+                        }
+                    }
+                    // Handle invalid input
+                    else {
+                        await sendToWhatsApp(from, "❌ Invalid input. Please select a city from the options.");
                         await sendCitySelection(from, session.language);
                     }
-                }
-                // Handle text input
-                else if (message.type === "text") {
-                    console.log("Checking user response for city:", textRaw);
-                    const selectedCity = extractCity(textRaw, session.language);
-                    if (selectedCity) {
-                        session.data.city = selectedCity;
-                        console.log("City set to:", selectedCity);
-                        // Validate against detected location
-                        if (session.data.latitude && session.data.longitude) {
-                            const validation = await validateCityAndLocation(
-                                session.data.latitude,
-                                session.data.longitude,
-                                session.data.city
-                            );
-                            if (!validation.isValid) {
-                                await sendToWhatsApp(
-                                    from,
-                                    `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`
-                                );
-                                return res.sendStatus(200);
-                            }
-                        }
-                        moveToNextStep(session, from);
-                    } else {
-                        await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
-                        await sendCitySelection(from, session.language);
-                    }
-                }
-                // Handle invalid input
-                else {
-                    await sendToWhatsApp(from, "❌ Invalid input. Please select a city from the options.");
-                    await sendCitySelection(from, session.language);
-                }
-                break;
+                    break;
             case "ASK_STREET":
                 // If the user hasn't provided a street name yet, ask for it
                 if (!textRaw) {
@@ -3137,7 +3137,7 @@ app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PO
 //                     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
 //                 ]);
 //                 userSessions[from] = {
-//                     step: STATES.WELCOME,
+//                     step: STATES.CHANGE_INFO,
 //                     data: user,
 //                     language: detectedLanguage,
 //                     inRequest: false,
