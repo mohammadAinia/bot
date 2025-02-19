@@ -1109,7 +1109,7 @@ app.post('/webhook', async (req, res) => {
                 return res.sendStatus(200);
             }
         }
-//
+
         // Handle CHANGE_INFO state
 // Handle CHANGE_INFO state
 if (session.step === STATES.CHANGE_INFOO) {
