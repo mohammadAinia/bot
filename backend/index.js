@@ -548,7 +548,7 @@ const sendCitySelection = async (to, language) => {
                 }
             }
         };
-
+//
         console.log("Sending City Selection Payload:", JSON.stringify(payload, null, 2));
 
         const response = await axios.post(process.env.WHATSAPP_API_URL, payload, {
