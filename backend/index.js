@@ -1129,14 +1129,14 @@ app.post('/webhook', async (req, res) => {
                         { type: "reply", reply: { id: "yes_change", title: "Yes" } },
                         { type: "reply", reply: { id: "no_change", title: "No" } }
                     ]);
-                    session.step = STATES.CHANGE_INFOO;
+                    session.step = STATES.CHANGE_INFO;
                 }
                 return res.sendStatus(200);
             }
         }
 
         // Handle CHANGE_INFO state
-        if (session.step === STATES.CHANGE_INFOO) {
+        if (session.step === STATES.CHANGE_INFO) {
             if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                 const buttonId = message.interactive.button_reply.id;
                 if (buttonId === "yes_change") {
@@ -1172,18 +1172,18 @@ app.post('/webhook', async (req, res) => {
 
         // Handle other states (e.g., NAME, QUANTITY, etc.)
         switch (session.step) {
-            case STATES.CHANGE_INFO:
-                if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-                    const buttonId = message.interactive.button_reply.id;
-                    if (buttonId === "yes_change") {
-                        session.step = STATES.NAME;
-                        await sendToWhatsApp(from, "Please provide your new name.");
-                    } else if (buttonId === "no_change") {
-                        session.step = STATES.QUANTITY;
-                        await sendToWhatsApp(from, "Please provide the quantity (in liters).");
-                    }
-                }
-                break;
+            // case STATES.CHANGE_INFO:
+            //     if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+            //         const buttonId = message.interactive.button_reply.id;
+            //         if (buttonId === "yes_change") {
+            //             session.step = STATES.NAME;
+            //             await sendToWhatsApp(from, "Please provide your new name.");
+            //         } else if (buttonId === "no_change") {
+            //             session.step = STATES.QUANTITY;
+            //             await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+            //         }
+            //     }
+            //     break;
             case STATES.WELCOME:
                 if (message.type === "text") {
                     const isRequestStart = await detectRequestStart(textRaw);
