@@ -1093,30 +1093,37 @@ app.post('/webhook', async (req, res) => {
                 return res.sendStatus(200);
             }
         }
-
+//
         // Handle CHANGE_INFO state
-        if (session.step === STATES.CHANGE_INFO) {
-            if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-                const buttonId = message.interactive.button_reply.id;
-                if (buttonId === "yes_change") {
-                    // Update session data with extracted information
-                    session.data = { ...session.data, ...session.tempData };
-                    delete session.tempData; // Clear temporary data
-                    const missingFields = getMissingFields(session.data);
-                    if (missingFields.length > 0) {
-                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                        await askForNextMissingField(session, from);
-                    } else {
-                        session.step = STATES.QUANTITY;
-                        await sendToWhatsApp(from, "Please provide the quantity (in liters).");
-                    }
-                } else if (buttonId === "no_change") {
-                    session.step = STATES.QUANTITY;
-                    await sendToWhatsApp(from, "Please provide the quantity (in liters).");
-                }
+// Handle CHANGE_INFO state
+if (session.step === STATES.CHANGE_INFO) {
+    if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+        const buttonId = message.interactive.button_reply.id;
+        if (buttonId === "yes_change") {
+            // Update session data with extracted information
+            session.data = { ...session.data, ...session.tempData };
+            delete session.tempData; // Clear temporary data
+
+            // Ensure the phone number is not overwritten if already present
+            if (!session.data.phone) {
+                session.data.phone = from; // Use the WhatsApp number as the default phone number
             }
-            return res.sendStatus(200);
+
+            const missingFields = getMissingFields(session.data);
+            if (missingFields.length > 0) {
+                session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                await askForNextMissingField(session, from);
+            } else {
+                session.step = STATES.QUANTITY;
+                await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+            }
+        } else if (buttonId === "no_change") {
+            session.step = STATES.QUANTITY;
+            await sendToWhatsApp(from, "Please provide the quantity (in liters).");
         }
+    }
+    return res.sendStatus(200);
+}
         
 
         const classification = await isQuestionOrRequest(textRaw);
