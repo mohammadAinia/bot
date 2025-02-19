@@ -1100,18 +1100,27 @@ app.post('/webhook', async (req, res) => {
                 // Update session data with extracted information
                 session.data = { ...session.data, ...extractedInfo };
 
-                // Check if all required fields are present
-                const missingFields = getMissingFields(session.data);
-
-                if (missingFields.length === 0) {
-                    // If no missing fields, proceed to confirmation
-                    session.step = STATES.CONFIRMATION;
-                    await sendOrderSummary(from, session);
+                // Check if the user is registered
+                const user = await checkUserRegistration(from);
+                if (user && user.name) {
+                    // Registered user: Ask if they want to change their information
+                    await sendInteractiveButtons(from, "Do you want to change your information?", [
+                        { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                        { type: "reply", reply: { id: "no_change", title: "No" } }
+                    ]);
+                    session.step = STATES.CHANGE_INFO;
                 } else {
-                    // If missing fields, ask for the next missing field
-                    await askForNextMissingField(session, from);
+                    // New user: Proceed to collect missing fields
+                    const missingFields = getMissingFields(session.data);
+                    if (missingFields.length === 0) {
+                        // If no missing fields, proceed to confirmation
+                        session.step = STATES.CONFIRMATION;
+                        await sendOrderSummary(from, session);
+                    } else {
+                        // If missing fields, ask for the next missing field
+                        await askForNextMissingField(session, from);
+                    }
                 }
-
                 return res.sendStatus(200);
             } else {
                 // Handle greetings or other inputs
@@ -1147,26 +1156,19 @@ app.post('/webhook', async (req, res) => {
             if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                 const buttonId = message.interactive.button_reply.id;
                 if (buttonId === "yes_change") {
-                    // Update session data with extracted information
-                    session.data = { ...session.data, ...session.tempData };
-                    delete session.tempData; // Clear temporary data
-        
-                    // Ensure the phone number is not overwritten if already present
-                    if (!session.data.phone) {
-                        session.data.phone = from; // Use the WhatsApp number as the default phone number
-                    }
-        
+                    // User wants to change their information
                     const missingFields = getMissingFields(session.data);
                     if (missingFields.length > 0) {
                         session.step = `ASK_${missingFields[0].toUpperCase()}`;
                         await askForNextMissingField(session, from);
                     } else {
-                        session.step = STATES.QUANTITY;
-                        await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+                        session.step = STATES.CONFIRMATION;
+                        await sendOrderSummary(from, session);
                     }
                 } else if (buttonId === "no_change") {
-                    session.step = STATES.QUANTITY;
-                    await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+                    // User does not want to change their information
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
                 }
             }
             return res.sendStatus(200);
