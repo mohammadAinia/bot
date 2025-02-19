@@ -371,7 +371,8 @@ const STATES = {
     QUANTITY: 6,
     CONFIRMATION: 5,
     MODIFY: "modify",  // New state for modification,
-    CHANGE_INFO: "CHANGE_INFO"
+    CHANGE_INFO: "CHANGE_INFO",
+    CHANGE_INFOO:"CHANGE_INFOO"
 };
 
 const sendUpdatedSummary = async (to, session) => {
@@ -1079,7 +1080,7 @@ app.post('/webhook', async (req, res) => {
         if (session.step === STATES.WELCOME && message.type === "text") {
             const extractedData = await extractInformationFromText(textRaw, session.language);
             if (Object.keys(extractedData).length > 0) {
-                session.step = STATES.CHANGE_INFO;
+                session.step = STATES.CHANGE_INFOO;
                 await sendInteractiveButtons(from, "Do you want to change your information?", [
                     { type: "reply", reply: { id: "yes_change", title: "Yes" } },
                     { type: "reply", reply: { id: "no_change", title: "No" } }
@@ -1091,7 +1092,7 @@ app.post('/webhook', async (req, res) => {
 //
         // Handle CHANGE_INFO state
 // Handle CHANGE_INFO state
-if (session.step === STATES.CHANGE_INFO) {
+if (session.step === STATES.CHANGE_INFOO) {
     if (message.type === "interactive" && message.interactive?.type === "button_reply") {
         const buttonId = message.interactive.button_reply.id;
         if (buttonId === "yes_change") {
