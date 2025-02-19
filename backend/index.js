@@ -1089,10 +1089,22 @@ app.post('/webhook', async (req, res) => {
                 ]);
                 return res.sendStatus(200);
             } else if (classification === "request") {
-                // Start the request flow if the user explicitly indicates a request
+                // Start the request flow
                 session.inRequest = true;
-                session.step = STATES.NAME;
-                await sendToWhatsApp(from, "Please provide your name.");
+
+                // Check if the user is registered
+                if (session.data && session.data.name) {
+                    // Registered user: Ask if they want to change their information
+                    await sendInteractiveButtons(from, "Do you want to change your information?", [
+                        { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                        { type: "reply", reply: { id: "no_change", title: "No" } }
+                    ]);
+                    session.step = STATES.CHANGE_INFO;
+                } else {
+                    // New user: Ask for their name
+                    session.step = STATES.NAME;
+                    await sendToWhatsApp(from, "Please provide your name.");
+                }
                 return res.sendStatus(200);
             } else {
                 // Handle greetings or other inputs
@@ -1124,28 +1136,15 @@ app.post('/webhook', async (req, res) => {
         }
 
         // Handle CHANGE_INFO state
-        if (session.step === STATES.CHANGE_INFOO) {
+        if (session.step === STATES.CHANGE_INFO) {
             if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                 const buttonId = message.interactive.button_reply.id;
                 if (buttonId === "yes_change") {
-                    // Update session data with extracted information
-                    session.data = { ...session.data, ...session.tempData };
-                    delete session.tempData; // Clear temporary data
-
-                    // Ensure the phone number is not overwritten if already present
-                    if (!session.data.phone) {
-                        session.data.phone = from; // Use the WhatsApp number as the default phone number
-                    }
-
-                    const missingFields = getMissingFields(session.data);
-                    if (missingFields.length > 0) {
-                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                        await askForNextMissingField(session, from);
-                    } else {
-                        session.step = STATES.QUANTITY;
-                        await sendToWhatsApp(from, "Please provide the quantity (in liters).");
-                    }
+                    // Ask for updated information
+                    session.step = STATES.NAME;
+                    await sendToWhatsApp(from, "Please provide your new name.");
                 } else if (buttonId === "no_change") {
+                    // Skip to quantity
                     session.step = STATES.QUANTITY;
                     await sendToWhatsApp(from, "Please provide the quantity (in liters).");
                 }
