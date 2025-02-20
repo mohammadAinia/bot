@@ -1012,6 +1012,11 @@ function formatAddress(address) {
     return [street, city, country].filter(Boolean).join(", "); // Join non-empty parts
 }
 
+function extractStreetName(address) {
+    if (!address) return null;
+    return address.road || address.street || address.neighbourhood || address.suburb || null;
+}
+
 
 
 app.post('/webhook', async (req, res) => {
