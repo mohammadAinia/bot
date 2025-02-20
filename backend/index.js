@@ -1003,16 +1003,13 @@ async function checkUserRegistration(phoneNumber) {
 async function getAddressFromCoordinates(latitude, longitude) {
     try {
         const response = await axios.get(`https://nominatim.openstreetmap.org/reverse`, {
-            params: {
-                lat: latitude,
-                lon: longitude,
-                format: "json"
-            }
+            params: { lat: latitude, lon: longitude, format: "json" }
         });
 
         if (response.data && response.data.address) {
-            const address = response.data.address;
-            return formatAddress(address); // Format the address before returning
+            console.log("🔍 Address API Response:", response.data.address); // Debugging
+
+            return formatAddress(response.data.address);
         }
         return null;
     } catch (error) {
@@ -1020,6 +1017,7 @@ async function getAddressFromCoordinates(latitude, longitude) {
         return null;
     }
 }
+
 
 // Function to format the address into a readable string
 function formatAddress(address) {
@@ -1031,9 +1029,18 @@ function formatAddress(address) {
 }
 
 function extractStreetName(address) {
-    if (!address) return null;
-    return address.road || address.street || address.neighbourhood || address.suburb || "Unknown Street"; 
+    if (!address) return "Unknown Street";
+
+    // Prioritize main street-related fields
+    return address.road || 
+           address.street || 
+           address.residential || // Sometimes used in residential areas
+           address.neighbourhood || 
+           address.suburb || 
+           address.city_district || // Extra fallback for districts
+           "Unknown Street"; 
 }
+
 
 
 
