@@ -828,9 +828,6 @@ function getBuildingMessage(language) {
 function getFlatMessage(language) {
     return language === 'ar' ? '🚪 يرجى تقديم رقم الشقة.' : '🚪 Please provide the flat number.';
 }
-function getFlatMessage(language) {
-    return language === 'ar' ? '🚪 يرجى تقديم رقم الشقة.' : '🚪 Please provide the flat number.';
-}
 
 const getLocationMessage = (language) => {
     return language === 'ar'
