@@ -510,6 +510,44 @@ const sendInteractiveButtons = async (to, message, buttons) => {
         console.error("❌ Failed to send interactive buttons:", error.response?.data || error.message);
     }
 };
+
+const sendInteractiveButtons2 = async (to, message, buttons) => {
+    try {
+        const payload = {
+            messaging_product: "whatsapp",
+            recipient_type: "individual",
+            to: to,
+            type: "interactive",
+            interactive: {
+                type: "button",
+                body: { text: message },
+                action: {
+                    buttons: buttons.map(button => ({
+                        type: "reply",
+                        reply: {
+                            id: button.id, // Fix: button should have id, not button.reply.id
+                            title: button.title // Fix: button should have title, not button.reply.title
+                        }
+                    }))
+                }
+            }
+        };
+
+        console.log("✅ Sending Interactive Buttons Payload:", JSON.stringify(payload, null, 2));
+
+        const response = await axios.post(process.env.WHATSAPP_API_URL, payload, {
+            headers: {
+                "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                "Content-Type": "application/json"
+            }
+        });
+
+        console.log("✅ Interactive Buttons Response:", response.data);
+    } catch (error) {
+        console.error("❌ Failed to send interactive buttons:", error.response?.data || error.message);
+    }
+};
+
 function extractQuantity(text) {
     // Match both Western Arabic (0-9) and Eastern Arabic (٠-٩) numerals
     const match = text.match(/[\d\u0660-\u0669]+/);
@@ -1059,6 +1097,7 @@ async function sendQuantitySelection(user, language) {
 
 
 
+
 app.post('/webhook', async (req, res) => {
     try {
         console.log("🔹 Incoming Webhook Data:", JSON.stringify(req.body, null, 2));
@@ -1464,7 +1503,8 @@ if (session.step === STATES.CHANGE_INFOO) {
                     session.data.flat_no = textRaw;
                     console.log("🔹 Updated session.data:", session.data);
                     session.step = STATES.QUANTITY;
-                    await sendToWhatsApp(from, getQuantityMessage(session.language));
+                    return await sendQuantitySelection(from, session.language);
+                    // await sendToWhatsApp(from, getQuantityMessage(session.language));
                     break;
                 // const missingFields2 = getMissingFields(session.data); // Reuse the variable
                 // if (missingFields2.length === 0) {
@@ -1482,7 +1522,6 @@ if (session.step === STATES.CHANGE_INFOO) {
                     console.log("🔹 Entered QUANTITY state for user:", from);
                     console.log("🔹 textRaw:", textRaw);
                 
-                    // ✅ Handle button selection (interactive message)
                     if (message.interactive && message.interactive.type === "button_reply") {
                         const selectedQuantity = parseInt(message.interactive.button_reply.id, 10);
                 
@@ -1494,9 +1533,7 @@ if (session.step === STATES.CHANGE_INFOO) {
                             await sendQuantitySelection(from, session.language);
                             return res.sendStatus(200);
                         }
-                    }
-                    // ✅ Handle manual input
-                    else {
+                    } else {
                         if (!textRaw || textRaw.trim() === "") {
                             console.log("🔹 No quantity provided. Asking for quantity.");
                             await sendQuantitySelection(from, session.language);
@@ -1516,7 +1553,7 @@ if (session.step === STATES.CHANGE_INFOO) {
                         session.data.quantity = quantity;
                     }
                 
-                    // ✅ Proceed to the next step
+                    // Proceed to the next step
                     const missingFields = getMissingFields(session.data);
                     console.log("🔹 Missing fields after quantity:", missingFields);
                 
@@ -1528,6 +1565,7 @@ if (session.step === STATES.CHANGE_INFOO) {
                         await askForNextMissingField(session, from);
                     }
                     break;
+                
                 
                 
             case "ASK_NAME":
