@@ -1422,9 +1422,6 @@ if (session.step === STATES.CHANGE_INFOO) {
                     await sendToWhatsApp(from, getFlatMessage(session.language));
                     return res.sendStatus(200);
                 }
-                if (!session.data) {
-                    session.data = {}; // Initialize if missing
-                }
                 session.data.flat_no = textRaw;
                 session.step = STATES.QUANTITY;
                 await sendOrderSummary(from, getQuantityMessage(session.language));
