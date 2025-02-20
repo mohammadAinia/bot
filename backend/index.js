@@ -1346,87 +1346,84 @@ if (session.step === STATES.CHANGE_INFOO) {
                     break;
                 
 
-    case STATES.CITY:
-        if (message.interactive && message.interactive.type === "list_reply") {
-            const citySelection = message.interactive.list_reply.id; // Get selected city ID
-            const cityMap = {
-                "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
-                "dubai": { en: "Dubai", ar: "دبي" },
-                "sharjah": { en: "Sharjah", ar: "الشارقة" },
-                "ajman": { en: "Ajman", ar: "عجمان" },
-                "umm_al_quwain": { en: "Umm Al Quwain", ar: "أم القيوين" },
-                "ras_al_khaimah": { en: "Ras Al Khaimah", ar: "رأس الخيمة" },
-                "fujairah": { en: "Fujairah", ar: "الفجيرة" }
-            };
-    
-            if (cityMap[citySelection]) {
-                const selectedCity = cityMap[citySelection][session.language] || cityMap[citySelection].en;
-                
-                // Validate the city using the actual location if available
-                if (session.data.latitude && session.data.longitude) {
-                    const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
-                    if (!validationResult.isValid) {
-                        const errorMessage = session.language === 'ar'
-                            ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
-                            : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;    
-    
-                        await sendToWhatsApp(from, errorMessage);
-                        await sendCitySelection(from, session.language);
-                        return res.sendStatus(200);
-                    }
-                }
-    
-                // Store the selected city
-                session.data.city = selectedCity;
-    
-                // 📌 🏠 Automatically fetch the street name
-                if (session.data.latitude && session.data.longitude) {
-                    const address = await getAddressFromCoordinates(session.data.latitude, session.data.longitude);
-                    if (address) {
-                        session.data.street = extractStreetName(address); // Extract street name
-                    }
-                }
-    
-                session.step = STATES.BUILDING_NAME; // Skip STREET state
-    
-                const buildingPrompt = session.language === 'ar'
-                    ? `✅ لقد اخترت *${session.data.city}*.\n\n🏢 يرجى تقديم اسم المبنى.`
-                    : `✅ You selected *${session.data.city}*.\n\n🏢 Please provide the building name.`;
-    
-                await sendToWhatsApp(from, buildingPrompt);
-            } else {
-                const invalidSelectionMessage = session.language === 'ar'
-                    ? "❌ اختيار غير صالح. يرجى الاختيار من الخيارات المتاحة."
-                    : "❌ Invalid selection. Please choose from the provided options.";
-    
-                await sendToWhatsApp(from, invalidSelectionMessage);
-                await sendCitySelection(from, session.language);
-            }
-        }
-        break;
+                    case STATES.CITY:
+                        if (message.interactive && message.interactive.type === "list_reply") {
+                            const citySelection = message.interactive.list_reply.id; // Get selected city ID
+                            const cityMap = {
+                                "abu_dhabi": { en: "Abu Dhabi", ar: "أبو ظبي" },
+                                "dubai": { en: "Dubai", ar: "دبي" },
+                                "sharjah": { en: "Sharjah", ar: "الشارقة" },
+                                "ajman": { en: "Ajman", ar: "عجمان" },
+                                "umm_al_quwain": { en: "Umm Al Quwain", ar: "أم القيوين" },
+                                "ras_al_khaimah": { en: "Ras Al Khaimah", ar: "رأس الخيمة" },
+                                "fujairah": { en: "Fujairah", ar: "الفجيرة" }
+                            };
+                    
+                            if (cityMap[citySelection]) {
+                                const selectedCity = cityMap[citySelection][session.language] || cityMap[citySelection].en;
+                    
+                                // Validate the city using the actual location if available
+                                if (session.data.latitude && session.data.longitude) {
+                                    const validationResult = await validateCityAndLocation(session.data.latitude, session.data.longitude, selectedCity);
+                                    if (!validationResult.isValid) {
+                                        const errorMessage = session.language === 'ar'
+                                            ? `❌ يبدو أن موقعك يقع في *${validationResult.actualCity}*. يرجى اختيار *${validationResult.actualCity}* بدلاً من *${selectedCity}*.`
+                                            : `❌ It seems your location is in *${validationResult.actualCity}*. Please select *${validationResult.actualCity}* instead of *${selectedCity}*.`;
+                    
+                                        await sendToWhatsApp(from, errorMessage);
+                                        await sendCitySelection(from, session.language);
+                                        return res.sendStatus(200);
+                                    }
+                                }
+                    
+                                // Store the selected city
+                                session.data.city = selectedCity;
+                    
+                                // Automatically fetch the street name
+                                if (session.data.latitude && session.data.longitude) {
+                                    const address = await getAddressFromCoordinates(session.data.latitude, session.data.longitude);
+                                    if (address) {
+                                        session.data.street = extractStreetName(address); // Extract street name
+                                    }
+                                }
+                    
+                                session.step = STATES.BUILDING_NAME; // Skip STREET state
+                    
+                                const buildingPrompt = session.language === 'ar'
+                                    ? `✅ لقد اخترت *${session.data.city}*.\n\n🏢 يرجى تقديم اسم المبنى.`
+                                    : `✅ You selected *${session.data.city}*.\n\n🏢 Please provide the building name.`;
+                    
+                                await sendToWhatsApp(from, buildingPrompt);
+                            } else {
+                                const invalidSelectionMessage = session.language === 'ar'
+                                    ? "❌ اختيار غير صالح. يرجى الاختيار من الخيارات المتاحة."
+                                    : "❌ Invalid selection. Please choose from the provided options.";
+                    
+                                await sendToWhatsApp(from, invalidSelectionMessage);
+                                await sendCitySelection(from, session.language);
+                            }
+                        }
+                        break;
     
                     
-            case STATES.BUILDING_NAME:
-                if (!textRaw || textRaw.trim() === "") {
-                    // If no building name is provided, ask for it again
-                    await sendToWhatsApp(from, getBuildingMessage(session.language));
-                    return res.sendStatus(200); // Exit and wait for the user's response
-                }
-                // If the building name is provided, store it and proceed to the next step
-                session.data.building_name = textRaw;
-                session.step = STATES.FLAT_NO;
-                await sendToWhatsApp(from, getFlatMessage(session.language)); // Ask for flat number
-                break;
+        case STATES.BUILDING_NAME:
+            if (!textRaw || textRaw.trim() === "") {
+                await sendToWhatsApp(from, getBuildingMessage(session.language));
+                return res.sendStatus(200);
+            }
+            session.data.building_name = textRaw;
+            session.step = STATES.FLAT_NO;
+            await sendToWhatsApp(from, getFlatMessage(session.language));
+            break;
 
 
                 case STATES.FLAT_NO:
                     console.log("🔹 Entered FLAT_NO state for user:", from);
                     console.log("🔹 Current session.data:", session.data);
                 
-                    // Validate session.data
                     if (!session.data || typeof session.data !== "object") {
                         console.error("❌ Error: session.data is corrupted. Reinitializing.");
-                        session.data = {}; // Reset to an empty object
+                        session.data = {};
                     }
                 
                     if (!textRaw || textRaw.trim() === "") {
@@ -1436,9 +1433,11 @@ if (session.step === STATES.CHANGE_INFOO) {
                     }
                 
                     console.log("🔹 Flat number provided:", textRaw);
-                    session.data.flat_no = textRaw; // Set the flat number
+                    session.data.flat_no = textRaw;
                     console.log("🔹 Updated session.data:", session.data);
                     session.step = STATES.QUANTITY;
+                    await sendToWhatsApp(from, getQuantityMessage(session.language));
+                    break;
                 // const missingFields2 = getMissingFields(session.data); // Reuse the variable
                 // if (missingFields2.length === 0) {
                 //     session.step = STATES.CONFIRMATION;
@@ -1467,7 +1466,6 @@ if (session.step === STATES.CHANGE_INFOO) {
                     console.log("🔹 Valid quantity provided:", textRaw);
                     session.data.quantity = textRaw;
                 
-                    // Initialize missingFields after setting the quantity
                     const missingFields = getMissingFields(session.data);
                     console.log("🔹 Missing fields after quantity:", missingFields);
                 
