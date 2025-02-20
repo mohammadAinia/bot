@@ -1417,15 +1417,27 @@ if (session.step === STATES.CHANGE_INFOO) {
                 session.step = STATES.FLAT_NO;
                 await sendToWhatsApp(from, getFlatMessage(session.language)); // Ask for flat number
                 break;
-            case STATES.FLAT_NO:
-                if (!textRaw || textRaw.trim() === "") {
-                    await sendToWhatsApp(from, getFlatMessage(session.language));
-                    return res.sendStatus(200);
-                }
-                session.data.flat_no = textRaw;
-                session.step = STATES.QUANTITY;
-                await sendOrderSummary(from, getQuantityMessage(session.language));
-                break;
+
+
+                case STATES.FLAT_NO:
+                    console.log("🔹 Entered FLAT_NO state for user:", from);
+                    console.log("🔹 Current session.data:", session.data);
+                
+                    // Validate session.data
+                    if (!session.data || typeof session.data !== "object") {
+                        console.error("❌ Error: session.data is corrupted. Reinitializing.");
+                        session.data = {}; // Reset to an empty object
+                    }
+                
+                    if (!textRaw || textRaw.trim() === "") {
+                        console.log("🔹 No flat number provided. Asking for flat number.");
+                        await sendToWhatsApp(from, getFlatMessage(session.language));
+                        return res.sendStatus(200);
+                    }
+                
+                    console.log("🔹 Flat number provided:", textRaw);
+                    session.data.flat_no = textRaw; // Set the flat number
+                    console.log("🔹 Updated session.data:", session.data);
                 // const missingFields2 = getMissingFields(session.data); // Reuse the variable
                 // if (missingFields2.length === 0) {
                 //     session.step = STATES.CONFIRMATION;
@@ -1435,6 +1447,9 @@ if (session.step === STATES.CHANGE_INFOO) {
                 //     await askForNextMissingField(session, from);
                 // }
                 // break;
+
+
+
                 case STATES.QUANTITY:
                     console.log("🔹 Entered QUANTITY state for user:", from);
                     console.log("🔹 textRaw:", textRaw);
