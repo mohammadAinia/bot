@@ -828,6 +828,9 @@ function getBuildingMessage(language) {
 function getFlatMessage(language) {
     return language === 'ar' ? '🚪 يرجى تقديم رقم الشقة.' : '🚪 Please provide the flat number.';
 }
+function getFlatMessage(language) {
+    return language === 'ar' ? '🚪 يرجى تقديم رقم الشقة.' : '🚪 Please provide the flat number.';
+}
 
 const getLocationMessage = (language) => {
     return language === 'ar'
@@ -1405,15 +1408,18 @@ if (session.step === STATES.CHANGE_INFOO) {
                     return res.sendStatus(200);
                 }
                 session.data.flat_no = textRaw;
-                const missingFields2 = getMissingFields(session.data); // Reuse the variable
-                if (missingFields2.length === 0) {
-                    session.step = STATES.CONFIRMATION;
-                    await sendOrderSummary(from, session);
-                } else {
-                    session.step = `ASK_${missingFields2[0].toUpperCase()}`;
-                    await askForNextMissingField(session, from);
-                }
+                session.step = STATES.QUANTITY;
+                await sendOrderSummary(from, getQuantityMessage(session.language));
                 break;
+                // const missingFields2 = getMissingFields(session.data); // Reuse the variable
+                // if (missingFields2.length === 0) {
+                //     session.step = STATES.CONFIRMATION;
+                //     await sendOrderSummary(from, session);
+                // } else {
+                //     session.step = `ASK_${missingFields2[0].toUpperCase()}`;
+                //     await askForNextMissingField(session, from);
+                // }
+                // break;
                 case STATES.QUANTITY:
                     console.log("🔹 Entered QUANTITY state for user:", from);
                     console.log("🔹 textRaw:", textRaw);
