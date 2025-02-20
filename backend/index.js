@@ -1438,6 +1438,7 @@ if (session.step === STATES.CHANGE_INFOO) {
                     console.log("🔹 Flat number provided:", textRaw);
                     session.data.flat_no = textRaw; // Set the flat number
                     console.log("🔹 Updated session.data:", session.data);
+                    session.step = STATES.QUANTITY;
                 // const missingFields2 = getMissingFields(session.data); // Reuse the variable
                 // if (missingFields2.length === 0) {
                 //     session.step = STATES.CONFIRMATION;
