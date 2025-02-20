@@ -1212,7 +1212,16 @@ app.post('/webhook', async (req, res) => {
         } catch (error) {
             console.log("⚠️ Language detection failed. Defaulting to English.", error);
         }
+
         let session = userSessions[from];
+
+        // Check for out-of-order messages
+        if (session?.lastTimestamp && Number(message.timestamp) < session.lastTimestamp) {
+            console.log(`Ignoring out-of-order message for user ${from}`);
+            return res.sendStatus(200);
+        }
+
+        // Initialize session if it doesn't exist
         if (!session) {
             const user = await checkUserRegistration(from);
             if (user && user.name) {
@@ -1252,11 +1261,11 @@ app.post('/webhook', async (req, res) => {
             }
             return res.sendStatus(200); // Exit after sending welcome message
         }
-        
-        
 
+        // Update the session's last timestamp
+        session.lastTimestamp = Number(message.timestamp);
 
-
+        // Classify the user's input
         const classification = await isQuestionOrRequest(textRaw);
 
         if (classification === "question") {
@@ -1294,6 +1303,7 @@ app.post('/webhook', async (req, res) => {
             ]);
         }
 
+        // Handle button replies
         if (message.type === "interactive" && message.interactive?.type === "button_reply") {
             const buttonId = message.interactive.button_reply.id;
             if (buttonId === "new_request") {
@@ -1314,100 +1324,36 @@ app.post('/webhook', async (req, res) => {
             }
         }
 
-        if (session.lastTimestamp && Number(message.timestamp) < session.lastTimestamp) {
-            console.log(`Ignoring out-of-order message for user ${from}`);
+        // Handle CHANGE_INFOO state
+        if (session.step === STATES.CHANGE_INFOO) {
+            if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+                const buttonId = message.interactive.button_reply.id;
+                if (buttonId === "yes_change") {
+                    // Update session data with extracted information
+                    session.data = { ...session.data, ...session.tempData };
+                    delete session.tempData; // Clear temporary data
+
+                    // Ensure the phone number is not overwritten if already present
+                    if (!session.data.phone) {
+                        session.data.phone = from; // Use the WhatsApp number as the default phone number
+                    }
+
+                    const missingFields = getMissingFields(session.data);
+                    if (missingFields.length > 0) {
+                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                        await askForNextMissingField(session, from);
+                    } else {
+                        session.step = STATES.QUANTITY;
+                        await sendQuantitySelection(from, session.language);
+                    }
+                } else if (buttonId === "no_change") {
+                    session.step = STATES.QUANTITY;
+                    await sendQuantitySelection(from, session.language);
+                }
+            }
             return res.sendStatus(200);
         }
-        session.lastTimestamp = Number(message.timestamp);
 
-
-if (session.step === STATES.CHANGE_INFOO) {
-    if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-        const buttonId = message.interactive.button_reply.id;
-        if (buttonId === "yes_change") {
-            // Update session data with extracted information
-            session.data = { ...session.data, ...session.tempData };
-            delete session.tempData; // Clear temporary data
-
-            // Ensure the phone number is not overwritten if already present
-            if (!session.data.phone) {
-                session.data.phone = from; // Use the WhatsApp number as the default phone number
-            }
-
-            const missingFields = getMissingFields(session.data);
-            if (missingFields.length > 0) {
-                session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                await askForNextMissingField(session, from);
-            } else {
-                session.step = STATES.QUANTITY;
-                await sendQuantitySelection(from, session.language);
-            }
-        } else if (buttonId === "no_change") {
-            session.step = STATES.QUANTITY;
-            await sendQuantitySelection(from, session.language);
-        }
-    }
-    return res.sendStatus(200);
-}
-                // if (!session.hasReceivedWelcome) {
-        //     const welcomeMessage = await getOpenAIResponse(
-        //         session.data?.name ? `Welcome back, ${session.data.name}. Generate a WhatsApp welcome message for Lootah Biofuels.` : "Generate a WhatsApp welcome message for Lootah Biofuels.",
-        //         "",
-        //         session.language
-        //     );
-        //     await sendInteractiveButtons(from, welcomeMessage, [
-        //         { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-        //         { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-        //     ]);
-        //     session.hasReceivedWelcome = true; // Update the flag
-        //     return res.sendStatus(200);
-        // }
-
-        // Check if the user's message contains information
-        // if (session.step === STATES.WELCOME && message.type === "text") {
-        //     const extractedData = await extractInformationFromText(textRaw, session.language);
-        //     if (Object.keys(extractedData).length > 0) {
-        //         session.step = STATES.CHANGE_INFOO;
-        //         await sendInteractiveButtons(from, "Do you want to change your information?", [
-        //             { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-        //             { type: "reply", reply: { id: "no_change", title: "No" } }
-        //         ]);
-        //         session.tempData = extractedData; // Store extracted data temporarily
-        //         return res.sendStatus(200);
-        //     }
-        // }
-
-
-
-        // Handle CHANGE_INFO state
-// Handle CHANGE_INFO state
-// const classification = await isQuestionOrRequest(textRaw);
-
-// if (classification === "question") {
-//     const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-//     if (session.inRequest) {
-//         await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
-//     } else {
-//         const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-//         await sendInteractiveButtons(from, reply, [
-//             { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-//             { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-//         ]);
-//     }
-// } else if (classification === "request") {
-//     session.inRequest = true;
-//     const extractedData = await extractInformationFromText(textRaw, session.language);
-//     session.data = { ...session.data, ...extractedData, phone: extractedData.phone || session.data.phone };
-    
-//     const missingFields = getMissingFields(session.data);
-//     if (missingFields.length === 0) {
-//         session.step = STATES.CONFIRMATION;
-//         await sendOrderSummary(from, session);
-//     } else {
-//         session.step = `ASK_${missingFields[0].toUpperCase()}`;
-//         await askForNextMissingField(session, from);
-//     }
-// }
 
         let latitude
         let longitude
@@ -1424,65 +1370,7 @@ if (session.step === STATES.CHANGE_INFOO) {
                     }
                 }
                 break;
-                //
-                // case STATES.WELCOME:
-                //     if (message.type === "text") {
-                //         // First, classify the user's input
-                //         const classification = await isQuestionOrRequest(textRaw);
-                
-                //         if (classification === "question") {
-                //             // Handle questions directly
-                //             const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-                //             const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-                
-                //             await sendInteractiveButtons(from, reply, [
-                //                 { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-                //                 { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-                //             ]);
-                //             return res.sendStatus(200); // Exit after handling the question
-                //         } else if (classification === "request") {
-                //             // Handle requests
-                //             session.inRequest = true;
-                //             const extractedData = await extractInformationFromText(textRaw, session.language);
-                //             session.data = {
-                //                 ...session.data,
-                //                 ...extractedData,
-                //                 phone: extractedData.phone || session.data.phone
-                //             };
-                //             console.log("Extracted data:", extractedData);
-                
-                //             const missingFields = getMissingFields(session.data);
-                //             if (missingFields.length === 0) {
-                //                 session.step = STATES.CONFIRMATION;
-                //                 await sendOrderSummary(from, session);
-                //             } else {
-                //                 session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                //                 await askForNextMissingField(session, from);
-                //             }
-                //         } else {
-                //             // Handle other cases (greeting, other)
-                //             const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-                //             const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-                
-                //             await sendInteractiveButtons(from, reply, [
-                //                 { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-                //                 { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-                //             ]);
-                //         }
-                //     } else if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-                //         const buttonId = message.interactive.button_reply.id;
-                
-                //         if (buttonId === "contact_us") {
-                //             await sendToWhatsApp(from, getContactMessage(session.language));
-                //         } else if (buttonId === "new_request") {
-                //             session.inRequest = true;
-                //             session.step = STATES.NAME;
-                //             await sendToWhatsApp(from, getNameMessage(session.language));
-                //         } else {
-                //             await sendToWhatsApp(from, getInvalidOptionMessage(session.language));
-                //         }
-                //     }
-                //     break;
+
             case STATES.WELCOME:
                 if (message.type === "text") {
                     const isRequestStart = await detectRequestStart(textRaw);
@@ -2450,7 +2338,65 @@ if (session.step === STATES.CHANGE_INFOO) {
 
 
 
+                // if (!session.hasReceivedWelcome) {
+        //     const welcomeMessage = await getOpenAIResponse(
+        //         session.data?.name ? `Welcome back, ${session.data.name}. Generate a WhatsApp welcome message for Lootah Biofuels.` : "Generate a WhatsApp welcome message for Lootah Biofuels.",
+        //         "",
+        //         session.language
+        //     );
+        //     await sendInteractiveButtons(from, welcomeMessage, [
+        //         { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+        //         { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+        //     ]);
+        //     session.hasReceivedWelcome = true; // Update the flag
+        //     return res.sendStatus(200);
+        // }
 
+        // Check if the user's message contains information
+        // if (session.step === STATES.WELCOME && message.type === "text") {
+        //     const extractedData = await extractInformationFromText(textRaw, session.language);
+        //     if (Object.keys(extractedData).length > 0) {
+        //         session.step = STATES.CHANGE_INFOO;
+        //         await sendInteractiveButtons(from, "Do you want to change your information?", [
+        //             { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+        //             { type: "reply", reply: { id: "no_change", title: "No" } }
+        //         ]);
+        //         session.tempData = extractedData; // Store extracted data temporarily
+        //         return res.sendStatus(200);
+        //     }
+        // }
+
+
+
+        // Handle CHANGE_INFO state
+// Handle CHANGE_INFO state
+// const classification = await isQuestionOrRequest(textRaw);
+
+// if (classification === "question") {
+//     const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+//     if (session.inRequest) {
+//         await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
+//     } else {
+//         const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+//         await sendInteractiveButtons(from, reply, [
+//             { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+//             { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+//         ]);
+//     }
+// } else if (classification === "request") {
+//     session.inRequest = true;
+//     const extractedData = await extractInformationFromText(textRaw, session.language);
+//     session.data = { ...session.data, ...extractedData, phone: extractedData.phone || session.data.phone };
+    
+//     const missingFields = getMissingFields(session.data);
+//     if (missingFields.length === 0) {
+//         session.step = STATES.CONFIRMATION;
+//         await sendOrderSummary(from, session);
+//     } else {
+//         session.step = `ASK_${missingFields[0].toUpperCase()}`;
+//         await askForNextMissingField(session, from);
+//     }
+// }
 
 
 
@@ -2610,7 +2556,65 @@ app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PO
 
 
 
-
+                //
+                // case STATES.WELCOME:
+                //     if (message.type === "text") {
+                //         // First, classify the user's input
+                //         const classification = await isQuestionOrRequest(textRaw);
+                
+                //         if (classification === "question") {
+                //             // Handle questions directly
+                //             const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+                //             const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+                
+                //             await sendInteractiveButtons(from, reply, [
+                //                 { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+                //                 { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+                //             ]);
+                //             return res.sendStatus(200); // Exit after handling the question
+                //         } else if (classification === "request") {
+                //             // Handle requests
+                //             session.inRequest = true;
+                //             const extractedData = await extractInformationFromText(textRaw, session.language);
+                //             session.data = {
+                //                 ...session.data,
+                //                 ...extractedData,
+                //                 phone: extractedData.phone || session.data.phone
+                //             };
+                //             console.log("Extracted data:", extractedData);
+                
+                //             const missingFields = getMissingFields(session.data);
+                //             if (missingFields.length === 0) {
+                //                 session.step = STATES.CONFIRMATION;
+                //                 await sendOrderSummary(from, session);
+                //             } else {
+                //                 session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                //                 await askForNextMissingField(session, from);
+                //             }
+                //         } else {
+                //             // Handle other cases (greeting, other)
+                //             const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+                //             const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+                
+                //             await sendInteractiveButtons(from, reply, [
+                //                 { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+                //                 { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+                //             ]);
+                //         }
+                //     } else if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+                //         const buttonId = message.interactive.button_reply.id;
+                
+                //         if (buttonId === "contact_us") {
+                //             await sendToWhatsApp(from, getContactMessage(session.language));
+                //         } else if (buttonId === "new_request") {
+                //             session.inRequest = true;
+                //             session.step = STATES.NAME;
+                //             await sendToWhatsApp(from, getNameMessage(session.language));
+                //         } else {
+                //             await sendToWhatsApp(from, getInvalidOptionMessage(session.language));
+                //         }
+                //     }
+                //     break;
 
 
             // case STATES.LONGITUDE:
