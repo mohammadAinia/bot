@@ -1944,7 +1944,7 @@ if (session.step === STATES.CHANGE_INFOO) {
 
                     } else if (buttonId === "no_correct") {
                         session.step = STATES.MODIFY;
-                        await sendToWhatsApp(from, "Which information would you like to modify? Please reply with the corresponding number:\n\n1. Name\n2. Phone Number\n3. Email\n4. Address\n5. City\n6. Street\n7. Building Name\n8. Flat Number\n9. Location\n10. Quantity");
+                        await sendToWhatsApp(from, "Which information would you like to modify? Please reply with the corresponding number:\n\n1. Location\n2. City\n3. Street\n4. Building Name\n5. Flat No\n6. Quantity");
                     }
                 }
                 break;
@@ -1953,7 +1953,7 @@ if (session.step === STATES.CHANGE_INFOO) {
                 // Convert any Arabic digits in the text to English digits
                 const normalizedText = convertArabicNumbers(text);
                 const fieldToModify = parseInt(normalizedText);
-                if (isNaN(fieldToModify) || fieldToModify < 1 || fieldToModify > 11) {
+                if (isNaN(fieldToModify) || fieldToModify < 1 || fieldToModify > 6) {
                     await sendToWhatsApp(from, "❌ Invalid option. Please choose a number between 1 and 11.");
                     return res.sendStatus(200);
                 }
