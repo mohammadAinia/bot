@@ -1340,7 +1340,8 @@ if (session.step === STATES.CHANGE_INFOO) {
             }
             return res.sendStatus(200);
         }
-
+        let latitude
+        let longitude
         switch (session.step) {
             case STATES.CHANGE_INFO:
                 if (message.type === "interactive" && message.interactive?.type === "button_reply") {
@@ -1436,8 +1437,10 @@ if (session.step === STATES.CHANGE_INFOO) {
                 break;
                 case STATES.LONGITUDE:
                     if (message.location) {
-                        const { latitude, longitude } = message.location;
-                
+                        const { latitude: lat, longitude: lng } = message.location; // Use different variable names
+                        latitude = lat;
+                        longitude = lng;
+
                         // Validate UAE location
                         const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
                         if (
@@ -1720,8 +1723,9 @@ if (session.step === STATES.CHANGE_INFOO) {
                     return res.sendStatus(200); // Exit and wait for the user's response
                 }
                 // If the location is shared, store it and proceed to the next step
-                const { latitude, longitude } = message.location;
-                // Validate UAE location
+            const { latitude: lat2, longitude: lng2 } = message.location; // Use different variable names
+            latitude = lat2;
+            longitude = lng2;                // Validate UAE location
                 const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
                 if (
                     latitude >= UAE_BOUNDS.minLat &&
@@ -2099,30 +2103,29 @@ if (session.step === STATES.CHANGE_INFOO) {
                     return res.sendStatus(200); // Exit and wait for the user's response
                 }
                 // If the location is shared, store it and proceed to the next step
-                const { latitude3, longitude3 } = message.location; // Extract correct values
-
+                const { latitude: lat3, longitude: lng3 } = message.location; // Use different variable names
+                latitude = lat3;
+                longitude = lng3;
                 const UAE_BOUNDS2 = { minLat: 22.0, maxLat: 27.0, minLng: 51.0, maxLng: 57.0 };
                 
                 if (
-                    latitude3 >= UAE_BOUNDS2.minLat &&
-                    latitude3 <= UAE_BOUNDS2.maxLat &&
-                    longitude3 >= UAE_BOUNDS2.minLng &&
-                    longitude3 <= UAE_BOUNDS2.maxLng
+                    latitude >= UAE_BOUNDS2.minLat &&
+                    latitude <= UAE_BOUNDS2.maxLat &&
+                    longitude >= UAE_BOUNDS2.minLng &&
+                    longitude <= UAE_BOUNDS2.maxLng
                 ) {
-                    const address = await getAddressFromCoordinates(latitude3, longitude3);
+                    const address = await getAddressFromCoordinates(latitude, longitude);
                     if (address) {
                         session.data.address = address; 
                     }
-                    session.data.latitude = latitude3;
-                    session.data.longitude = longitude3;
+                    session.data.latitude = latitude;
+                    session.data.longitude = longitude;
                 
                     session.step = STATES.CONFIRMATION;
                     await sendUpdatedSummary(from, session);
                 } else {
                     await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
                 }
-                
-                
                 break;
             case "MODIFY_CITY_SELECTION":
                 if (!session) {
