@@ -287,15 +287,19 @@ const isValidPhone = (phone) => {
 // };
 async function sendOrderSummary(to, session) {
     try {
-        if (!session || typeof session !== "object") {
-            console.error("❌ Error: session is corrupted. Reinitializing.");
-            session = { data: {} };  // Reset session properly
+        // Ensure session and session.data are initialized
+        if (!session) {
+            console.error("❌ Error: session is undefined.");
+            await sendToWhatsApp(to, "⚠️ Session error. Please restart the process.");
+            return;
         }
         
+        // Explicitly check if session.data is an object, reinitialize if necessary
         if (!session.data || typeof session.data !== "object") {
             console.error("❌ Error: session.data is corrupted. Reinitializing.");
-            session.data = {};  // Reset session.data
+            session.data = {};  // Reset to an empty object to prevent further issues
         }
+        
 
         // Ensure language exists, default to English if undefined
         const language = session.language || 'en';
@@ -311,6 +315,7 @@ async function sendOrderSummary(to, session) {
 اسم المبنى: ${session.data.building_name || 'غير متوفر'}
 رقم الشقة: ${session.data.flat_no || 'غير متوفر'}
 الكمية: ${session.data.quantity || 'غير متوفر'} لتر`
+
             : `📝 *Order Summary*\n
 Name: ${session.data.name || 'Not provided'}
 Phone: ${session.data.phone || 'Not provided'}
@@ -347,7 +352,6 @@ Quantity: ${session.data.quantity || 'Not provided'} liters`;
         await sendToWhatsApp(to, "❌ An error occurred while generating your order summary.");
     }
 }
-
 
 
 
@@ -1420,11 +1424,7 @@ if (session.step === STATES.CHANGE_INFOO) {
                     await sendToWhatsApp(from, getFlatMessage(session.language));
                     return res.sendStatus(200);
                 }
-                if (typeof session.data !== "object") {
-                    session.data = {}; // Reset if it's not an object
-                }
                 session.data.flat_no = textRaw;
-                
                 session.step = STATES.QUANTITY;
                 await sendOrderSummary(from, getQuantityMessage(session.language));
                 break;
