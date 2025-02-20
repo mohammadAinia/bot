@@ -1355,6 +1355,7 @@ if (session.step === STATES.CHANGE_INFOO) {
                     }
                 }
                 break;
+                //
                 case STATES.WELCOME:
     if (message.type === "text") {
         const classification = await isQuestionOrRequest(textRaw);
