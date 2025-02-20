@@ -1269,22 +1269,17 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(200); // Exit after handling the question
         } else if (classification === "request") {
             // Handle requests
-            session.inRequest = true;
-            const extractedData = await extractInformationFromText(textRaw, session.language);
-            session.data = {
-                ...session.data,
-                ...extractedData,
-                phone: extractedData.phone || session.data.phone
-            };
-            console.log("Extracted data:", extractedData);
-
-            const missingFields = getMissingFields(session.data);
-            if (missingFields.length === 0) {
-                session.step = STATES.CONFIRMATION;
-                await sendOrderSummary(from, session);
-            } else {
-                session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                await askForNextMissingField(session, from);
+            if (session.step === STATES.WELCOME && message.type === "text") {
+                const extractedData = await extractInformationFromText(textRaw, session.language);
+                if (Object.keys(extractedData).length > 0) {
+                    session.step = STATES.CHANGE_INFOO;
+                    await sendInteractiveButtons(from, "Do you want to change your information?", [
+                        { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                        { type: "reply", reply: { id: "no_change", title: "No" } }
+                    ]);
+                    session.tempData = extractedData; // Store extracted data temporarily
+                    return res.sendStatus(200);
+                }
             }
         } else {
             // Handle other cases (greeting, other)
@@ -1324,18 +1319,18 @@ app.post('/webhook', async (req, res) => {
         session.lastTimestamp = Number(message.timestamp);
 
         // Check if the user's message contains information
-        if (session.step === STATES.WELCOME && message.type === "text") {
-            const extractedData = await extractInformationFromText(textRaw, session.language);
-            if (Object.keys(extractedData).length > 0) {
-                session.step = STATES.CHANGE_INFOO;
-                await sendInteractiveButtons(from, "Do you want to change your information?", [
-                    { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                    { type: "reply", reply: { id: "no_change", title: "No" } }
-                ]);
-                session.tempData = extractedData; // Store extracted data temporarily
-                return res.sendStatus(200);
-            }
-        }
+        // if (session.step === STATES.WELCOME && message.type === "text") {
+        //     const extractedData = await extractInformationFromText(textRaw, session.language);
+        //     if (Object.keys(extractedData).length > 0) {
+        //         session.step = STATES.CHANGE_INFOO;
+        //         await sendInteractiveButtons(from, "Do you want to change your information?", [
+        //             { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+        //             { type: "reply", reply: { id: "no_change", title: "No" } }
+        //         ]);
+        //         session.tempData = extractedData; // Store extracted data temporarily
+        //         return res.sendStatus(200);
+        //     }
+        // }
 
 
 
