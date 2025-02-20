@@ -2099,28 +2099,29 @@ if (session.step === STATES.CHANGE_INFOO) {
                     return res.sendStatus(200); // Exit and wait for the user's response
                 }
                 // If the location is shared, store it and proceed to the next step
-                const { latitude2, longitude2 } = message.location;
-                // Validate UAE location
-                const UAE_BOUNDS2 = { minLat: 22.0, maxLat: 27.0, minLng: 51.0, maxLng: 57.0 };
+                const { latitude3, longitude3 } = message.location; // Extract correct values
 
+                const UAE_BOUNDS2 = { minLat: 22.0, maxLat: 27.0, minLng: 51.0, maxLng: 57.0 };
+                
                 if (
-                    latitude >= UAE_BOUNDS2.minLat &&
-                    latitude <= UAE_BOUNDS2.maxLat &&
-                    longitude >= UAE_BOUNDS2.minLng &&
-                    longitude <= UAE_BOUNDS2.maxLng
+                    latitude3 >= UAE_BOUNDS2.minLat &&
+                    latitude3 <= UAE_BOUNDS2.maxLat &&
+                    longitude3 >= UAE_BOUNDS2.minLng &&
+                    longitude3 <= UAE_BOUNDS2.maxLng
                 ) {
-                    const address = await getAddressFromCoordinates(latitude, longitude);
+                    const address = await getAddressFromCoordinates(latitude3, longitude3);
                     if (address) {
                         session.data.address = address; 
                     }
-                    session.data.latitude = latitude;
-                    session.data.longitude = longitude;
+                    session.data.latitude = latitude3;
+                    session.data.longitude = longitude3;
                 
                     session.step = STATES.CONFIRMATION;
                     await sendUpdatedSummary(from, session);
                 } else {
                     await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
                 }
+                
                 
                 break;
             case "MODIFY_CITY_SELECTION":
