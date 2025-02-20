@@ -287,7 +287,22 @@ const isValidPhone = (phone) => {
 // };
 async function sendOrderSummary(to, session) {
     try {
-        const orderSummary = session.language === 'ar'
+        // Ensure session and session.data are initialized
+        if (!session) {
+            console.error("❌ Error: session is undefined.");
+            await sendToWhatsApp(to, "⚠️ Session error. Please restart the process.");
+            return;
+        }
+
+        if (!session.data) {
+            console.error("❌ Error: session.data is undefined. Initializing session.data.");
+            session.data = {}; // Initialize session.data to prevent further errors
+        }
+
+        // Ensure language exists, default to English if undefined
+        const language = session.language || 'en';
+
+        const orderSummary = language === 'ar'
             ? `📝 *ملخص الطلب*\n
 الاسم: ${session.data.name || 'غير متوفر'}
 الهاتف: ${session.data.phone || 'غير متوفر'} 
@@ -315,24 +330,27 @@ Quantity: ${session.data.quantity || 'Not provided'} liters`;
                 type: "reply",
                 reply: {
                     id: "yes_confirm",
-                    title: session.language === 'ar' ? "تأكيد ✅" : "Confirm ✅"
+                    title: language === 'ar' ? "تأكيد ✅" : "Confirm ✅"
                 }
             },
             {
                 type: "reply",
                 reply: {
                     id: "no_correct",
-                    title: session.language === 'ar' ? "تعديل ❌" : "Modify ❌"
+                    title: language === 'ar' ? "تعديل ❌" : "Modify ❌"
                 }
             }
         ];
 
+        console.log("📦 Sending order summary:", orderSummary);
         await sendInteractiveButtons(to, orderSummary, confirmationButtons);
 
     } catch (error) {
-        console.error("Error sending order summary:", error);
+        console.error("❌ Error sending order summary:", error);
+        await sendToWhatsApp(to, "❌ An error occurred while generating your order summary.");
     }
 }
+
 
 
 let dataStore = [];  // Array to temporarily store data
@@ -1400,9 +1418,12 @@ if (session.step === STATES.CHANGE_INFOO) {
                 await sendToWhatsApp(from, getFlatMessage(session.language)); // Ask for flat number
                 break;
             case STATES.FLAT_NO:
-                if (!textRaw) {
+                if (!textRaw || textRaw.trim() === "") {
                     await sendToWhatsApp(from, getFlatMessage(session.language));
                     return res.sendStatus(200);
+                }
+                if (!session.data) {
+                    session.data = {}; // Initialize if missing
                 }
                 session.data.flat_no = textRaw;
                 session.step = STATES.QUANTITY;
