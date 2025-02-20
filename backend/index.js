@@ -1213,7 +1213,7 @@ app.post('/webhook', async (req, res) => {
             console.log("⚠️ Language detection failed. Defaulting to English.", error);
         }
 
-        let session = userSessions[from];
+        const session = userSessions[from];
 
         // Debugging: Log session state
         console.log("🔹 Session before processing:", session);
@@ -1238,7 +1238,7 @@ app.post('/webhook', async (req, res) => {
                     { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
                     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
                 ]);
-                userSessions[from] = {
+                userSessions[from] = { ...session , 
                     step: STATES.WELCOME,
                     data: user,
                     language: detectedLanguage,
@@ -1255,7 +1255,7 @@ app.post('/webhook', async (req, res) => {
                     { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
                     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
                 ]);
-                userSessions[from] = {
+                userSessions[from] = {...session,
                     step: STATES.WELCOME,
                     data: { phone: from },
                     language: detectedLanguage,
