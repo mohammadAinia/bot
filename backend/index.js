@@ -1212,7 +1212,7 @@ app.post('/webhook', async (req, res) => {
         } catch (error) {
             console.log("⚠️ Language detection failed. Defaulting to English.", error);
         }
-
+        let hasReceivedWelcome = false
         let session = userSessions[from];
         if (!session) {
             const user = await checkUserRegistration(from);
@@ -1255,19 +1255,19 @@ app.post('/webhook', async (req, res) => {
             }
             return res.sendStatus(200);
         }
-        if (!session.hasReceivedWelcome) {
-            const welcomeMessage = await getOpenAIResponse(
-                session.data?.name ? `Welcome back, ${session.data.name}. Generate a WhatsApp welcome message for Lootah Biofuels.` : "Generate a WhatsApp welcome message for Lootah Biofuels.",
-                "",
-                session.language
-            );
-            await sendInteractiveButtons(from, welcomeMessage, [
-                { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-                { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-            ]);
-            session.hasReceivedWelcome = true; // Update the flag
-            return res.sendStatus(200);
-        }
+        // if (!session.hasReceivedWelcome) {
+        //     const welcomeMessage = await getOpenAIResponse(
+        //         session.data?.name ? `Welcome back, ${session.data.name}. Generate a WhatsApp welcome message for Lootah Biofuels.` : "Generate a WhatsApp welcome message for Lootah Biofuels.",
+        //         "",
+        //         session.language
+        //     );
+        //     await sendInteractiveButtons(from, welcomeMessage, [
+        //         { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+        //         { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+        //     ]);
+        //     session.hasReceivedWelcome = true; // Update the flag
+        //     return res.sendStatus(200);
+        // }
 
 
         const classification = await isQuestionOrRequest(textRaw);
