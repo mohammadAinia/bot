@@ -780,7 +780,7 @@ async function askForNextMissingField(session, from) {
                 await sendToWhatsApp(from, getFlatMessage(lang));
                 break;
             case "quantity":
-                await sendToWhatsApp(from, getQuantityMessage(lang));
+                await sendQuantitySelection(from, lang);
                 break;
             default:
                 await sendToWhatsApp(from, lang === 'ar'
@@ -1845,26 +1845,52 @@ if (session.step === STATES.CHANGE_INFOO) {
                 }
                 break;
             case "ASK_QUANTITY":
-                // If the user hasn't provided a quantity yet, ask for it
-                if (!textRaw) {
-                    await sendToWhatsApp(from, "🔢 Please provide the quantity (in liters).");
-                    return res.sendStatus(200); // Exit and wait for the user's response
+                console.log("🔹 Entered QUANTITY state for user:", from);
+                console.log("🔹 textRaw:", textRaw);
+            
+                // ✅ Handle button selection (interactive message)
+                if (message.interactive && message.interactive.type === "button_reply") {
+                    const selectedQuantity = message.interactive.button_reply.id;
+            
+                    if (["10", "15", "20"].includes(selectedQuantity)) {
+                        console.log("🔹 User selected predefined quantity:", selectedQuantity);
+                        session.data.quantity = parseInt(selectedQuantity, 10);
+                    } else {
+                        console.log("🔹 Invalid button selection. Asking for valid quantity.");
+                        await sendQuantitySelection(from, session.language);
+                        return res.sendStatus(200);
+                    }
                 }
-                // Validate the quantity after the user provides it
-                if (isNaN(textRaw) || textRaw.trim() === "") {
-                    await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
-                    return res.sendStatus(200); // Exit and wait for the user to correct their input
+                // ✅ Handle manual input
+                else {
+                    if (!textRaw || textRaw.trim() === "") {
+                        console.log("🔹 No quantity provided. Asking for quantity.");
+                        await sendQuantitySelection(from, session.language);
+                        return res.sendStatus(200);
+                    }
+            
+                    const quantity = parseInt(textRaw.trim(), 10);
+            
+                    if (isNaN(quantity) || quantity < 10) {
+                        console.log("🔹 Invalid quantity or less than 10 provided. Asking for a valid quantity.");
+                        await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
+                        await sendQuantitySelection(from, session.language);
+                        return res.sendStatus(200);
+                    }
+            
+                    console.log("🔹 Valid quantity provided:", quantity);
+                    session.data.quantity = quantity;
                 }
-                // If the quantity is valid, store it and proceed to the next step
-                session.data.quantity = textRaw;
-
-                // Check for other missing fields
-                const missingFieldsQuantity = getMissingFields(session.data);
-                if (missingFieldsQuantity.length === 0) {
+            
+                // ✅ Proceed to the next step
+                 missingFields = getMissingFields(session.data);
+                console.log("🔹 Missing fields after quantity:", missingFields);
+            
+                if (missingFields.length === 0) {
                     session.step = STATES.CONFIRMATION;
                     await sendOrderSummary(from, session);
                 } else {
-                    session.step = `ASK_${missingFieldsQuantity[0].toUpperCase()}`;
+                    session.step = `ASK_${missingFields[0].toUpperCase()}`;
                     await askForNextMissingField(session, from);
                 }
                 break;
