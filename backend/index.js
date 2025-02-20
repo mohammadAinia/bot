@@ -1427,19 +1427,24 @@ if (classification === "question") {
     // break;
             case STATES.WELCOME:
                 if (message.type === "text") {
-                    const isRequestStart = await detectRequestStart(textRaw);
-                    if (isRequestStart) {
+                    const classification = await isQuestionOrRequest(textRaw);
+
+                    if (classification === "question") {
+                        const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+                        if (session.inRequest) {
+                            await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
+                        } else {
+                            const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+                            await sendInteractiveButtons(from, reply, [
+                                { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+                                { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+                            ]);
+                        }
+                    } else if (classification === "request") {
                         session.inRequest = true;
                         const extractedData = await extractInformationFromText(textRaw, session.language);
-                        // Initialize session data with extracted information
-                        session.data = {
-                            ...session.data, // Keep existing data including phone from WhatsApp
-                            ...extractedData,
-                            phone: extractedData.phone || session.data.phone // Only overwrite if new phone found
-                        };
-                        // Debugging: Log extracted data
-                        console.log("Extracted data:", extractedData);
-                        // Check for missing fields
+                        session.data = { ...session.data, ...extractedData, phone: extractedData.phone || session.data.phone };
+                        
                         const missingFields = getMissingFields(session.data);
                         if (missingFields.length === 0) {
                             session.step = STATES.CONFIRMATION;
@@ -1448,15 +1453,8 @@ if (classification === "question") {
                             session.step = `ASK_${missingFields[0].toUpperCase()}`;
                             await askForNextMissingField(session, from);
                         }
-                    } else {
-                        const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-                        const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-
-                        await sendInteractiveButtons(from, reply, [
-                            { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-                            { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-                        ]);
                     }
+                    
                 } else if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                     const buttonId = message.interactive.button_reply.id;
 
