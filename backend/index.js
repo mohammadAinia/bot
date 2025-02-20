@@ -2101,28 +2101,27 @@ if (session.step === STATES.CHANGE_INFOO) {
                 // If the location is shared, store it and proceed to the next step
                 const { latitude2, longitude2 } = message.location;
                 // Validate UAE location
-                const UAE_BOUNDS2 = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
+                const UAE_BOUNDS2 = { minLat: 22.0, maxLat: 27.0, minLng: 51.0, maxLng: 57.0 };
+
                 if (
-                    latitude2 >= UAE_BOUNDS2.minLat &&
-                    latitude2 <= UAE_BOUNDS2.maxLat &&
-                    longitude2 >= UAE_BOUNDS2.minLng &&
-                    longitude2 <= UAE_BOUNDS2.maxLng
+                    latitude >= UAE_BOUNDS2.minLat &&
+                    latitude <= UAE_BOUNDS2.maxLat &&
+                    longitude >= UAE_BOUNDS2.minLng &&
+                    longitude <= UAE_BOUNDS2.maxLng
                 ) {
-                    const address = await getAddressFromCoordinates(latitude2, longitude2);
+                    const address = await getAddressFromCoordinates(latitude, longitude);
                     if (address) {
                         session.data.address = address; 
-                        // session.data.street = extractStreetName(address); // Store street name separately
                     }
-                    session.data.address = address; // Auto-fill address
-                    session.data.latitude = latitude2;
-                    session.data.longitude = longitude2;
-
+                    session.data.latitude = latitude;
+                    session.data.longitude = longitude;
+                
                     session.step = STATES.CONFIRMATION;
                     await sendUpdatedSummary(from, session);
-
                 } else {
                     await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
                 }
+                
                 break;
             case "MODIFY_CITY_SELECTION":
                 if (!session) {
