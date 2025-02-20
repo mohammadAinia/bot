@@ -1040,6 +1040,20 @@ function extractStreetName(address) {
            address.city_district || // Extra fallback for districts
            "Unknown Street"; 
 }
+async function sendQuantitySelection(user, language) {
+    const message = language === "ar"
+        ? "🛢️ يرجى اختيار كمية الزيت أو إدخالها يدويًا:"
+        : "🛢️ Please select the oil quantity or enter manually:";
+
+    const buttons = [
+        { id: "10", title: "10 Liters" },
+        { id: "15", title: "15 Liters" },
+        { id: "20", title: "20 Liters" }
+    ];
+
+    await sendInteractiveButtons(user, message, buttons);
+}
+
 
 
 
@@ -1467,19 +1481,42 @@ if (session.step === STATES.CHANGE_INFOO) {
                 case STATES.QUANTITY:
                     console.log("🔹 Entered QUANTITY state for user:", from);
                     console.log("🔹 textRaw:", textRaw);
-                    if (!textRaw || textRaw.trim() === "") {
-                        console.log("🔹 No quantity provided. Asking for quantity.");
-                        await sendToWhatsApp(from, getQuantityMessage(session.language));
-                        return res.sendStatus(200);
-                    }
-                    if (isNaN(textRaw)) {
-                        console.log("🔹 Invalid quantity provided. Asking for valid quantity.");
-                        await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
-                        return res.sendStatus(200);
-                    }
-                    console.log("🔹 Valid quantity provided:", textRaw);
-                    session.data.quantity = textRaw;
                 
+                    // ✅ Handle button selection (interactive message)
+                    if (message.interactive && message.interactive.type === "button_reply") {
+                        const selectedQuantity = parseInt(message.interactive.button_reply.id, 10);
+                
+                        if ([10, 15, 20].includes(selectedQuantity)) {
+                            console.log("🔹 User selected predefined quantity:", selectedQuantity);
+                            session.data.quantity = selectedQuantity;
+                        } else {
+                            console.log("🔹 Invalid button selection. Asking for valid quantity.");
+                            await sendQuantitySelection(from, session.language);
+                            return res.sendStatus(200);
+                        }
+                    }
+                    // ✅ Handle manual input
+                    else {
+                        if (!textRaw || textRaw.trim() === "") {
+                            console.log("🔹 No quantity provided. Asking for quantity.");
+                            await sendQuantitySelection(from, session.language);
+                            return res.sendStatus(200);
+                        }
+                
+                        const quantity = parseInt(textRaw.trim(), 10);
+                
+                        if (isNaN(quantity) || quantity < 10) {
+                            console.log("🔹 Invalid quantity or less than 10 provided. Asking for a valid quantity.");
+                            await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
+                            await sendQuantitySelection(from, session.language);
+                            return res.sendStatus(200);
+                        }
+                
+                        console.log("🔹 Valid quantity provided:", quantity);
+                        session.data.quantity = quantity;
+                    }
+                
+                    // ✅ Proceed to the next step
                     const missingFields = getMissingFields(session.data);
                     console.log("🔹 Missing fields after quantity:", missingFields);
                 
@@ -1491,6 +1528,7 @@ if (session.step === STATES.CHANGE_INFOO) {
                         await askForNextMissingField(session, from);
                     }
                     break;
+                
                 
             case "ASK_NAME":
                 // If the user hasn't provided a name yet, ask for it
