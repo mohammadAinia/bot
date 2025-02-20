@@ -1399,8 +1399,8 @@ if (session.step === STATES.CHANGE_INFOO) {
                                 session.step = STATES.STREET; 
                     
                                 const buildingPrompt = session.language === 'ar'
-                                    ? `✅ لقد اخترت *${session.data.city}*.\n\n🏢 يرجى تقديم اسم المبنى.`
-                                    : `✅ You selected *${session.data.city}*.\n\n🏢 Please provide the building name.`;
+                                    ? `✅ لقد اخترت *${session.data.city}*.\n\n🏢 يرجى تقديم اسم الشارع.`
+                                    : `✅ You selected *${session.data.city}*.\n\n🏢 Please provide the Street name.`;
                     
                                 await sendToWhatsApp(from, buildingPrompt);
                             } else {
@@ -1578,6 +1578,12 @@ if (session.step === STATES.CHANGE_INFOO) {
                     longitude >= UAE_BOUNDS.minLng &&
                     longitude <= UAE_BOUNDS.maxLng
                 ) {
+                    const address = await getAddressFromCoordinates(latitude, longitude);
+                    if (address) {
+                        session.data.address = address; 
+                        session.data.street = extractStreetName(address); // Store street name separately
+                    }
+                    session.data.address = address; // Auto-fill address
                     session.data.latitude = latitude;
                     session.data.longitude = longitude;
                     // Check for other missing fields
