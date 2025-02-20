@@ -1215,6 +1215,9 @@ app.post('/webhook', async (req, res) => {
 
         let session = userSessions[from];
 
+        // Debugging: Log session state
+        console.log("🔹 Session before processing:", session);
+
         // Check for out-of-order messages
         if (session?.lastTimestamp && Number(message.timestamp) < session.lastTimestamp) {
             console.log(`Ignoring out-of-order message for user ${from}`);
@@ -1223,6 +1226,7 @@ app.post('/webhook', async (req, res) => {
 
         // Initialize session if it doesn't exist
         if (!session) {
+            console.log("🔹 No session found. Creating a new session for user:", from);
             const user = await checkUserRegistration(from);
             if (user && user.name) {
                 let welcomeMessage = await getOpenAIResponse(
@@ -1259,11 +1263,15 @@ app.post('/webhook', async (req, res) => {
                     lastTimestamp: Number(message.timestamp),
                 };
             }
+            console.log("🔹 New session created:", userSessions[from]);
             return res.sendStatus(200); // Exit after sending welcome message
         }
 
         // Update the session's last timestamp
         session.lastTimestamp = Number(message.timestamp);
+
+        // Debugging: Log session state after update
+        console.log("🔹 Session after update:", session);
 
         // Classify the user's input
         const classification = await isQuestionOrRequest(textRaw);
