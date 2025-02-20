@@ -1581,7 +1581,7 @@ if (session.step === STATES.CHANGE_INFOO) {
                     const address = await getAddressFromCoordinates(latitude, longitude);
                     if (address) {
                         session.data.address = address; 
-                        session.data.street = extractStreetName(address); // Store street name separately
+                        // session.data.street = extractStreetName(address); // Store street name separately
                     }
                     session.data.address = address; // Auto-fill address
                     session.data.latitude = latitude;
