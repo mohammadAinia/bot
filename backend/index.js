@@ -1032,8 +1032,9 @@ function formatAddress(address) {
 
 function extractStreetName(address) {
     if (!address) return null;
-    return address.road || address.street || address.neighbourhood || address.suburb || null;
+    return address.road || address.street || address.neighbourhood || address.suburb || "Unknown Street"; 
 }
+
 
 
 
@@ -1319,7 +1320,8 @@ if (session.step === STATES.CHANGE_INFOO) {
                             // Reverse Geocode to get address
                             const address = await getAddressFromCoordinates(latitude, longitude);
                             if (address) {
-                                session.data.address = address; // Now this will store a proper address string
+                                session.data.address = address; 
+                                session.data.street = extractStreetName(address); // Store street name separately
                             }
                             
                 
