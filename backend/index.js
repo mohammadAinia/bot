@@ -2014,7 +2014,7 @@ if (session.step === STATES.CHANGE_INFOO) {
 
                     } else if (buttonId === "no_correct") {
                         session.step = STATES.MODIFY;
-                        await sendToWhatsApp(from, "Which information would you like to modify? Please reply with the corresponding number:\n\n1. Location\n2. City\n3. Street\n4. Building Name\n5. Flat No\n6. Quantity");
+                        await sendToWhatsApp(from, "Which information would you like to modify? Please reply with the corresponding number:\n\n1. Location\n2. Street\n3. Building Name\n4. Flat No\n5. Quantity");
                     }
                 }
                 break;
@@ -2030,11 +2030,10 @@ if (session.step === STATES.CHANGE_INFOO) {
 
                 const fieldMap = {
                     1: "location",
-                    2: "city",
-                    3: "street",
-                    4: "building_name",
-                    5: "flat_no",
-                    6: "quantity"
+                    2: "street",
+                    3: "building_name",
+                    4: "flat_no",
+                    5: "quantity"
                 };
 
                 const selectedField = fieldMap[fieldToModify];
@@ -2043,10 +2042,10 @@ if (session.step === STATES.CHANGE_INFOO) {
                     session.step = "MODIFY_LOCATION";
                     await sendToWhatsApp(from, getLocationMessage(session.language));
                 }
-                else if (selectedField === "city") {
-                    session.step = "MODIFY_CITY_SELECTION";
-                    return await sendCitySelection(from, session.language);
-                }
+                // else if (selectedField === "city") {
+                //     session.step = "MODIFY_CITY_SELECTION";
+                //     return await sendCitySelection(from, session.language);
+                // }
                 else if (selectedField === "quantity") {
                     session.step = "MODIFY_QUANTITY";
                     await sendQuantitySelection(from, session.language);
@@ -2121,8 +2120,9 @@ if (session.step === STATES.CHANGE_INFOO) {
                     session.data.latitude = latitude;
                     session.data.longitude = longitude;
                 
-                    session.step = STATES.CONFIRMATION;
-                    await sendUpdatedSummary(from, session);
+                    session.step = "MODIFY_CITY_SELECTION";
+                    return await sendCitySelection(from, session.language);
+                    
                 } else {
                     await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
                 }
