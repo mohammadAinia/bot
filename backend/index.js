@@ -525,8 +525,8 @@ const sendInteractiveButtons2 = async (to, message, buttons) => {
                     buttons: buttons.map(button => ({
                         type: "reply",
                         reply: {
-                            id: button.id, // Fix: button should have id, not button.reply.id
-                            title: button.title // Fix: button should have title, not button.reply.title
+                            id: button.id, 
+                            title: button.title
                         }
                     }))
                 }
@@ -547,6 +547,7 @@ const sendInteractiveButtons2 = async (to, message, buttons) => {
         console.error("❌ Failed to send interactive buttons:", error.response?.data || error.message);
     }
 };
+
 
 function extractQuantity(text) {
     // Match both Western Arabic (0-9) and Eastern Arabic (٠-٩) numerals
@@ -1089,8 +1090,10 @@ async function sendQuantitySelection(user, language) {
         { id: "20", title: "20 Liters" }
     ];
 
-    await sendInteractiveButtons(user, message, buttons);
+    console.log("🔹 Sending interactive buttons for quantity selection...");
+    await sendInteractiveButtons2(user, message, buttons);
 }
+
 
 
 
@@ -1484,28 +1487,30 @@ if (session.step === STATES.CHANGE_INFOO) {
             
 
 
-                case STATES.FLAT_NO:
-                    console.log("🔹 Entered FLAT_NO state for user:", from);
-                    console.log("🔹 Current session.data:", session.data);
-                
-                    if (!session.data || typeof session.data !== "object") {
-                        console.error("❌ Error: session.data is corrupted. Reinitializing.");
-                        session.data = {};
-                    }
-                
-                    if (!textRaw || textRaw.trim() === "") {
-                        console.log("🔹 No flat number provided. Asking for flat number.");
-                        await sendToWhatsApp(from, getFlatMessage(session.language));
-                        return res.sendStatus(200);
-                    }
-                
-                    console.log("🔹 Flat number provided:", textRaw);
-                    session.data.flat_no = textRaw;
-                    console.log("🔹 Updated session.data:", session.data);
-                    session.step = STATES.QUANTITY;
-                    return await sendQuantitySelection(from, session.language);
-                    // await sendToWhatsApp(from, getQuantityMessage(session.language));
-                    break;
+            case STATES.FLAT_NO:
+                console.log("🔹 Entered FLAT_NO state for user:", from);
+                console.log("🔹 Current session.data:", session.data);
+            
+                if (!session.data || typeof session.data !== "object") {
+                    console.error("❌ Error: session.data is corrupted. Reinitializing.");
+                    session.data = {};
+                }
+            
+                if (!textRaw || textRaw.trim() === "") {
+                    console.log("🔹 No flat number provided. Asking for flat number.");
+                    await sendToWhatsApp(from, getFlatMessage(session.language));
+                    return res.sendStatus(200);
+                }
+            
+                console.log("🔹 Flat number provided:", textRaw);
+                session.data.flat_no = textRaw;
+                console.log("🔹 Updated session.data:", session.data);
+            
+                session.step = STATES.QUANTITY;
+            
+                console.log("🔹 Sending interactive quantity selection...");
+                return await sendQuantitySelection(from, session.language);
+            
                 // const missingFields2 = getMissingFields(session.data); // Reuse the variable
                 // if (missingFields2.length === 0) {
                 //     session.step = STATES.CONFIRMATION;
@@ -1522,18 +1527,21 @@ if (session.step === STATES.CHANGE_INFOO) {
                     console.log("🔹 Entered QUANTITY state for user:", from);
                     console.log("🔹 textRaw:", textRaw);
                 
+                    // ✅ Handle button selection (interactive message)
                     if (message.interactive && message.interactive.type === "button_reply") {
-                        const selectedQuantity = parseInt(message.interactive.button_reply.id, 10);
+                        const selectedQuantity = message.interactive.button_reply.id;
                 
-                        if ([10, 15, 20].includes(selectedQuantity)) {
+                        if (["10", "15", "20"].includes(selectedQuantity)) {
                             console.log("🔹 User selected predefined quantity:", selectedQuantity);
-                            session.data.quantity = selectedQuantity;
+                            session.data.quantity = parseInt(selectedQuantity, 10);
                         } else {
                             console.log("🔹 Invalid button selection. Asking for valid quantity.");
                             await sendQuantitySelection(from, session.language);
                             return res.sendStatus(200);
                         }
-                    } else {
+                    }
+                    // ✅ Handle manual input
+                    else {
                         if (!textRaw || textRaw.trim() === "") {
                             console.log("🔹 No quantity provided. Asking for quantity.");
                             await sendQuantitySelection(from, session.language);
@@ -1553,7 +1561,7 @@ if (session.step === STATES.CHANGE_INFOO) {
                         session.data.quantity = quantity;
                     }
                 
-                    // Proceed to the next step
+                    // ✅ Proceed to the next step
                     const missingFields = getMissingFields(session.data);
                     console.log("🔹 Missing fields after quantity:", missingFields);
                 
@@ -1565,6 +1573,7 @@ if (session.step === STATES.CHANGE_INFOO) {
                         await askForNextMissingField(session, from);
                     }
                     break;
+                
                 
                 
                 
