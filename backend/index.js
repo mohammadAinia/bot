@@ -1214,7 +1214,7 @@ app.post('/webhook', async (req, res) => {
         }
         let hasReceivedWelcome = false
         let session = userSessions[from];
-        if (!session) {
+        if (!session || !session.hasReceivedWelcome) {
             const user = await checkUserRegistration(from);
             if (user && user.name) {
                 let welcomeMessage = await getOpenAIResponse(
@@ -1232,7 +1232,7 @@ app.post('/webhook', async (req, res) => {
                     language: detectedLanguage,
                     inRequest: false,
                     lastTimestamp: Number(message.timestamp),
-                    hasReceivedWelcome: true // Set flag to true after sending welcome message
+                    hasReceivedWelcome: true // ✅ Ensuring it doesn't resend
                 };
             } else {
                 const welcomeMessage = await getOpenAIResponse(
@@ -1250,11 +1250,12 @@ app.post('/webhook', async (req, res) => {
                     language: detectedLanguage,
                     inRequest: false,
                     lastTimestamp: Number(message.timestamp),
-                    hasReceivedWelcome: true // Set flag to true after sending welcome message
+                    hasReceivedWelcome: true // ✅ Ensuring it doesn't resend
                 };
             }
             return res.sendStatus(200);
         }
+        
         // if (!session.hasReceivedWelcome) {
         //     const welcomeMessage = await getOpenAIResponse(
         //         session.data?.name ? `Welcome back, ${session.data.name}. Generate a WhatsApp welcome message for Lootah Biofuels.` : "Generate a WhatsApp welcome message for Lootah Biofuels.",
