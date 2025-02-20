@@ -1231,16 +1231,10 @@ app.post('/webhook', async (req, res) => {
                     data: user,
                     language: detectedLanguage,
                     inRequest: false,
-                    lastTimestamp: Number(message.timestamp)
+                    lastTimestamp: Number(message.timestamp),
+                    hasReceivedWelcome: true // Set flag to true after sending welcome message
                 };
             } else {
-                userSessions[from] = {
-                    step: STATES.WELCOME,
-                    data: { phone: from },
-                    language: detectedLanguage,
-                    inRequest: false,
-                    lastTimestamp: Number(message.timestamp)
-                };
                 const welcomeMessage = await getOpenAIResponse(
                     "Generate a WhatsApp welcome message for Lootah Biofuels.",
                     "",
@@ -1250,7 +1244,28 @@ app.post('/webhook', async (req, res) => {
                     { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
                     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
                 ]);
+                userSessions[from] = {
+                    step: STATES.WELCOME,
+                    data: { phone: from },
+                    language: detectedLanguage,
+                    inRequest: false,
+                    lastTimestamp: Number(message.timestamp),
+                    hasReceivedWelcome: true // Set flag to true after sending welcome message
+                };
             }
+            return res.sendStatus(200);
+        }
+        if (!session.hasReceivedWelcome) {
+            const welcomeMessage = await getOpenAIResponse(
+                session.data?.name ? `Welcome back, ${session.data.name}. Generate a WhatsApp welcome message for Lootah Biofuels.` : "Generate a WhatsApp welcome message for Lootah Biofuels.",
+                "",
+                session.language
+            );
+            await sendInteractiveButtons(from, welcomeMessage, [
+                { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+                { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+            ]);
+            session.hasReceivedWelcome = true; // Update the flag
             return res.sendStatus(200);
         }
 
@@ -1318,24 +1333,7 @@ app.post('/webhook', async (req, res) => {
         }
         session.lastTimestamp = Number(message.timestamp);
 
-        // Check if the user's message contains information
-        // if (session.step === STATES.WELCOME && message.type === "text") {
-        //     const extractedData = await extractInformationFromText(textRaw, session.language);
-        //     if (Object.keys(extractedData).length > 0) {
-        //         session.step = STATES.CHANGE_INFOO;
-        //         await sendInteractiveButtons(from, "Do you want to change your information?", [
-        //             { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-        //             { type: "reply", reply: { id: "no_change", title: "No" } }
-        //         ]);
-        //         session.tempData = extractedData; // Store extracted data temporarily
-        //         return res.sendStatus(200);
-        //     }
-        // }
 
-
-
-        // Handle CHANGE_INFO state
-// Handle CHANGE_INFO state
 if (session.step === STATES.CHANGE_INFOO) {
     if (message.type === "interactive" && message.interactive?.type === "button_reply") {
         const buttonId = message.interactive.button_reply.id;
@@ -1366,6 +1364,24 @@ if (session.step === STATES.CHANGE_INFOO) {
 }
         
 
+        // Check if the user's message contains information
+        // if (session.step === STATES.WELCOME && message.type === "text") {
+        //     const extractedData = await extractInformationFromText(textRaw, session.language);
+        //     if (Object.keys(extractedData).length > 0) {
+        //         session.step = STATES.CHANGE_INFOO;
+        //         await sendInteractiveButtons(from, "Do you want to change your information?", [
+        //             { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+        //             { type: "reply", reply: { id: "no_change", title: "No" } }
+        //         ]);
+        //         session.tempData = extractedData; // Store extracted data temporarily
+        //         return res.sendStatus(200);
+        //     }
+        // }
+
+
+
+        // Handle CHANGE_INFO state
+// Handle CHANGE_INFO state
 // const classification = await isQuestionOrRequest(textRaw);
 
 // if (classification === "question") {
