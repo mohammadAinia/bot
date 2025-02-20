@@ -350,6 +350,71 @@ Quantity: ${session.data.quantity || 'Not provided'} liters`;
         await sendToWhatsApp(to, "❌ An error occurred while generating your order summary.");
     }
 }
+const sendUpdatedSummary = async (to, session) => {
+    try {
+        // Ensure session exists
+        if (!session) {
+            console.error("❌ Error: session is undefined.");
+            await sendToWhatsApp(to, "⚠️ Session error. Please restart the process.");
+            return;
+        }
+
+        // Ensure session.data is an object, reinitialize if necessary
+        if (!session.data || typeof session.data !== "object") {
+            console.error("❌ Error: session.data is corrupted. Reinitializing.");
+            session.data = {}; // Reset to an empty object
+        }
+
+        // Ensure language exists, default to English if undefined
+        const language = session.language || 'en';
+
+        const orderSummary = language === 'ar'
+            ? `📝 * ملخص الطلب بعد التعديل*\n
+الاسم: ${session.data.name || 'غير متوفر'}
+الهاتف: ${session.data.phone || 'غير متوفر'} 
+البريد الإلكتروني: ${session.data.email || 'غير متوفر'}
+المدينة: ${session.data.city || 'غير متوفر'}
+العنوان: ${session.data.address || 'غير متوفر'}
+الشارع: ${session.data.street || 'غير متوفر'}
+اسم المبنى: ${session.data.building_name || 'غير متوفر'}
+رقم الشقة: ${session.data.flat_no || 'غير متوفر'}
+الكمية: ${session.data.quantity || 'غير متوفر'} لتر`
+            : `📝 *Summary of the Order after modification*\n
+Name: ${session.data.name || 'Not provided'}
+Phone: ${session.data.phone || 'Not provided'}
+Email: ${session.data.email || 'Not provided'}
+City: ${session.data.city || 'Not provided'}
+Address: ${session.data.address || 'Not provided'}
+Street: ${session.data.street || 'Not provided'}
+Building: ${session.data.building_name || 'Not provided'}
+Flat: ${session.data.flat_no || 'Not provided'}
+Quantity: ${session.data.quantity || 'Not provided'} liters`;
+
+        const confirmationButtons = [
+            {
+                type: "reply",
+                reply: {
+                    id: "yes_confirm",
+                    title: language === 'ar' ? "تأكيد ✅" : "Confirm ✅"
+                }
+            },
+            {
+                type: "reply",
+                reply: {
+                    id: "no_correct",
+                    title: language === 'ar' ? "تعديل ❌" : "Modify ❌"
+                }
+            }
+        ];
+
+        console.log("📦 Sending order summary:", orderSummary);
+        await sendInteractiveButtons(to, orderSummary, confirmationButtons);
+
+    } catch (error) {
+        console.error("❌ Error sending order summary:", error);
+        await sendToWhatsApp(to, "❌ An error occurred while generating your order summary.");
+    }
+};
 
 
 
@@ -393,49 +458,50 @@ const STATES = {
     CHANGE_INFOO:"CHANGE_INFOO"
 };
 
-const sendUpdatedSummary = async (to, session) => {
-    try {
-        let summary = `✅ *Updated Order Summary:*\n\n`;
-        summary += `🔹 *Name:* ${session.data.name}\n`;
-        summary += `📞 *Phone Number:* ${session.data.phone}\n`;
-        summary += `📧 *Email:* ${session.data.email}\n`;
-        summary += `📍 *Address:* ${session.data.address}\n`;
-        summary += `🌆 *City:* ${session.data.city}\n`;
-        summary += `🏠 *Street:* ${session.data.street}\n`;
-        summary += `🏢 *Building Name:* ${session.data.building_name}\n`;
-        summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;
-        summary += `📍 *Latitude:* ${session.data.latitude}\n`;
-        summary += `📍 *Longitude:* ${session.data.longitude}\n`;
-        summary += `📦 *Quantity:* ${session.data.quantity}\n\n`;
-        summary += `Is the information correct? Please confirm below:`;
 
-        await axios.post(process.env.WHATSAPP_API_URL, {
-            messaging_product: "whatsapp",
-            recipient_type: "individual",
-            to: to,
-            type: "interactive",
-            interactive: {
-                type: "button",
-                body: {
-                    text: summary
-                },
-                action: {
-                    buttons: [
-                        { type: "reply", reply: { id: "yes_confirm", title: "✅ Yes" } },
-                        { type: "reply", reply: { id: "no_correct", title: "❌ No" } }
-                    ]
-                }
-            }
-        }, {
-            headers: {
-                "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-                "Content-Type": "application/json"
-            }
-        });
-    } catch (error) {
-        console.error("❌ Failed to send updated order summary:", error.response?.data || error.message);
-    }
-};
+// const sendUpdatedSummary = async (to, session) => {
+//     try {
+//         let summary = `✅ *Updated Order Summary:*\n\n`;
+//         summary += `🔹 *Name:* ${session.data.name}\n`;
+//         summary += `📞 *Phone Number:* ${session.data.phone}\n`;
+//         summary += `📧 *Email:* ${session.data.email}\n`;
+//         summary += `📍 *Address:* ${session.data.address}\n`;
+//         summary += `🌆 *City:* ${session.data.city}\n`;
+//         summary += `🏠 *Street:* ${session.data.street}\n`;
+//         summary += `🏢 *Building Name:* ${session.data.building_name}\n`;
+//         summary += `🏠 *Flat Number:* ${session.data.flat_no}\n`;
+//         summary += `📍 *Latitude:* ${session.data.latitude}\n`;
+//         summary += `📍 *Longitude:* ${session.data.longitude}\n`;
+//         summary += `📦 *Quantity:* ${session.data.quantity}\n\n`;
+//         summary += `Is the information correct? Please confirm below:`;
+
+//         await axios.post(process.env.WHATSAPP_API_URL, {
+//             messaging_product: "whatsapp",
+//             recipient_type: "individual",
+//             to: to,
+//             type: "interactive",
+//             interactive: {
+//                 type: "button",
+//                 body: {
+//                     text: summary
+//                 },
+//                 action: {
+//                     buttons: [
+//                         { type: "reply", reply: { id: "yes_confirm", title: "✅ Yes" } },
+//                         { type: "reply", reply: { id: "no_correct", title: "❌ No" } }
+//                     ]
+//                 }
+//             }
+//         }, {
+//             headers: {
+//                 "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+//                 "Content-Type": "application/json"
+//             }
+//         });
+//     } catch (error) {
+//         console.error("❌ Failed to send updated order summary:", error.response?.data || error.message);
+//     }
+// };
 
 // const sendInteractiveButtons = async (to, message, buttons) => {
 //     try {
@@ -2186,47 +2252,47 @@ if (session.step === STATES.CHANGE_INFOO) {
                 await sendUpdatedSummary(from, session);
                 break;
 
-            case "MODIFY_QUANTITY":
-                console.log("🔹 Entered QUANTITY state for user:", from);
-                console.log("🔹 textRaw:", textRaw);
-            
-                // ✅ Handle button selection (interactive message)
-                if (message.interactive && message.interactive.type === "button_reply") {
-                    const selectedQuantity = message.interactive.button_reply.id;
-            
-                    if (["10", "15", "20"].includes(selectedQuantity)) {
-                        console.log("🔹 User selected predefined quantity:", selectedQuantity);
-                        session.data.quantity = parseInt(selectedQuantity, 10);
+                case "MODIFY_QUANTITY":
+                    console.log("🔹 Entered MODIFY_QUANTITY state for user:", from);
+                    console.log("🔹 User input:", textRaw);
+                
+                    if (message.interactive && message.interactive.type === "button_reply") {
+                        const selectedQuantity = message.interactive.button_reply.id;
+                        
+                        if (["10", "15", "20"].includes(selectedQuantity)) {
+                            console.log("✅ User selected predefined quantity:", selectedQuantity);
+                            session.data.quantity = parseInt(selectedQuantity, 10);
+                        } else {
+                            console.log("❌ Invalid quantity selection. Asking again.");
+                            await sendQuantitySelection(from, session.language);
+                            return res.sendStatus(200);
+                        }
                     } else {
-                        console.log("🔹 Invalid button selection. Asking for valid quantity.");
-                        await sendQuantitySelection(from, session.language);
-                        return res.sendStatus(200);
+                        if (!textRaw || textRaw.trim() === "") {
+                            console.log("❌ No quantity provided. Asking again.");
+                            await sendQuantitySelection(from, session.language);
+                            return res.sendStatus(200);
+                        }
+                
+                        const quantity = parseInt(textRaw.trim(), 10);
+                
+                        if (isNaN(quantity) || quantity < 10) {
+                            console.log("❌ Invalid quantity or less than 10 provided.");
+                            await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
+                            await sendQuantitySelection(from, session.language);
+                            return res.sendStatus(200);
+                        }
+                
+                        console.log("✅ Valid quantity received:", quantity);
+                        session.data.quantity = quantity;
                     }
-                }
-                // ✅ Handle manual input
-                else {
-                    if (!textRaw || textRaw.trim() === "") {
-                        console.log("🔹 No quantity provided. Asking for quantity.");
-                        await sendQuantitySelection(from, session.language);
-                        return res.sendStatus(200);
-                    }
-            
-                    const quantity = parseInt(textRaw.trim(), 10);
-            
-                    if (isNaN(quantity) || quantity < 10) {
-                        console.log("🔹 Invalid quantity or less than 10 provided. Asking for a valid quantity.");
-                        await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
-                        await sendQuantitySelection(from, session.language);
-                        return res.sendStatus(200);
-                    }
-            
-                    console.log("🔹 Valid quantity provided:", quantity);
-                    session.data.quantity = quantity;
-                    session.step = STATES.CONFIRMATION
+                
+                    // Move to confirmation step and send summary
+                    session.step = STATES.CONFIRMATION;
+                    console.log("📦 Sending updated summary...");
                     await sendUpdatedSummary(from, session);
-                }
-            
-                break;
+                    break;
+                
             //     if (isNaN(textRaw) || textRaw.trim() === "") {
             //         await sendToWhatsApp(from, "❌ Please enter a valid quantity (numeric values only).");
             //         return res.sendStatus(200);
