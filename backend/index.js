@@ -1389,14 +1389,14 @@ if (session.step === STATES.CHANGE_INFOO) {
                                 session.data.city = selectedCity;
                     
                                 // Automatically fetch the street name
-                                if (session.data.latitude && session.data.longitude) {
-                                    const address = await getAddressFromCoordinates(session.data.latitude, session.data.longitude);
-                                    if (address) {
-                                        session.data.street = extractStreetName(address); // Extract street name
-                                    }
-                                }
+                                // if (session.data.latitude && session.data.longitude) {
+                                //     const address = await getAddressFromCoordinates(session.data.latitude, session.data.longitude);
+                                //     if (address) {
+                                //         session.data.street = extractStreetName(address); // Extract street name
+                                //     }
+                                // }
                     
-                                session.step = STATES.BUILDING_NAME; // Skip STREET state
+                                session.step = STATES.STREET; 
                     
                                 const buildingPrompt = session.language === 'ar'
                                     ? `✅ لقد اخترت *${session.data.city}*.\n\n🏢 يرجى تقديم اسم المبنى.`
@@ -1414,7 +1414,11 @@ if (session.step === STATES.CHANGE_INFOO) {
                         }
                         break;
     
-                    
+                        case STATES.STREET:
+                            session.data.street = textRaw;
+                            session.step = STATES.BUILDING_NAME;
+                            await sendToWhatsApp(from, getBuildingMessage(session.language)); // Ask for building name
+                            break;
         case STATES.BUILDING_NAME:
             if (!textRaw || textRaw.trim() === "") {
                 await sendToWhatsApp(from, getBuildingMessage(session.language));
@@ -1424,6 +1428,7 @@ if (session.step === STATES.CHANGE_INFOO) {
             session.step = STATES.FLAT_NO;
             await sendToWhatsApp(from, getFlatMessage(session.language));
             break;
+            
 
 
                 case STATES.FLAT_NO:
