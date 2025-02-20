@@ -1277,45 +1277,46 @@ if (session.step === STATES.CHANGE_INFOO) {
                 await sendToWhatsApp(from, getLocationMessage(session.language)); // Ask for location
                 break;
                 case STATES.LONGITUDE:
-    if (message.location) {
-        const { latitude, longitude } = message.location;
-
-        // Validate UAE location
-        const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
-        if (
-            latitude >= UAE_BOUNDS.minLat &&
-            latitude <= UAE_BOUNDS.maxLat &&
-            longitude >= UAE_BOUNDS.minLng &&
-            longitude <= UAE_BOUNDS.maxLng
-        ) {
-            // Reverse Geocode to get address
-            const address = await getAddressFromCoordinates(latitude, longitude);
-            if (!address) {
-                await sendToWhatsApp(from, "❌ Unable to retrieve your address. Please try again.");
-                return res.sendStatus(200);
-            }
-
-            session.data.latitude = latitude;
-            session.data.longitude = longitude;
-            session.data.address = address; // Auto-fill address
-            session.step = STATES.CITY; // Proceed to city selection
-
-            return await sendCitySelection(from, session.language); // ✅ Ask user to select city
-        } else {
-            await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
-        }
-    } else {
-        if (!session.locationPromptSent) {
-            await sendInteractiveButtons(from, getLocationMessage(session.language), [
-                {
-                    type: "location_request",
-                    title: getButtonTitle("send_site", session.language) // "Send Location" button
-                }
-            ]);
-            session.locationPromptSent = true;
-        }
-    }
-    break;
+                    if (message.location) {
+                        const { latitude, longitude } = message.location;
+                
+                        // Validate UAE location
+                        const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
+                        if (
+                            latitude >= UAE_BOUNDS.minLat &&
+                            latitude <= UAE_BOUNDS.maxLat &&
+                            longitude >= UAE_BOUNDS.minLng &&
+                            longitude <= UAE_BOUNDS.maxLng
+                        ) {
+                            // Reverse Geocode to get address
+                            const address = await getAddressFromCoordinates(latitude, longitude);
+                            if (!address) {
+                                await sendToWhatsApp(from, "❌ Unable to retrieve your address. Please try again.");
+                                return res.sendStatus(200);
+                            }
+                
+                            session.data.latitude = latitude;
+                            session.data.longitude = longitude;
+                            session.data.address = address; // Auto-fill address
+                            session.step = STATES.CITY; // Proceed to city selection
+                
+                            return await sendCitySelection(from, session.language); // ✅ Ask user to select city
+                        } else {
+                            await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
+                        }
+                    } else {
+                        if (!session.locationPromptSent) {
+                            await sendInteractiveButtons(from, getLocationMessage(session.language), [
+                                {
+                                    type: "location_request",
+                                    title: getButtonTitle("send_site", session.language) // "Send Location" button
+                                }
+                            ]);
+                            session.locationPromptSent = true;
+                        }
+                    }
+                    break;
+                
 
     case STATES.CITY:
         if (message.interactive && message.interactive.type === "list_reply") {
