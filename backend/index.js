@@ -1883,14 +1883,14 @@ if (session.step === STATES.CHANGE_INFOO) {
                 }
             
                 // ✅ Proceed to the next step
-                 missingFields = getMissingFields(session.data);
-                console.log("🔹 Missing fields after quantity:", missingFields);
+                const missingFields2 = getMissingFields(session.data);
+                console.log("🔹 Missing fields after quantity:", missingFields2);
             
-                if (missingFields.length === 0) {
+                if (missingFields2.length === 0) {
                     session.step = STATES.CONFIRMATION;
                     await sendOrderSummary(from, session);
                 } else {
-                    session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                    session.step = `ASK_${missingFields2[0].toUpperCase()}`;
                     await askForNextMissingField(session, from);
                 }
                 break;
