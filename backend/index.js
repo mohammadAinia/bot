@@ -993,7 +993,8 @@ async function getAddressFromCoordinates(latitude, longitude) {
         });
 
         if (response.data && response.data.address) {
-            return response.data.address; // Return full address object
+            const address = response.data.address;
+            return formatAddress(address); // Format the address before returning
         }
         return null;
     } catch (error) {
@@ -1002,11 +1003,15 @@ async function getAddressFromCoordinates(latitude, longitude) {
     }
 }
 
-// Function to extract street name from Nominatim response
-function extractStreetName(address) {
-    if (!address) return null;
-    return address.road || address.street || address.neighbourhood || address.suburb || null;
+// Function to format the address into a readable string
+function formatAddress(address) {
+    const street = address.road || address.street || address.neighbourhood || address.suburb || "";
+    const city = address.city || address.town || address.village || address.state || "";
+    const country = address.country || "";
+    
+    return [street, city, country].filter(Boolean).join(", "); // Join non-empty parts
 }
+
 
 
 app.post('/webhook', async (req, res) => {
@@ -1290,10 +1295,10 @@ if (session.step === STATES.CHANGE_INFOO) {
                         ) {
                             // Reverse Geocode to get address
                             const address = await getAddressFromCoordinates(latitude, longitude);
-                            if (!address) {
-                                await sendToWhatsApp(from, "❌ Unable to retrieve your address. Please try again.");
-                                return res.sendStatus(200);
+                            if (address) {
+                                session.data.address = address; // Now this will store a proper address string
                             }
+                            
                 
                             session.data.latitude = latitude;
                             session.data.longitude = longitude;
