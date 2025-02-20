@@ -1355,52 +1355,107 @@ if (session.step === STATES.CHANGE_INFOO) {
                     }
                 }
                 break;
-            case STATES.WELCOME:
-                if (message.type === "text") {
-                    const isRequestStart = await detectRequestStart(textRaw);
-                    if (isRequestStart) {
-                        session.inRequest = true;
-                        const extractedData = await extractInformationFromText(textRaw, session.language);
-                        // Initialize session data with extracted information
-                        session.data = {
-                            ...session.data, // Keep existing data including phone from WhatsApp
-                            ...extractedData,
-                            phone: extractedData.phone || session.data.phone // Only overwrite if new phone found
-                        };
-                        // Debugging: Log extracted data
-                        console.log("Extracted data:", extractedData);
-                        // Check for missing fields
-                        const missingFields = getMissingFields(session.data);
-                        if (missingFields.length === 0) {
-                            session.step = STATES.CONFIRMATION;
-                            await sendOrderSummary(from, session);
-                        } else {
-                            session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                            await askForNextMissingField(session, from);
-                        }
-                    } else {
-                        const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-                        const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+                case STATES.WELCOME:
+    if (message.type === "text") {
+        const classification = await isQuestionOrRequest(textRaw);
+        if (classification === "request") {
+            session.inRequest = true;
+            const extractedData = await extractInformationFromText(textRaw, session.language);
+            // Initialize session data with extracted information
+            session.data = {
+                ...session.data, // Keep existing data including phone from WhatsApp
+                ...extractedData,
+                phone: extractedData.phone || session.data.phone // Only overwrite if new phone found
+            };
+            // Debugging: Log extracted data
+            console.log("Extracted data:", extractedData);
+            // Check for missing fields
+            const missingFields = getMissingFields(session.data);
+            if (missingFields.length === 0) {
+                session.step = STATES.CONFIRMATION;
+                await sendOrderSummary(from, session);
+            } else {
+                session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                await askForNextMissingField(session, from);
+            }
+        } else if (classification === "question") {
+            const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+            const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
 
-                        await sendInteractiveButtons(from, reply, [
-                            { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-                            { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-                        ]);
-                    }
-                } else if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-                    const buttonId = message.interactive.button_reply.id;
+            await sendInteractiveButtons(from, reply, [
+                { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+                { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+            ]);
+        } else {
+            // Handle other classifications (greeting, other) if necessary
+            const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+            const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
 
-                    if (buttonId === "contact_us") {
-                        await sendToWhatsApp(from, getContactMessage(session.language));
-                    } else if (buttonId === "new_request") {
-                        session.inRequest = true; // Set inRequest to true
-                        session.step = STATES.NAME;
-                        await sendToWhatsApp(from, getNameMessage(session.language));
-                    } else {
-                        await sendToWhatsApp(from, getInvalidOptionMessage(session.language));
-                    }
-                }
-                break;
+            await sendInteractiveButtons(from, reply, [
+                { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+                { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+            ]);
+        }
+    } else if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+        const buttonId = message.interactive.button_reply.id;
+
+        if (buttonId === "contact_us") {
+            await sendToWhatsApp(from, getContactMessage(session.language));
+        } else if (buttonId === "new_request") {
+            session.inRequest = true; // Set inRequest to true
+            session.step = STATES.NAME;
+            await sendToWhatsApp(from, getNameMessage(session.language));
+        } else {
+            await sendToWhatsApp(from, getInvalidOptionMessage(session.language));
+        }
+    }
+    break;
+            // case STATES.WELCOME:
+            //     if (message.type === "text") {
+            //         const isRequestStart = await detectRequestStart(textRaw);
+            //         if (isRequestStart) {
+            //             session.inRequest = true;
+            //             const extractedData = await extractInformationFromText(textRaw, session.language);
+            //             // Initialize session data with extracted information
+            //             session.data = {
+            //                 ...session.data, // Keep existing data including phone from WhatsApp
+            //                 ...extractedData,
+            //                 phone: extractedData.phone || session.data.phone // Only overwrite if new phone found
+            //             };
+            //             // Debugging: Log extracted data
+            //             console.log("Extracted data:", extractedData);
+            //             // Check for missing fields
+            //             const missingFields = getMissingFields(session.data);
+            //             if (missingFields.length === 0) {
+            //                 session.step = STATES.CONFIRMATION;
+            //                 await sendOrderSummary(from, session);
+            //             } else {
+            //                 session.step = `ASK_${missingFields[0].toUpperCase()}`;
+            //                 await askForNextMissingField(session, from);
+            //             }
+            //         } else {
+            //             const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+            //             const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+
+            //             await sendInteractiveButtons(from, reply, [
+            //                 { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+            //                 { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+            //             ]);
+            //         }
+            //     } else if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+            //         const buttonId = message.interactive.button_reply.id;
+
+            //         if (buttonId === "contact_us") {
+            //             await sendToWhatsApp(from, getContactMessage(session.language));
+            //         } else if (buttonId === "new_request") {
+            //             session.inRequest = true; // Set inRequest to true
+            //             session.step = STATES.NAME;
+            //             await sendToWhatsApp(from, getNameMessage(session.language));
+            //         } else {
+            //             await sendToWhatsApp(from, getInvalidOptionMessage(session.language));
+            //         }
+            //     }
+            //     break;
             case STATES.NAME:
                 if (!textRaw) {
                     await sendToWhatsApp(from, getNameMessage(session.language));
