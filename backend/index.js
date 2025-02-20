@@ -293,11 +293,13 @@ async function sendOrderSummary(to, session) {
             await sendToWhatsApp(to, "⚠️ Session error. Please restart the process.");
             return;
         }
-
-        if (!session.data) {
-            console.error("❌ Error: session.data is undefined. Initializing session.data.");
-            session.data = {}; // Initialize session.data to prevent further errors
+        
+        // Explicitly check if session.data is an object, reinitialize if necessary
+        if (!session.data || typeof session.data !== "object") {
+            console.error("❌ Error: session.data is corrupted. Reinitializing.");
+            session.data = {};  // Reset to an empty object to prevent further issues
         }
+        
 
         // Ensure language exists, default to English if undefined
         const language = session.language || 'en';
@@ -1422,7 +1424,11 @@ if (session.step === STATES.CHANGE_INFOO) {
                     await sendToWhatsApp(from, getFlatMessage(session.language));
                     return res.sendStatus(200);
                 }
+                if (typeof session.data !== "object") {
+                    session.data = {}; // Reset if it's not an object
+                }
                 session.data.flat_no = textRaw;
+                
                 session.step = STATES.QUANTITY;
                 await sendOrderSummary(from, getQuantityMessage(session.language));
                 break;
