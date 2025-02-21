@@ -1166,6 +1166,18 @@ const fetchMediaUrl = async (mediaId) => {
     }
 };
 
+const determineIntent = async (text, language) => {
+    const systemMessage = `
+        Analyze the user's message and determine their intent. Respond with one of the following:
+        - "submit_application": If the user wants to submit an application.
+        - "ask_about_company": If the user is asking about the company or its products.
+        - "other": For any other intent.
+    `;
+
+    const response = await getOpenAIResponse(text, systemMessage, language);
+    return response.trim().toLowerCase();
+};
+
 // Webhook endpoint
 app.post('/webhook', async (req, res) => {
     try {
@@ -1327,19 +1339,43 @@ app.post('/webhook', async (req, res) => {
         }
         session.lastTimestamp = Number(message.timestamp);
 
+        // Classify the user's message using isQuestionOrRequest
         const classification = await isQuestionOrRequest(textRaw);
-        if (classification === "question") {
-            const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-            if (session.inRequest) {
-                await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
-            } else {
-                const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-                await sendInteractiveButtons(from, reply, [
-                    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-                    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-                ]);
-            }
-            return res.sendStatus(200);
+        console.log(`🔹 Detected classification: ${classification}`);
+
+        switch (classification) {
+            case "request":
+                // Start the application process
+                session.inRequest = true;
+                session.step = STATES.NAME;
+                await sendToWhatsApp(from, "Please provide your name to start the application process.");
+                break;
+
+            case "question":
+                // Answer questions about the company
+                const companyInfo = await getOpenAIResponse(
+                    "Tell me about Lootah Biofuels and its products.",
+                    "",
+                    session.language
+                );
+                await sendToWhatsApp(from, companyInfo);
+                break;
+
+            case "greeting":
+                // Respond to greetings
+                await sendToWhatsApp(from, "Hello! How can I assist you today?");
+                break;
+
+            case "other":
+                // Handle other intents or fallback
+                const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+                await sendToWhatsApp(from, aiResponse);
+                break;
+
+            default:
+                // Handle unknown classifications
+                await sendToWhatsApp(from, "Sorry, I didn't understand your request. Please try again.");
+                break;
         }
 
         // Check if the user's message contains information
