@@ -8,6 +8,8 @@ import fs from 'fs';
 import {OpenAI} from 'openai';
 import mime from 'mime-types';
 import path from 'path';
+import FormData from 'form-data';
+
 
 
 
