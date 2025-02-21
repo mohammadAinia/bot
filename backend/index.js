@@ -1277,9 +1277,21 @@ app.post('/webhook', async (req, res) => {
         if (message.type === "interactive" && message.interactive?.type === "button_reply") {
             const buttonId = message.interactive.button_reply.id;
             if (buttonId === "new_request") {
-                session.inRequest = true;
-                session.step = STATES.NAME; // Transition to NAME state
-                await sendToWhatsApp(from, "Please provide your name.");
+                // Check if the user is registered
+                const user = await checkUserRegistration(from);
+                if (user && user.name) {
+                    // Registered user: Ask if they want to change their information
+                    session.step = STATES.CHANGE_INFO;
+                    await sendInteractiveButtons(from, "Do you want to change your information?", [
+                        { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                        { type: "reply", reply: { id: "no_change", title: "No" } }
+                    ]);
+                } else {
+                    // New user: Start collecting information
+                    session.inRequest = true;
+                    session.step = STATES.NAME;
+                    await sendToWhatsApp(from, "Please provide your name.");
+                }
                 return res.sendStatus(200);
             } else if (buttonId === "contact_us") {
                 await sendToWhatsApp(from, getContactMessage(session.language));
@@ -1287,35 +1299,75 @@ app.post('/webhook', async (req, res) => {
             }
         }
 
-        // Handle CHANGE_INFOO state
-        if (session.step === STATES.CHANGE_INFOO) {
+        // Handle CHANGE_INFO state
+        if (session.step === STATES.CHANGE_INFO) {
             if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                 const buttonId = message.interactive.button_reply.id;
                 if (buttonId === "yes_change") {
-                    // Update session data with extracted information
-                    session.data = { ...session.data, ...session.tempData };
-                    delete session.tempData; // Clear temporary data
-
-                    // Ensure the phone number is not overwritten if already present
-                    if (!session.data.phone) {
-                        session.data.phone = from; // Use the WhatsApp number as the default phone number
-                    }
-
-                    const missingFields = getMissingFields(session.data);
-                    if (missingFields.length > 0) {
-                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                        await askForNextMissingField(session, from);
-                    } else {
-                        session.step = STATES.QUANTITY;
-                        await sendQuantitySelection(from, session.language);
-                    }
+                    // User wants to change information
+                    session.step = STATES.NAME;
+                    await sendToWhatsApp(from, "Please provide your new name.");
                 } else if (buttonId === "no_change") {
+                    // User does not want to change information
                     session.step = STATES.QUANTITY;
                     await sendQuantitySelection(from, session.language);
                 }
             }
             return res.sendStatus(200);
         }
+
+        // Handle text input for starting a request
+        if (message.type === "text") {
+            const isRequestStart = await detectRequestStart(textRaw);
+            if (isRequestStart) {
+                // Check if the user is registered
+                const user = await checkUserRegistration(from);
+                if (user && user.name) {
+                    // Registered user: Ask if they want to change their information
+                    session.step = STATES.CHANGE_INFO;
+                    await sendInteractiveButtons(from, "Do you want to change your information?", [
+                        { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                        { type: "reply", reply: { id: "no_change", title: "No" } }
+                    ]);
+                } else {
+                    // New user: Start collecting information
+                    session.inRequest = true;
+                    session.step = STATES.NAME;
+                    await sendToWhatsApp(from, "Please provide your name.");
+                }
+                return res.sendStatus(200);
+            }
+        }
+
+        // Handle CHANGE_INFOO state
+        // if (session.step === STATES.CHANGE_INFOO) {
+        //     if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+        //         const buttonId = message.interactive.button_reply.id;
+        //         if (buttonId === "yes_change") {
+        //             // Update session data with extracted information
+        //             session.data = { ...session.data, ...session.tempData };
+        //             delete session.tempData; // Clear temporary data
+
+        //             // Ensure the phone number is not overwritten if already present
+        //             if (!session.data.phone) {
+        //                 session.data.phone = from; // Use the WhatsApp number as the default phone number
+        //             }
+
+        //             const missingFields = getMissingFields(session.data);
+        //             if (missingFields.length > 0) {
+        //                 session.step = `ASK_${missingFields[0].toUpperCase()}`;
+        //                 await askForNextMissingField(session, from);
+        //             } else {
+        //                 session.step = STATES.QUANTITY;
+        //                 await sendQuantitySelection(from, session.language);
+        //             }
+        //         } else if (buttonId === "no_change") {
+        //             session.step = STATES.QUANTITY;
+        //             await sendQuantitySelection(from, session.language);
+        //         }
+        //     }
+        //     return res.sendStatus(200);
+        // }
 
 
         let latitude
