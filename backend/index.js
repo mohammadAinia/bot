@@ -1228,50 +1228,41 @@ app.post('/webhook', async (req, res) => {
         if (!userSessions[from]) {
             console.log("🔹 No session found. Creating a new session for user:", from);
             const user = await checkUserRegistration(from);
-            if (user && user.name ) {
+            if (user && user.name) {
                 let welcomeMessage = await getOpenAIResponse(
                     `Welcome back, ${user.name}. Generate a WhatsApp welcome message for Lootah Biofuels.`,
                     "",
                     detectedLanguage
                 );
-                if (session.inRequest) {
-                    console.log("User is already in a request process. Skipping welcome message.");
-                } else {
-                    await sendInteractiveButtons(from, welcomeMessage, [
-                        { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
-                        { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
-                    ]);
-                    userSessions[from] = { ...session , 
-                        step: STATES.WELCOME,
-                        data: user,
-                        language: detectedLanguage,
-                        inRequest: false,
-                        lastTimestamp: Number(message.timestamp),
-                    };//
-                }
-
+                
+                await sendInteractiveButtons(from, welcomeMessage, [
+                    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
+                    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
+                ]);
+                userSessions[from] = { ...session , 
+                    step: STATES.WELCOME,
+                    data: user,
+                    language: detectedLanguage,
+                    inRequest: false,
+                    lastTimestamp: Number(message.timestamp),
+                };//
             } else {
-                if (session.inRequest) {
-                    console.log("User is already in a request process. Skipping welcome message.");
-                } else {
-                    const welcomeMessage = await getOpenAIResponse(
-                        "Generate a WhatsApp welcome message for Lootah Biofuels.",
-                        "",
-                        detectedLanguage
-                    );
-                    await sendInteractiveButtons(from, welcomeMessage, [
-                        { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
-                        { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
-                    ]);
-                    userSessions[from] = {...session,
-                        step: STATES.WELCOME,
-                        data: { phone: from },
-                        language: detectedLanguage,
-                        inRequest: false,
-                        lastTimestamp: Number(message.timestamp),
-                    };
-                }
-
+                const welcomeMessage = await getOpenAIResponse(
+                    "Generate a WhatsApp welcome message for Lootah Biofuels.",
+                    "",
+                    detectedLanguage
+                );
+                await sendInteractiveButtons(from, welcomeMessage, [
+                    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
+                    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
+                ]);
+                userSessions[from] = {...session,
+                    step: STATES.WELCOME,
+                    data: { phone: from },
+                    language: detectedLanguage,
+                    inRequest: false,
+                    lastTimestamp: Number(message.timestamp),
+                };
             }
             console.log("🔹 New session created:", userSessions[from]);
             return res.sendStatus(200); // Exit after sending welcome message
