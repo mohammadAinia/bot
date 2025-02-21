@@ -186,6 +186,14 @@ For more details, visit: [Lootah Biofuels Website](https://www.lootahbiofuels.co
 
 `;
 
+const truncateTextForAudio = (text, maxWords = 75) => {
+    const words = text.split(" ");
+    if (words.length > maxWords) {
+        return words.slice(0, maxWords).join(" ") + "...";
+    }
+    return text;
+};
+
 const getOpenAIResponse = async (userMessage, context = "", language = "en") => {
     try {
         const systemMessage = `
@@ -193,6 +201,7 @@ const getOpenAIResponse = async (userMessage, context = "", language = "en") => 
             Your goal is to assist users in completing their orders and answering their questions.
             Always respond concisely, use emojis sparingly, and maintain a helpful attitude.
             Generate the response in the user's language: ${language}.
+            Keep your responses very short and to the point. Each response should be no longer than 30 seconds when spoken.
         `;
 
         const messages = [
@@ -207,7 +216,7 @@ const getOpenAIResponse = async (userMessage, context = "", language = "en") => 
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
             model: "gpt-4",
             messages,
-            max_tokens: 350,
+            max_tokens: 100, // Limit the response to 100 tokens (approx. 1-2 sentences)
             temperature: 0.7
         }, {
             headers: {
@@ -216,7 +225,10 @@ const getOpenAIResponse = async (userMessage, context = "", language = "en") => 
             }
         });
 
-        return response.data.choices[0].message.content.trim();
+        const responseText = response.data.choices[0].message.content.trim();
+
+        // Truncate the response if it exceeds the word limit
+        return truncateTextForAudio(responseText, 75);
     } catch (error) {
         console.error('❌ Error with OpenAI:', error.response?.data || error.message);
         return "❌ Oops! Something went wrong. Please try again later.";
