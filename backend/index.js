@@ -1110,6 +1110,7 @@ app.post('/webhook', async (req, res) => {
             console.warn("⚠️ No messages found in webhook payload. Ignoring event.");
             return res.sendStatus(200);
         }
+        const from = message.from;
 
         const message = value.messages[0];
         if (!message?.from) {
@@ -1118,7 +1119,6 @@ app.post('/webhook', async (req, res) => {
         }
         let session = userSessions[from];
 
-        const from = message.from;
         const messageId = message.id; // Get the message ID for reactions
         const textRaw = message.text?.body || "";
 
