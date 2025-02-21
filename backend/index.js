@@ -1473,19 +1473,18 @@ app.post('/webhook', async (req, res) => {
                         }
 
                         // Generate audio response using OpenAI TTS
-// Generate audio response using OpenAI TTS
-const audioFilePath = `./temp/${messageId}_response.mp3`;
-await generateAudio(aiResponse, audioFilePath);
+                        const audioFilePath = `./temp/${messageId}_response.mp3`;
+                        await generateAudio(aiResponse, audioFilePath);
 
-// Upload audio file to WhatsApp's servers
-const mediaId = await uploadMediaToWhatsApp(audioFilePath);
+                        // Upload audio file to WhatsApp's servers
+                        const mediaId = await uploadMediaToWhatsApp(audioFilePath);
 
-// Send audio to user using the media ID
-await sendAudioUsingMediaId(from, mediaId);
+                        // Send audio to user using the media ID
+                        await sendAudioUsingMediaId(from, mediaId);
 
-// Clean up temporary files
-fs.unlinkSync(audioFilePath);
-console.log("✅ Temporary audio file deleted:", audioFilePath);
+                        // Clean up temporary files
+                        fs.unlinkSync(audioFilePath);
+                        console.log("✅ Temporary audio file deleted:", audioFilePath);
 
                         return res.sendStatus(200);
                     }
