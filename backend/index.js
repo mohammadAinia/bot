@@ -1239,7 +1239,7 @@ app.post('/webhook', async (req, res) => {
                     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
                 ]);
                 userSessions[from] = { ...session , 
-                    step: STATES.WELCOME,
+                    // step: STATES.WELCOME,
                     data: user,
                     language: detectedLanguage,
                     inRequest: false,
@@ -1256,7 +1256,7 @@ app.post('/webhook', async (req, res) => {
                     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
                 ]);
                 userSessions[from] = {...session,
-                    step: STATES.WELCOME,
+                    // step: STATES.WELCOME,
                     data: { phone: from },
                     language: detectedLanguage,
                     inRequest: false,
