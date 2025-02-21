@@ -4,6 +4,8 @@ import axios from 'axios';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import langdetect from 'langdetect';
+import fs from 'fs';
+import {OpenAI} from 'openai';
 
 
 dotenv.config();
@@ -11,6 +13,16 @@ dotenv.config();
 if (!process.env.OPENAI_API_KEY || !process.env.WHATSAPP_API_URL || !process.env.WHATSAPP_ACCESS_TOKEN) {
     console.error('❌ Missing required environment variables');
     process.exit(1);
+}
+// Initialize OpenAI client
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+});
+if (!fs.existsSync('./temp')) {
+    fs.mkdirSync('./temp');
+    console.log("✅ Created ./temp directory.");
+} else {
+    console.log("✅ ./temp directory already exists.");
 }
 
 const app = express();
@@ -1098,6 +1110,35 @@ const sendReaction = async (to, messageId, emoji) => {
     }
 };
 
+// Function to download a file from a URL
+const downloadFile = async (url, filePath) => {
+    const response = await axios({
+        url,
+        method: 'GET',
+        responseType: 'stream',
+    });
+    const writer = fs.createWriteStream(filePath);
+    response.data.pipe(writer);
+    return new Promise((resolve, reject) => {
+        writer.on('finish', resolve);
+        writer.on('error', reject);
+    });
+};
+
+// Function to transcribe a voice file using OpenAI's Whisper API
+const transcribeVoiceMessage = async (filePath) => {
+    try {
+        const transcription = await openai.audio.transcriptions.create({
+            file: fs.createReadStream(filePath),
+            model: "whisper-1",
+        });
+        return transcription.text;
+    } catch (error) {
+        console.error('❌ Error transcribing voice message:', error);
+        return null;
+    }
+};
+
 // Webhook endpoint
 app.post('/webhook', async (req, res) => {
     try {
@@ -1130,7 +1171,30 @@ app.post('/webhook', async (req, res) => {
         let session = userSessions[from];
 
         const messageId = message.id; // Get the message ID for reactions
-        const textRaw = message.text?.body || "";
+        let textRaw = message.text?.body || "";
+
+        // Handle voice messages
+        if (message.type === "audio" && message.audio) {
+            const audioUrl = message.audio.url; // URL of the voice recording
+            const filePath = `./temp/${messageId}.ogg`; // Temporary file path
+
+            // Download the voice file
+            await downloadFile(audioUrl, filePath);
+
+            // Transcribe the voice file
+            const transcription = await transcribeVoiceMessage(filePath);
+            if (transcription) {
+                textRaw = transcription; // Use the transcribed text as the message
+                console.log(`🔹 Transcribed voice message: ${textRaw}`);
+            } else {
+                console.error("❌ Failed to transcribe voice message.");
+                await sendToWhatsApp(from, "Sorry, I couldn't understand your voice message. Please try again.");
+                return res.sendStatus(200);
+            }
+
+            // Clean up the temporary file
+            fs.unlinkSync(filePath);
+        }
 
         // Get an emoji reaction based on the user's message
         const emoji = await getEmojiReaction(textRaw, session?.language || "en");
