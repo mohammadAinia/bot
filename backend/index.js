@@ -1214,6 +1214,10 @@ app.post('/webhook', async (req, res) => {
         }
 
         const session = userSessions[from];
+        if (!session.step || session.step === STATES.WELCOME) {
+            session.step = STATES.IDLE; // Use a neutral state instead of resetting to WELCOME
+        }
+        
 
         // Debugging: Log session state
         console.log("🔹 Session before processing:", session);
@@ -1224,8 +1228,17 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(200);
         }
 
+        if (session.inRequest) {
+            console.log("User is already in a request process. Skipping welcome message.");
+        } else {
+            await sendInteractiveButtons(from, welcomeMessage, [
+                { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
+                { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
+            ]);
+        }
+        
         // Initialize session if it doesn't exist
-        if (!session) {
+        if (!userSessions[from]) {
             console.log("🔹 No session found. Creating a new session for user:", from);
             const user = await checkUserRegistration(from);
             if (user && user.name) {
