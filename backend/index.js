@@ -1110,9 +1110,10 @@ app.post('/webhook', async (req, res) => {
             console.warn("⚠️ No messages found in webhook payload. Ignoring event.");
             return res.sendStatus(200);
         }
-        const from = message.from;
 
         const message = value.messages[0];
+        const from = message.from;
+
         if (!message?.from) {
             console.error("❌ Error: Missing 'from' field in message.");
             return res.sendStatus(400);
