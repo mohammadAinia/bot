@@ -422,8 +422,35 @@ const STATES = {
     CHANGE_INFOO:"CHANGE_INFOO"
 };
 
+// Helper function to validate text length
+const validateTextLength = (text) => {
+    if (!text || typeof text !== "string" || text.trim().length === 0) {
+        return false; // Text is empty or not a string
+    }
+    if (text.length > 1024) {
+        return false; // Text exceeds the maximum length
+    }
+    return true;
+};
+
+// Helper function to truncate text if it exceeds the maximum length
+const truncateText = (text, maxLength = 1024) => {
+    return text.length > maxLength ? text.slice(0, maxLength) : text;
+};
+
 const sendInteractiveButtons = async (to, message, buttons) => {
+    // Validate the message text length
+    if (!validateTextLength(message)) {
+        console.error("❌ Invalid message text length. Message must be between 1 and 1024 characters.");
+        await sendToWhatsApp(to, "Sorry, there was an issue processing your request. Please try again.");
+        return;
+    }
+
+    // Truncate the message if it exceeds 1024 characters
+    const truncatedMessage = truncateText(message, 1024);
+
     try {
+        // Construct the payload
         const payload = {
             messaging_product: "whatsapp",
             recipient_type: "individual",
@@ -431,7 +458,7 @@ const sendInteractiveButtons = async (to, message, buttons) => {
             type: "interactive",
             interactive: {
                 type: "button",
-                body: { text: message },
+                body: { text: truncatedMessage }, // Use truncated message
                 action: {
                     buttons: buttons.map(button => {
                         if (button.type === "location_request") {
@@ -453,8 +480,9 @@ const sendInteractiveButtons = async (to, message, buttons) => {
             }
         };
 
-        console.log("Sending Interactive Buttons Payload:", JSON.stringify(payload, null, 2));
+        console.log("✅ Sending Interactive Buttons Payload:", JSON.stringify(payload, null, 2));
 
+        // Send the payload to the WhatsApp API
         const response = await axios.post(process.env.WHATSAPP_API_URL, payload, {
             headers: {
                 "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
@@ -462,22 +490,16 @@ const sendInteractiveButtons = async (to, message, buttons) => {
             }
         });
 
-        console.log("Interactive Buttons Response:", response.data);
+        console.log("✅ Interactive Buttons Response:", response.data);
     } catch (error) {
         console.error("❌ Failed to send interactive buttons:", error.response?.data || error.message);
+
+        // Send a fallback message to the user if the request fails
+        await sendToWhatsApp(to, "Sorry, there was an issue processing your request. Please try again.");
     }
 };
 
-// Helper function to validate text length
-const validateTextLength = (text) => {
-    if (!text || text.length === 0) {
-        return false; // Text is empty
-    }
-    if (text.length > 1024) {
-        return false; // Text exceeds the maximum length
-    }
-    return true;
-};
+
 
 const sendInteractiveButtons2 = async (to, message, buttons) => {
     // Validate the message text length
@@ -486,6 +508,9 @@ const sendInteractiveButtons2 = async (to, message, buttons) => {
         await sendToWhatsApp(to, "Sorry, there was an issue processing your request. Please try again.");
         return;
     }
+
+    // Truncate the message if it exceeds 1024 characters
+    const truncatedMessage = truncateText(message, 1024);
 
     try {
         // Construct the payload
@@ -496,7 +521,7 @@ const sendInteractiveButtons2 = async (to, message, buttons) => {
             type: "interactive",
             interactive: {
                 type: "button",
-                body: { text: message },
+                body: { text: truncatedMessage }, // Use truncated message
                 action: {
                     buttons: buttons.map(button => ({
                         type: "reply",
