@@ -1244,7 +1244,7 @@ app.post('/webhook', async (req, res) => {
                     language: detectedLanguage,
                     inRequest: false,
                     lastTimestamp: Number(message.timestamp),
-                };
+                };//
             } else {
                 const welcomeMessage = await getOpenAIResponse(
                     "Generate a WhatsApp welcome message for Lootah Biofuels.",
