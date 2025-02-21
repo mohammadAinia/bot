@@ -7,6 +7,8 @@ import langdetect from 'langdetect';
 import fs from 'fs';
 import {OpenAI} from 'openai';
 import mime from 'mime-types';
+import path from 'path';
+
 
 
 
@@ -1264,7 +1266,7 @@ const uploadMediaToWhatsApp = async (filePath) => {
         // Create FormData
         const formData = new FormData();
         formData.append("file", fileContent, {
-            filename: path.basename(filePath),
+            filename: path.basename(filePath), // Use path.basename to get the filename
             contentType: "audio/mpeg",
         });
         formData.append("messaging_product", "whatsapp");
