@@ -1214,18 +1214,6 @@ const fetchMediaUrl = async (mediaId) => {
     }
 };
 
-const determineIntent = async (text, language) => {
-    const systemMessage = `
-        Analyze the user's message and determine their intent. Respond with one of the following:
-        - "submit_application": If the user wants to submit an application.
-        - "ask_about_company": If the user is asking about the company or its products.
-        - "other": For any other intent.
-    `;
-
-    const response = await getOpenAIResponse(text, systemMessage, language);
-    return response.trim().toLowerCase();
-};
-
 const generateAudio = async (text, filePath) => {
     try {
         const mp3 = await openai.audio.speech.create({
@@ -1303,8 +1291,6 @@ app.post('/webhook', async (req, res) => {
 
         const messageId = message.id; // Get the message ID for reactions
         let textRaw = message.text?.body || "";
-
-
 
         // Get an emoji reaction based on the user's message
         const emoji = await getEmojiReaction(textRaw, session?.language || "en");
@@ -1384,7 +1370,7 @@ app.post('/webhook', async (req, res) => {
                 await downloadFile(audioUrl, filePath);
                 console.log("🔹 Voice file downloaded successfully:", filePath);
 
-                // Transcribe the voice file
+                // Transcribe the voice file using OpenAI Whisper
                 const transcription = await transcribeVoiceMessage(filePath);
                 if (transcription) {
                     textRaw = transcription; // Use the transcribed text as the message
@@ -1406,15 +1392,12 @@ app.post('/webhook', async (req, res) => {
                             ]);
                         }
 
-                        // Generate and send audio response
+                        // Generate audio response using OpenAI TTS
                         const audioFilePath = `./temp/${messageId}_response.mp3`;
                         await generateAudio(aiResponse, audioFilePath);
 
-                        // Upload audio file to a publicly accessible URL (e.g., AWS S3, Firebase Storage)
-                        const audioUrl = await uploadFileToStorage(audioFilePath);
-
                         // Send audio to user
-                        await sendAudio(from, audioUrl);
+                        await sendAudio(from, audioFilePath);
 
                         // Clean up temporary files
                         fs.unlinkSync(audioFilePath);
