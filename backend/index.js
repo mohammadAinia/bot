@@ -186,6 +186,7 @@ For more details, visit: [Lootah Biofuels Website](https://www.lootahbiofuels.co
 
 `;
 
+// Truncate text function (kept separate)
 const truncateTextForAudio = (text, maxWords = 75) => {
     const words = text.split(" ");
     if (words.length > maxWords) {
@@ -194,6 +195,7 @@ const truncateTextForAudio = (text, maxWords = 75) => {
     return text;
 };
 
+// OpenAI response function
 const getOpenAIResponse = async (userMessage, context = "", language = "en") => {
     try {
         const systemMessage = `
@@ -202,6 +204,7 @@ const getOpenAIResponse = async (userMessage, context = "", language = "en") => 
             Always respond concisely, use emojis sparingly, and maintain a helpful attitude.
             Generate the response in the user's language: ${language}.
             Keep your responses very short and to the point. Each response should be no longer than 30 seconds when spoken.
+            For Arabic responses, ensure the answer is complete and concise, fitting within 100 tokens.
         `;
 
         const messages = [
@@ -216,7 +219,7 @@ const getOpenAIResponse = async (userMessage, context = "", language = "en") => 
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
             model: "gpt-4",
             messages,
-            max_tokens: 100, // Limit the response to 100 tokens (approx. 1-2 sentences)
+            max_tokens: 100, // Limit the response to 100 tokens
             temperature: 0.7
         }, {
             headers: {
@@ -225,10 +228,9 @@ const getOpenAIResponse = async (userMessage, context = "", language = "en") => 
             }
         });
 
+        // Truncate the OpenAI response using the truncateTextForAudio function
         const responseText = response.data.choices[0].message.content.trim();
-
-        // Truncate the response if it exceeds the word limit
-        return truncateTextForAudio(responseText, 75);
+        return truncateTextForAudio(responseText, 75); // Truncate to 75 words
     } catch (error) {
         console.error('❌ Error with OpenAI:', error.response?.data || error.message);
         return "❌ Oops! Something went wrong. Please try again later.";
