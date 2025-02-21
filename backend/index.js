@@ -1152,6 +1152,20 @@ const transcribeVoiceMessage = async (filePath) => {
     }
 };
 
+const fetchMediaUrl = async (mediaId) => {
+    try {
+        const response = await axios.get(`https://graph.facebook.com/v19.0/${mediaId}`, {
+            headers: {
+                'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+            },
+        });
+        return response.data.url; // Returns the URL of the media file
+    } catch (error) {
+        console.error('❌ Error fetching media URL:', error.response?.data || error.message);
+        return null;
+    }
+};
+
 // Webhook endpoint
 app.post('/webhook', async (req, res) => {
     try {
@@ -1188,9 +1202,10 @@ app.post('/webhook', async (req, res) => {
 
         // Handle voice messages
         if (message.type === "audio" && message.audio) {
-            const audioUrl = message.audio.url; // URL of the voice recording
+            const mediaId = message.audio.id; // Get the media ID
 
-            // Validate the URL
+            // Fetch the media URL using the media ID
+            const audioUrl = await fetchMediaUrl(mediaId);
             if (!audioUrl || !isValidUrl(audioUrl)) {
                 console.error("❌ Invalid or missing audio URL:", audioUrl);
                 await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
