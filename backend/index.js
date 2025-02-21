@@ -6,6 +6,8 @@ import cors from 'cors';
 import langdetect from 'langdetect';
 import fs from 'fs';
 import {OpenAI} from 'openai';
+import mime from 'mime-types';
+
 
 
 dotenv.config();
@@ -1225,6 +1227,14 @@ const generateAudio = async (text, filePath) => {
         const buffer = Buffer.from(await mp3.arrayBuffer());
         fs.writeFileSync(filePath, buffer);
         console.log("🔹 Audio file generated successfully:", filePath);
+
+        // Check MIME type of the generated file
+        const mimeType = mime.lookup(filePath);
+        if (mimeType !== "audio/mpeg") {
+            console.error("❌ Invalid file format. Expected audio/mpeg, got:", mimeType);
+            throw new Error("Invalid file format");
+        }
+
         return filePath;
     } catch (error) {
         console.error("❌ Error generating audio:", error);
@@ -1233,18 +1243,41 @@ const generateAudio = async (text, filePath) => {
 };
 const uploadMediaToWhatsApp = async (filePath) => {
     try {
+        // Check file format
+        const mimeType = mime.lookup(filePath);
+        if (mimeType !== "audio/mpeg") {
+            console.error("❌ Invalid file format. Expected audio/mpeg, got:", mimeType);
+            throw new Error("Invalid file format");
+        }
+
+        // Check file size
+        const fileStats = fs.statSync(filePath);
+        const fileSizeInMB = fileStats.size / (1024 * 1024);
+        if (fileSizeInMB > 16) {
+            console.error("❌ File size exceeds WhatsApp's limit (16 MB):", fileSizeInMB);
+            throw new Error("File size too large");
+        }
+
+        // Read file content
         const fileContent = fs.readFileSync(filePath);
+
+        // Create FormData
+        const formData = new FormData();
+        formData.append("file", fileContent, {
+            filename: path.basename(filePath),
+            contentType: "audio/mpeg",
+        });
+        formData.append("messaging_product", "whatsapp");
+        formData.append("type", "audio/mpeg");
+
+        // Upload file to WhatsApp
         const response = await axios.post(
-            `https://graph.facebook.com/v19.0/${process.env.PHONE_NUMBER_ID}/media`,
-            {
-                messaging_product: "whatsapp",
-                file: fileContent,
-                type: "audio/mpeg",
-            },
+            `https://graph.facebook.com/v20.0/${process.env.PHONE_NUMBER_ID}/media`,
+            formData,
             {
                 headers: {
+                    ...formData.getHeaders(),
                     "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-                    "Content-Type": "multipart/form-data",
                 },
             }
         );
@@ -1252,7 +1285,11 @@ const uploadMediaToWhatsApp = async (filePath) => {
         console.log("✅ Media uploaded to WhatsApp:", response.data);
         return response.data.id; // Return the media ID
     } catch (error) {
-        console.error("❌ Error uploading media to WhatsApp:", error.response?.data || error.message);
+        console.error("❌ Error uploading media to WhatsApp:", {
+            message: error.message,
+            response: error.response?.data,
+            stack: error.stack,
+        });
         throw error;
     }
 };
