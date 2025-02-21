@@ -1340,7 +1340,8 @@ if (session.step === STATES.CHANGE_INFOO) {
             }
             return res.sendStatus(200);
         }
-
+        let latitude
+        let longitude
         switch (session.step) {
             case STATES.CHANGE_INFO:
                 if (message.type === "interactive" && message.interactive?.type === "button_reply") {
