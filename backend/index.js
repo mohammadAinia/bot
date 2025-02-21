@@ -1231,8 +1231,33 @@ const generateAudio = async (text, filePath) => {
         throw error;
     }
 };
+const uploadMediaToWhatsApp = async (filePath) => {
+    try {
+        const fileContent = fs.readFileSync(filePath);
+        const response = await axios.post(
+            `https://graph.facebook.com/v19.0/${process.env.PHONE_NUMBER_ID}/media`,
+            {
+                messaging_product: "whatsapp",
+                file: fileContent,
+                type: "audio/mpeg",
+            },
+            {
+                headers: {
+                    "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                    "Content-Type": "multipart/form-data",
+                },
+            }
+        );
 
-const sendAudio = async (to, audioUrl) => {
+        console.log("✅ Media uploaded to WhatsApp:", response.data);
+        return response.data.id; // Return the media ID
+    } catch (error) {
+        console.error("❌ Error uploading media to WhatsApp:", error.response?.data || error.message);
+        throw error;
+    }
+};
+
+const sendAudioUsingMediaId = async (to, mediaId) => {
     try {
         const payload = {
             messaging_product: "whatsapp",
@@ -1240,7 +1265,7 @@ const sendAudio = async (to, audioUrl) => {
             to: to,
             type: "audio",
             audio: {
-                link: audioUrl, // Publicly accessible URL of the audio file
+                id: mediaId, // Use the media ID instead of a URL
             },
         };
 
@@ -1393,15 +1418,19 @@ app.post('/webhook', async (req, res) => {
                         }
 
                         // Generate audio response using OpenAI TTS
-                        const audioFilePath = `./temp/${messageId}_response.mp3`;
-                        await generateAudio(aiResponse, audioFilePath);
+// Generate audio response using OpenAI TTS
+const audioFilePath = `./temp/${messageId}_response.mp3`;
+await generateAudio(aiResponse, audioFilePath);
 
-                        // Send audio to user
-                        await sendAudio(from, audioFilePath);
+// Upload audio file to WhatsApp's servers
+const mediaId = await uploadMediaToWhatsApp(audioFilePath);
 
-                        // Clean up temporary files
-                        fs.unlinkSync(audioFilePath);
-                        console.log("✅ Temporary audio file deleted:", audioFilePath);
+// Send audio to user using the media ID
+await sendAudioUsingMediaId(from, mediaId);
+
+// Clean up temporary files
+fs.unlinkSync(audioFilePath);
+console.log("✅ Temporary audio file deleted:", audioFilePath);
 
                         return res.sendStatus(200);
                     }
