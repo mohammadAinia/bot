@@ -468,8 +468,27 @@ const sendInteractiveButtons = async (to, message, buttons) => {
     }
 };
 
+// Helper function to validate text length
+const validateTextLength = (text) => {
+    if (!text || text.length === 0) {
+        return false; // Text is empty
+    }
+    if (text.length > 1024) {
+        return false; // Text exceeds the maximum length
+    }
+    return true;
+};
+
 const sendInteractiveButtons2 = async (to, message, buttons) => {
+    // Validate the message text length
+    if (!validateTextLength(message)) {
+        console.error("❌ Invalid message text length. Message must be between 1 and 1024 characters.");
+        await sendToWhatsApp(to, "Sorry, there was an issue processing your request. Please try again.");
+        return;
+    }
+
     try {
+        // Construct the payload
         const payload = {
             messaging_product: "whatsapp",
             recipient_type: "individual",
@@ -492,6 +511,7 @@ const sendInteractiveButtons2 = async (to, message, buttons) => {
 
         console.log("✅ Sending Interactive Buttons Payload:", JSON.stringify(payload, null, 2));
 
+        // Send the payload to the WhatsApp API
         const response = await axios.post(process.env.WHATSAPP_API_URL, payload, {
             headers: {
                 "Authorization": `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
@@ -502,6 +522,9 @@ const sendInteractiveButtons2 = async (to, message, buttons) => {
         console.log("✅ Interactive Buttons Response:", response.data);
     } catch (error) {
         console.error("❌ Failed to send interactive buttons:", error.response?.data || error.message);
+
+        // Send a fallback message to the user if the request fails
+        await sendToWhatsApp(to, "Sorry, there was an issue processing your request. Please try again.");
     }
 };
 
@@ -1212,77 +1235,7 @@ app.post('/webhook', async (req, res) => {
         const messageId = message.id; // Get the message ID for reactions
         let textRaw = message.text?.body || "";
 
-        // Handle voice messages
-        if (message.type === "audio" && message.audio) {
-            const mediaId = message.audio.id; // Get the media ID
-        
-            // Fetch the media URL using the media ID
-            const audioUrl = await fetchMediaUrl(mediaId);
-            if (!audioUrl || !isValidUrl(audioUrl)) {
-                console.error("❌ Invalid or missing audio URL:", audioUrl);
-                await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
-                return res.sendStatus(200);
-            }
-        
-            const filePath = `./temp/${messageId}.ogg`; // Temporary file path
-        
-            // Download the voice file
-            try {
-                await downloadFile(audioUrl, filePath);
-                console.log("🔹 Voice file downloaded successfully:", filePath);
-        
-                // Transcribe the voice file
-                const transcription = await transcribeVoiceMessage(filePath);
-                if (transcription) {
-                    textRaw = transcription; // Use the transcribed text as the message
-                    console.log(`🔹 Transcribed voice message: ${textRaw}`);
-        
-                    // Process the transcribed text as if it were a text message
-                    const classification = await isQuestionOrRequest(textRaw);
-                    if (classification === "question") {
-                        const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-                        if (session.inRequest) {
-                            await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
-                        } else {
-                            const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-                            await sendInteractiveButtons(from, reply, [
-                                { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-                                { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-                            ]);
-                        }
-                        return res.sendStatus(200);
-                    }
-        
-                    // Check if the user's message contains information
-                    if (session.step === STATES.WELCOME) {
-                        const extractedData = await extractInformationFromText(textRaw, session.language);
-                        if (Object.keys(extractedData).length > 0) {
-                            session.step = STATES.CHANGE_INFOO;
-                            await sendInteractiveButtons(from, "Do you want to change your information?", [
-                                { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                                { type: "reply", reply: { id: "no_change", title: "No" } }
-                            ]);
-                            session.tempData = extractedData; // Store extracted data temporarily
-                            return res.sendStatus(200);
-                        }
-                    }
-                } else {
-                    console.error("❌ Failed to transcribe voice message.");
-                    await sendToWhatsApp(from, "Sorry, I couldn't understand your voice message. Please try again.");
-                    return res.sendStatus(200);
-                }
-            } catch (error) {
-                console.error("❌ Error downloading or transcribing voice message:", error);
-                await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
-                return res.sendStatus(200);
-            } finally {
-                // Clean up the temporary file
-                if (fs.existsSync(filePath)) {
-                    fs.unlinkSync(filePath);
-                    console.log("✅ Temporary file deleted:", filePath);
-                }
-            }
-        }
+
 
         // Get an emoji reaction based on the user's message
         const emoji = await getEmojiReaction(textRaw, session?.language || "en");
@@ -1342,6 +1295,78 @@ app.post('/webhook', async (req, res) => {
             }
             return res.sendStatus(200);
         }
+
+                // Handle voice messages
+                if (message.type === "audio" && message.audio) {
+                    const mediaId = message.audio.id; // Get the media ID
+                
+                    // Fetch the media URL using the media ID
+                    const audioUrl = await fetchMediaUrl(mediaId);
+                    if (!audioUrl || !isValidUrl(audioUrl)) {
+                        console.error("❌ Invalid or missing audio URL:", audioUrl);
+                        await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
+                        return res.sendStatus(200);
+                    }
+                
+                    const filePath = `./temp/${messageId}.ogg`; // Temporary file path
+                
+                    // Download the voice file
+                    try {
+                        await downloadFile(audioUrl, filePath);
+                        console.log("🔹 Voice file downloaded successfully:", filePath);
+                
+                        // Transcribe the voice file
+                        const transcription = await transcribeVoiceMessage(filePath);
+                        if (transcription) {
+                            textRaw = transcription; // Use the transcribed text as the message
+                            console.log(`🔹 Transcribed voice message: ${textRaw}`);
+                
+                            // Process the transcribed text as if it were a text message
+                            const classification = await isQuestionOrRequest(textRaw);
+                            if (classification === "question") {
+                                const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+                                if (session.inRequest) {
+                                    await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
+                                } else {
+                                    const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+                                    await sendInteractiveButtons(from, reply, [
+                                        { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+                                        { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+                                    ]);
+                                }
+                                return res.sendStatus(200);
+                            }
+                
+                            // Check if the user's message contains information
+                            if (session.step === STATES.WELCOME) {
+                                const extractedData = await extractInformationFromText(textRaw, session.language);
+                                if (Object.keys(extractedData).length > 0) {
+                                    session.step = STATES.CHANGE_INFOO;
+                                    await sendInteractiveButtons(from, "Do you want to change your information?", [
+                                        { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                                        { type: "reply", reply: { id: "no_change", title: "No" } }
+                                    ]);
+                                    session.tempData = extractedData; // Store extracted data temporarily
+                                    return res.sendStatus(200);
+                                }
+                            }
+                        } else {
+                            console.error("❌ Failed to transcribe voice message.");
+                            await sendToWhatsApp(from, "Sorry, I couldn't understand your voice message. Please try again.");
+                            return res.sendStatus(200);
+                        }
+                    } catch (error) {
+                        console.error("❌ Error downloading or transcribing voice message:", error);
+                        await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
+                        return res.sendStatus(200);
+                    } finally {
+                        // Clean up the temporary file
+                        if (fs.existsSync(filePath)) {
+                            fs.unlinkSync(filePath);
+                            console.log("✅ Temporary file deleted:", filePath);
+                        }
+                    }
+                }
 
         if (message.type === "interactive" && message.interactive?.type === "button_reply") {
             const buttonId = message.interactive.button_reply.id;
