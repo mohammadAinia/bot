@@ -1116,6 +1116,7 @@ app.post('/webhook', async (req, res) => {
             console.error("❌ Error: Missing 'from' field in message.");
             return res.sendStatus(400);
         }
+        let session = userSessions[from];
 
         const from = message.from;
         const messageId = message.id; // Get the message ID for reactions
@@ -1140,7 +1141,6 @@ app.post('/webhook', async (req, res) => {
             console.log("⚠️ Language detection failed. Defaulting to English.", error);
         }
 
-        let session = userSessions[from];
         if (!session) {
             const user = await checkUserRegistration(from);
             if (user && user.name) {
