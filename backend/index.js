@@ -1347,6 +1347,36 @@ app.post('/webhook', async (req, res) => {
                 return res.sendStatus(200);
             }
         }
+
+        // Handle CHANGE_INFOO state
+        if (session.step === STATES.CHANGE_INFOO) {
+            if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+                const buttonId = message.interactive.button_reply.id;
+                if (buttonId === "yes_change") {
+                    // Update session data with extracted information
+                    session.data = { ...session.data, ...session.tempData };
+                    delete session.tempData; // Clear temporary data
+
+                    // Ensure the phone number is not overwritten if already present
+                    if (!session.data.phone) {
+                        session.data.phone = from; // Use the WhatsApp number as the default phone number
+                    }
+
+                    const missingFields = getMissingFields(session.data);
+                    if (missingFields.length > 0) {
+                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                        await askForNextMissingField(session, from);
+                    } else {
+                        session.step = STATES.QUANTITY;
+                        await sendQuantitySelection(from, session.language);
+                    }
+                } else if (buttonId === "no_change") {
+                    session.step = STATES.QUANTITY;
+                    await sendQuantitySelection(from, session.language);
+                }
+            }
+            return res.sendStatus(200);
+        }
     // try {
     //     console.log("🔹 Incoming Webhook Data:", JSON.stringify(req.body, null, 2));
     //     if (!req.body.entry || !Array.isArray(req.body.entry) || req.body.entry.length === 0) {
@@ -1519,34 +1549,34 @@ app.post('/webhook', async (req, res) => {
     //     }
 
         // Handle CHANGE_INFOO state
-        if (session.step === STATES.CHANGE_INFOO) {
-            if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-                const buttonId = message.interactive.button_reply.id;
-                if (buttonId === "yes_change") {
-                    // Update session data with extracted information
-                    session.data = { ...session.data, ...session.tempData };
-                    delete session.tempData; // Clear temporary data
+        // if (session.step === STATES.CHANGE_INFOO) {
+        //     if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+        //         const buttonId = message.interactive.button_reply.id;
+        //         if (buttonId === "yes_change") {
+        //             // Update session data with extracted information
+        //             session.data = { ...session.data, ...session.tempData };
+        //             delete session.tempData; // Clear temporary data
 
-                    // Ensure the phone number is not overwritten if already present
-                    if (!session.data.phone) {
-                        session.data.phone = from; // Use the WhatsApp number as the default phone number
-                    }
+        //             // Ensure the phone number is not overwritten if already present
+        //             if (!session.data.phone) {
+        //                 session.data.phone = from; // Use the WhatsApp number as the default phone number
+        //             }
 
-                    const missingFields = getMissingFields(session.data);
-                    if (missingFields.length > 0) {
-                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                        await askForNextMissingField(session, from);
-                    } else {
-                        session.step = STATES.QUANTITY;
-                        await sendQuantitySelection(from, session.language);
-                    }
-                } else if (buttonId === "no_change") {
-                    session.step = STATES.QUANTITY;
-                    await sendQuantitySelection(from, session.language);
-                }
-            }
-            return res.sendStatus(200);
-        }
+        //             const missingFields = getMissingFields(session.data);
+        //             if (missingFields.length > 0) {
+        //                 session.step = `ASK_${missingFields[0].toUpperCase()}`;
+        //                 await askForNextMissingField(session, from);
+        //             } else {
+        //                 session.step = STATES.QUANTITY;
+        //                 await sendQuantitySelection(from, session.language);
+        //             }
+        //         } else if (buttonId === "no_change") {
+        //             session.step = STATES.QUANTITY;
+        //             await sendQuantitySelection(from, session.language);
+        //         }
+        //     }
+        //     return res.sendStatus(200);
+        // }
 
 
         let latitude
