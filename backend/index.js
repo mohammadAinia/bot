@@ -1039,28 +1039,13 @@ async function sendQuantitySelection(user, language) {
     await sendInteractiveButtons2(user, message, buttons);
 }
 
-const sendReaction = async (to, messageId, emoji) => {
-    try {
-        await axios.post(process.env.WHATSAPP_API_URL, {
-            messaging_product: 'whatsapp',
-            recipient_type: 'individual',
-            to: to,
-            type: 'reaction',
-            reaction: {
-                message_id: messageId,
-                emoji: emoji
-            }
-        }, {
-            headers: {
-                'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-                'Content-Type': 'application/json'
-            }
-        });
-    } catch (error) {
-        console.error('❌ Failed to send reaction:', error.response?.data || error.message);
-    }
+// Function to validate and extract a single emoji
+const extractSingleEmoji = (text) => {
+    // Match a single emoji using a regex pattern
+    const emojiRegex = /\p{Emoji}/u;
+    const match = text.match(emojiRegex);
+    return match ? match[0] : "👍"; // Default to "👍" if no valid emoji is found
 };
-
 
 // Function to get an emoji reaction based on the user's message
 const getEmojiReaction = async (userMessage, language = "en") => {
@@ -1082,10 +1067,34 @@ const getEmojiReaction = async (userMessage, language = "en") => {
         `;
 
         const response = await getOpenAIResponse(userMessage, systemMessage, language);
-        return response.trim(); // Return the emoji
+        const emoji = extractSingleEmoji(response.trim()); // Extract a single emoji
+        return emoji;
     } catch (error) {
         console.error('❌ Error getting emoji reaction:', error);
         return "👍"; // Default emoji if something goes wrong
+    }
+};
+
+// Function to send a reaction (emoji) to a message
+const sendReaction = async (to, messageId, emoji) => {
+    try {
+        await axios.post(process.env.WHATSAPP_API_URL, {
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: to,
+            type: 'reaction',
+            reaction: {
+                message_id: messageId,
+                emoji: emoji
+            }
+        }, {
+            headers: {
+                'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+                'Content-Type': 'application/json'
+            }
+        });
+    } catch (error) {
+        console.error('❌ Failed to send reaction:', error.response?.data || error.message);
     }
 };
 
