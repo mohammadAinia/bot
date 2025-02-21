@@ -1320,6 +1320,10 @@ app.post('/webhook', async (req, res) => {
         if (message.type === "text") {
             const isRequestStart = await detectRequestStart(textRaw);
             if (isRequestStart) {
+                // Extract information from the text
+                const extractedData = await extractInformationFromText(textRaw, session.language);
+                session.data = { ...session.data, ...extractedData }; // Merge extracted data with session data
+
                 // Check if the user is registered
                 const user = await checkUserRegistration(from);
                 if (user && user.name) {
@@ -1330,14 +1334,189 @@ app.post('/webhook', async (req, res) => {
                         { type: "reply", reply: { id: "no_change", title: "No" } }
                     ]);
                 } else {
-                    // New user: Start collecting information
-                    session.inRequest = true;
-                    session.step = STATES.NAME;
-                    await sendToWhatsApp(from, "Please provide your name.");
+                    // New user: Start collecting missing information
+                    const missingFields = getMissingFields(session.data);
+                    if (missingFields.length > 0) {
+                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                        await askForNextMissingField(session, from);
+                    } else {
+                        session.step = STATES.CONFIRMATION;
+                        await sendOrderSummary(from, session);
+                    }
                 }
                 return res.sendStatus(200);
             }
         }
+    // try {
+    //     console.log("🔹 Incoming Webhook Data:", JSON.stringify(req.body, null, 2));
+    //     if (!req.body.entry || !Array.isArray(req.body.entry) || req.body.entry.length === 0) {
+    //         console.error("❌ Error: Missing or invalid 'entry' in webhook payload.");
+    //         return res.sendStatus(400);
+    //     }
+
+    //     const entry = req.body.entry[0];
+    //     if (!entry.changes || !Array.isArray(entry.changes) || entry.changes.length === 0) {
+    //         console.error("❌ Error: Missing or invalid 'changes' in webhook payload.");
+    //         return res.sendStatus(400);
+    //     }
+
+    //     const changes = entry.changes[0];
+    //     const value = changes.value;
+    //     if (!value?.messages || !Array.isArray(value.messages) || value.messages.length === 0) {
+    //         console.warn("⚠️ No messages found in webhook payload. Ignoring event.");
+    //         return res.sendStatus(200);
+    //     }
+
+    //     const message = value.messages[0];
+    //     if (!message?.from) {
+    //         console.error("❌ Error: Missing 'from' field in message.");
+    //         return res.sendStatus(400);
+    //     }
+
+    //     const from = message.from;
+    //     console.log(`Processing message from ${from}. Current session:`, userSessions[from]);
+
+    //     const textRaw = message.text?.body || "";
+    //     const text = textRaw.toLowerCase().trim();
+    //     let detectedLanguage = "en";
+
+    //     try {
+    //         const detected = langdetect.detect(textRaw);
+    //         if (Array.isArray(detected) && detected.length > 0) {
+    //             detectedLanguage = detected[0].lang;
+    //         }
+    //         if (detectedLanguage !== "ar" && detectedLanguage !== "en") {
+    //             detectedLanguage = "en";
+    //         }
+    //     } catch (error) {
+    //         console.log("⚠️ Language detection failed. Defaulting to English.", error);
+    //     }
+
+    //     const session = userSessions[from];
+
+    //     // Debugging: Log session state
+    //     console.log("🔹 Session before processing:", session);
+
+    //     // Check for out-of-order messages
+    //     if (session?.lastTimestamp && Number(message.timestamp) < session.lastTimestamp) {
+    //         console.log(`Ignoring out-of-order message for user ${from}`);
+    //         return res.sendStatus(200);
+    //     }
+
+    //     // Initialize session if it doesn't exist
+    //     if (!session) {
+    //         console.log("🔹 No session found. Creating a new session for user:", from);
+    //         const user = await checkUserRegistration(from);
+    //         if (user && user.name) {
+    //             let welcomeMessage = await getOpenAIResponse(
+    //                 `Welcome back, ${user.name}. Generate a WhatsApp welcome message for Lootah Biofuels.`,
+    //                 "",
+    //                 detectedLanguage
+    //             );
+    //             await sendInteractiveButtons(from, welcomeMessage, [
+    //                 { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
+    //                 { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
+    //             ]);
+    //             userSessions[from] = {
+    //                 step: STATES.WELCOME,
+    //                 data: user,
+    //                 language: detectedLanguage,
+    //                 inRequest: false,
+    //                 lastTimestamp: Number(message.timestamp),
+    //             };
+    //         } else {
+    //             const welcomeMessage = await getOpenAIResponse(
+    //                 "Generate a WhatsApp welcome message for Lootah Biofuels.",
+    //                 "",
+    //                 detectedLanguage
+    //             );
+    //             await sendInteractiveButtons(from, welcomeMessage, [
+    //                 { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
+    //                 { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
+    //             ]);
+    //             userSessions[from] = {
+    //                 step: STATES.WELCOME,
+    //                 data: { phone: from },
+    //                 language: detectedLanguage,
+    //                 inRequest: false,
+    //                 lastTimestamp: Number(message.timestamp),
+    //             };
+    //         }
+    //         console.log("🔹 New session created:", userSessions[from]);
+    //         return res.sendStatus(200); // Exit after sending welcome message
+    //     }
+
+    //     // Update the session's last timestamp
+    //     session.lastTimestamp = Number(message.timestamp);
+
+    //     // Debugging: Log session state after update
+    //     console.log("🔹 Session after update:", session);
+
+    //     // Handle button replies
+    //     if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+    //         const buttonId = message.interactive.button_reply.id;
+    //         if (buttonId === "new_request") {
+    //             // Check if the user is registered
+    //             const user = await checkUserRegistration(from);
+    //             if (user && user.name) {
+    //                 // Registered user: Ask if they want to change their information
+    //                 session.step = STATES.CHANGE_INFO;
+    //                 await sendInteractiveButtons(from, "Do you want to change your information?", [
+    //                     { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+    //                     { type: "reply", reply: { id: "no_change", title: "No" } }
+    //                 ]);
+    //             } else {
+    //                 // New user: Start collecting information
+    //                 session.inRequest = true;
+    //                 session.step = STATES.NAME;
+    //                 await sendToWhatsApp(from, "Please provide your name.");
+    //             }
+    //             return res.sendStatus(200);
+    //         } else if (buttonId === "contact_us") {
+    //             await sendToWhatsApp(from, getContactMessage(session.language));
+    //             return res.sendStatus(200);
+    //         }
+    //     }
+
+    //     // Handle CHANGE_INFO state
+    //     if (session.step === STATES.CHANGE_INFO) {
+    //         if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+    //             const buttonId = message.interactive.button_reply.id;
+    //             if (buttonId === "yes_change") {
+    //                 // User wants to change information
+    //                 session.step = STATES.NAME;
+    //                 await sendToWhatsApp(from, "Please provide your new name.");
+    //             } else if (buttonId === "no_change") {
+    //                 // User does not want to change information
+    //                 session.step = STATES.QUANTITY;
+    //                 await sendQuantitySelection(from, session.language);
+    //             }
+    //         }
+    //         return res.sendStatus(200);
+    //     }
+
+    //     // Handle text input for starting a request
+    //     if (message.type === "text") {
+    //         const isRequestStart = await detectRequestStart(textRaw);
+    //         if (isRequestStart) {
+    //             // Check if the user is registered
+    //             const user = await checkUserRegistration(from);
+    //             if (user && user.name) {
+    //                 // Registered user: Ask if they want to change their information
+    //                 session.step = STATES.CHANGE_INFO;
+    //                 await sendInteractiveButtons(from, "Do you want to change your information?", [
+    //                     { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+    //                     { type: "reply", reply: { id: "no_change", title: "No" } }
+    //                 ]);
+    //             } else {
+    //                 // New user: Start collecting information
+    //                 session.inRequest = true;
+    //                 session.step = STATES.NAME;
+    //                 await sendToWhatsApp(from, "Please provide your name.");
+    //             }
+    //             return res.sendStatus(200);
+    //         }
+    //     }
 
         // Handle CHANGE_INFOO state
         // if (session.step === STATES.CHANGE_INFOO) {
