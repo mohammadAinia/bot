@@ -1110,12 +1110,25 @@ const sendReaction = async (to, messageId, emoji) => {
     }
 };
 
+// Function to validate a URL
+const isValidUrl = (url) => {
+    try {
+        new URL(url); // This will throw an error if the URL is invalid
+        return true;
+    } catch (error) {
+        return false;
+    }
+};
+
 // Function to download a file from a URL
 const downloadFile = async (url, filePath) => {
     const response = await axios({
         url,
         method: 'GET',
         responseType: 'stream',
+        headers: {
+            'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+        },
     });
     const writer = fs.createWriteStream(filePath);
     response.data.pipe(writer);
@@ -1176,24 +1189,42 @@ app.post('/webhook', async (req, res) => {
         // Handle voice messages
         if (message.type === "audio" && message.audio) {
             const audioUrl = message.audio.url; // URL of the voice recording
-            const filePath = `./temp/${messageId}.ogg`; // Temporary file path
 
-            // Download the voice file
-            await downloadFile(audioUrl, filePath);
-
-            // Transcribe the voice file
-            const transcription = await transcribeVoiceMessage(filePath);
-            if (transcription) {
-                textRaw = transcription; // Use the transcribed text as the message
-                console.log(`🔹 Transcribed voice message: ${textRaw}`);
-            } else {
-                console.error("❌ Failed to transcribe voice message.");
-                await sendToWhatsApp(from, "Sorry, I couldn't understand your voice message. Please try again.");
+            // Validate the URL
+            if (!audioUrl || !isValidUrl(audioUrl)) {
+                console.error("❌ Invalid or missing audio URL:", audioUrl);
+                await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
                 return res.sendStatus(200);
             }
 
-            // Clean up the temporary file
-            fs.unlinkSync(filePath);
+            const filePath = `./temp/${messageId}.ogg`; // Temporary file path
+
+            // Download the voice file
+            try {
+                await downloadFile(audioUrl, filePath);
+                console.log("🔹 Voice file downloaded successfully:", filePath);
+
+                // Transcribe the voice file
+                const transcription = await transcribeVoiceMessage(filePath);
+                if (transcription) {
+                    textRaw = transcription; // Use the transcribed text as the message
+                    console.log(`🔹 Transcribed voice message: ${textRaw}`);
+                } else {
+                    console.error("❌ Failed to transcribe voice message.");
+                    await sendToWhatsApp(from, "Sorry, I couldn't understand your voice message. Please try again.");
+                    return res.sendStatus(200);
+                }
+            } catch (error) {
+                console.error("❌ Error downloading or transcribing voice message:", error);
+                await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
+                return res.sendStatus(200);
+            } finally {
+                // Clean up the temporary file
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                    console.log("✅ Temporary file deleted:", filePath);
+                }
+            }
         }
 
         // Get an emoji reaction based on the user's message
