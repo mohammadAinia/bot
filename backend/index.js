@@ -1315,11 +1315,11 @@ if (session.step === STATES.CHANGE_INFOO) {
                 await askForNextMissingField(session, from);
             } else {
                 session.step = STATES.QUANTITY;
-                await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+                        await sendQuantitySelection(from, session.language);
             }
         } else if (buttonId === "no_change") {
             session.step = STATES.QUANTITY;
-            await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+                        await sendQuantitySelection(from, session.language);
         }
     }
     return res.sendStatus(200);
@@ -1340,8 +1340,7 @@ if (session.step === STATES.CHANGE_INFOO) {
             }
             return res.sendStatus(200);
         }
-        let latitude
-        let longitude
+
         switch (session.step) {
             case STATES.CHANGE_INFO:
                 if (message.type === "interactive" && message.interactive?.type === "button_reply") {
@@ -1351,7 +1350,7 @@ if (session.step === STATES.CHANGE_INFOO) {
                         await sendToWhatsApp(from, "Please provide your new name.");
                     } else if (buttonId === "no_change") {
                         session.step = STATES.QUANTITY;
-                        await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+                        await sendQuantitySelection(from, session.language);
                     }
                 }
                 break;
@@ -3886,11 +3885,11 @@ app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PO
 //                 await askForNextMissingField(session, from);
 //             } else {
 //                 session.step = STATES.QUANTITY;
-//                 await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+//                         await sendQuantitySelection(from, session.language);
 //             }
 //         } else if (buttonId === "no_change") {
 //             session.step = STATES.QUANTITY;
-//             await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+//                         await sendQuantitySelection(from, session.language);
 //         }
 //     }
 //     return res.sendStatus(200);
@@ -3921,7 +3920,7 @@ app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PO
 //                         await sendToWhatsApp(from, "Please provide your new name.");
 //                     } else if (buttonId === "no_change") {
 //                         session.step = STATES.QUANTITY;
-//                         await sendToWhatsApp(from, "Please provide the quantity (in liters).");
+//                         await sendQuantitySelection(from, session.language);
 //                     }
 //                 }
 //                 break;
