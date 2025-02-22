@@ -1933,18 +1933,18 @@ app.post('/webhook', async (req, res) => {
 
         // Check if the user's message contains information
         
-        if (session.step === STATES.WELCOME && message.type === "text") {
-            const extractedData = await extractInformationFromText(textRaw, session.language);
-            if (Object.keys(extractedData).length > 0) {
-                session.step = STATES.CHANGE_INFOO;
-                await sendInteractiveButtons(from, "Do you want to change your information?", [
-                    { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                    { type: "reply", reply: { id: "no_change", title: "No" } }
-                ]);
-                session.tempData = extractedData; // Store extracted data temporarily
-                return res.sendStatus(200);
-            }
-        }
+        // if (session.step === STATES.WELCOME && message.type === "text") {
+        //     const extractedData = await extractInformationFromText(textRaw, session.language);
+        //     if (Object.keys(extractedData).length > 0) {
+        //         session.step = STATES.CHANGE_INFOO;
+        //         await sendInteractiveButtons(from, "Do you want to change your information?", [
+        //             { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+        //             { type: "reply", reply: { id: "no_change", title: "No" } }
+        //         ]);
+        //         session.tempData = extractedData; // Store extracted data temporarily
+        //         return res.sendStatus(200);
+        //     }
+        // }
 
         // Handle CHANGE_INFO state
         if (session.step === STATES.CHANGE_INFOO) {
