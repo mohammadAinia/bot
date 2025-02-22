@@ -985,9 +985,6 @@ async function isQuestionOrRequest(text) {
        - "mmyyttt@gmail.com"
        - "yazan@gmail.com"
        - "mohammaedAinia@gmail.com"
-       - "Dubai"
-       - "Sharjah"
-       - "Abu Dhabi"
        - "50 liters"
        - "100 liters"
        - "30 liters"
@@ -1899,6 +1896,16 @@ app.post('/webhook', async (req, res) => {
                     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
                 ]);
             }
+            return res.sendStatus(200);
+        } else if (classification === "greeting") {
+            // Handle greetings
+            const greetingResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+            await sendToWhatsApp(from, greetingResponse);
+            return res.sendStatus(200);
+        } else if (classification === "other") {
+            // Handle other cases
+            const otherResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+            await sendToWhatsApp(from, otherResponse);
             return res.sendStatus(200);
         }
         
