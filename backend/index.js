@@ -1663,8 +1663,8 @@ app.post('/webhook', async (req, res) => {
                     // Handle answers
                     if (session.step === STATES.NAME) {
                         session.data.name = transcribedText;
-                        session.step = STATES.NEXT_STEP; // Move to the next step in the request flow
-                        aiResponse = `Thank you, ${transcribedText}. What is your address?`; // Example next question
+                        session.step = STATES.EMAIL;
+                        await sendToWhatsApp(from, getEmailMessage(session.language));
                         await sendToWhatsApp(from, aiResponse);
                     } 
                     // else if (session.step === STATES.NEXT_STEP) {
