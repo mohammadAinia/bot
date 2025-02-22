@@ -1901,55 +1901,21 @@ app.post('/webhook', async (req, res) => {
             }
             return res.sendStatus(200);
         }
-        else if (classification === "request") {
-            // Handle requests
-            const isRegisteredUser = session.data && session.data.name && session.data.email && session.data.address; // Check if the user is registered
         
-            if (!isRegisteredUser) {
-                // Start collecting information immediately if the user is new or doesn't have sufficient data
-                session.inRequest = true;
-                session.step = STATES.NAME;
-                aiResponse = "Please provide your name."; // Set aiResponse for voice generation
-                await sendToWhatsApp(from, aiResponse);
-            } else {
-                // For registered users, ask if they want to change their information
-                const extractedData = await extractInformationFromText(textRaw, session.language);
-                if (Object.keys(extractedData).length > 0) {
-                    session.step = STATES.CHANGE_INFOO;
-                    aiResponse = "Do you want to change your information?"; // Set aiResponse for voice generation
-                    await sendInteractiveButtons(from, aiResponse, [
-                        { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                        { type: "reply", reply: { id: "no_change", title: "No" } }
-                    ]);
-                    session.tempData = extractedData; // Store extracted data temporarily
-                } else {
-                    // If no data is extracted, ask if they want to proceed with the existing information
-                    aiResponse = "Do you want to proceed with your existing information or update it?";
-                    await sendInteractiveButtons(from, aiResponse, [
-                        { type: "reply", reply: { id: "proceed_existing", title: "Proceed with existing" } },
-                        { type: "reply", reply: { id: "update_info", title: "Update information" } }
-                    ]);
-                }
-            }
-        } else if (classification === "greeting" || classification === "other") {
-            // Handle greetings or other cases
-            aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
-            await sendToWhatsApp(from, aiResponse);
-        }
 
-        // // Check if the user's message contains information
-        // if (session.step === STATES.WELCOME && message.type === "text") {
-        //     const extractedData = await extractInformationFromText(textRaw, session.language);
-        //     if (Object.keys(extractedData).length > 0) {
-        //         session.step = STATES.CHANGE_INFOO;
-        //         await sendInteractiveButtons(from, "Do you want to change your information?", [
-        //             { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-        //             { type: "reply", reply: { id: "no_change", title: "No" } }
-        //         ]);
-        //         session.tempData = extractedData; // Store extracted data temporarily
-        //         return res.sendStatus(200);
-        //     }
-        // }
+        // Check if the user's message contains information
+        if (session.step === STATES.WELCOME && message.type === "text") {
+            const extractedData = await extractInformationFromText(textRaw, session.language);
+            if (Object.keys(extractedData).length > 0) {
+                session.step = STATES.CHANGE_INFOO;
+                await sendInteractiveButtons(from, "Do you want to change your information?", [
+                    { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                    { type: "reply", reply: { id: "no_change", title: "No" } }
+                ]);
+                session.tempData = extractedData; // Store extracted data temporarily
+                return res.sendStatus(200);
+            }
+        }
 
         // Handle CHANGE_INFO state
         if (session.step === STATES.CHANGE_INFOO) {
