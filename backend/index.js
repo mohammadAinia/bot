@@ -1910,7 +1910,8 @@ app.post('/webhook', async (req, res) => {
                 aiResponse = "Please provide your name."; // Set aiResponse for voice generation
                 await sendToWhatsApp(from, aiResponse);
             } else {
-                const extractedData = await extractInformationFromText(transcribedText, session.language);
+                // For registered users, ask if they want to change their information
+                const extractedData = await extractInformationFromText(textRaw, session.language);
                 if (Object.keys(extractedData).length > 0) {
                     session.step = STATES.CHANGE_INFOO;
                     aiResponse = "Do you want to change your information?"; // Set aiResponse for voice generation
@@ -1920,9 +1921,12 @@ app.post('/webhook', async (req, res) => {
                     ]);
                     session.tempData = extractedData; // Store extracted data temporarily
                 } else {
-                    aiResponse = "Do you want to change your information?"; // Set aiResponse for voice generation
-                    await sendToWhatsApp(from, `${aiResponse}\n\nPlease provide more details about your request.`);
-                    session.inRequest = true; // Set the session to indicate the user is in a request flow
+                    // If no data is extracted, ask if they want to proceed with the existing information
+                    aiResponse = "Do you want to proceed with your existing information or update it?";
+                    await sendInteractiveButtons(from, aiResponse, [
+                        { type: "reply", reply: { id: "proceed_existing", title: "Proceed with existing" } },
+                        { type: "reply", reply: { id: "update_info", title: "Update information" } }
+                    ]);
                 }
             }
         } else if (classification === "greeting" || classification === "other") {
