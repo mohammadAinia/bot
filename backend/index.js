@@ -1905,10 +1905,10 @@ app.post('/webhook', async (req, res) => {
             const isRequestStart = await detectRequestStart(textRaw);
             if (isRequestStart) {
                 session.inRequest = true;
-        
+
                 // Extract information from the user's message
                 const extractedData = await extractInformationFromText(textRaw, session.language);
-        
+
                 // Check if the user is registered
                 const user = await checkUserRegistration(from);
                 if (user && user.name) {
@@ -1935,7 +1935,7 @@ app.post('/webhook', async (req, res) => {
                 // If the message is not a request, treat it as a general message
                 const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
                 const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-        
+
                 await sendInteractiveButtons(from, reply, [
                     { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
                     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
@@ -1943,7 +1943,7 @@ app.post('/webhook', async (req, res) => {
             }
             return res.sendStatus(200);
         }
-        
+
         if (session.step === STATES.CHANGE_INFOO) {
             if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                 const buttonId = message.interactive.button_reply.id;
@@ -1951,7 +1951,10 @@ app.post('/webhook', async (req, res) => {
                     // User wants to change information, update session data with extracted information
                     session.data = { ...session.data, ...session.tempData }; // Merge extracted data with session data
                     delete session.tempData; // Clear temporary data
-        
+                    if (!session.data.phone) {
+                        session.data.phone = from; // Use the WhatsApp number as the default phone number
+                    }
+
                     // Check for missing fields
                     const missingFields = getMissingFields(session.data);
                     if (missingFields.length > 0) {
@@ -1980,9 +1983,9 @@ app.post('/webhook', async (req, res) => {
         //             delete session.tempData; // Clear temporary data
 
         //             // Ensure the phone number is not overwritten if already present
-        //             if (!session.data.phone) {
-        //                 session.data.phone = from; // Use the WhatsApp number as the default phone number
-        //             }
+        // if (!session.data.phone) {
+        //     session.data.phone = from; // Use the WhatsApp number as the default phone number
+        // }
 
         //             const missingFields = getMissingFields(session.data);
         //             if (missingFields.length > 0) {
