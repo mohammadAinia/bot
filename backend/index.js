@@ -1905,7 +1905,10 @@ app.post('/webhook', async (req, res) => {
             const isRequestStart = await detectRequestStart(textRaw);
             if (isRequestStart) {
                 session.inRequest = true;
-
+        
+                // Extract information from the user's message
+                const extractedData = await extractInformationFromText(textRaw, session.language);
+        
                 // Check if the user is registered
                 const user = await checkUserRegistration(from);
                 if (user && user.name) {
@@ -1915,17 +1918,24 @@ app.post('/webhook', async (req, res) => {
                         { type: "reply", reply: { id: "yes_change", title: "Yes" } },
                         { type: "reply", reply: { id: "no_change", title: "No" } }
                     ]);
-                    session.tempData = {}; // Initialize tempData for potential changes
+                    session.tempData = extractedData; // Store extracted data temporarily
                 } else {
                     // User is not registered, start collecting information
-                    session.step = STATES.NAME;
-                    await sendToWhatsApp(from, "Please provide your name.");
+                    session.data = { ...session.data, ...extractedData }; // Merge extracted data with session data
+                    const missingFields = getMissingFields(session.data);
+                    if (missingFields.length > 0) {
+                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                        await askForNextMissingField(session, from);
+                    } else {
+                        session.step = STATES.QUANTITY;
+                        await sendQuantitySelection(from, session.language);
+                    }
                 }
             } else {
                 // If the message is not a request, treat it as a general message
                 const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
                 const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-
+        
                 await sendInteractiveButtons(from, reply, [
                     { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
                     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
@@ -1933,10 +1943,7 @@ app.post('/webhook', async (req, res) => {
             }
             return res.sendStatus(200);
         }
-
-
-
-
+        
         if (session.step === STATES.CHANGE_INFOO) {
             if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                 const buttonId = message.interactive.button_reply.id;
