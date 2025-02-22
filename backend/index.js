@@ -1491,32 +1491,24 @@ app.post('/webhook', async (req, res) => {
                         // Start collecting information immediately if the user is new and doesn't have data
                         session.inRequest = true;
                         session.step = STATES.NAME;
-                        await sendToWhatsApp(from, "Please provide your name."); 
-                    } 
-                        else{
-                            const extractedData = await extractInformationFromText(textRaw, session.language);
-                            if (Object.keys(extractedData).length > 0) {
-                                session.step = STATES.CHANGE_INFOO;
-                                await sendInteractiveButtons(from, "Do you want to change your information?", [
-                                    { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                                    { type: "reply", reply: { id: "no_change", title: "No" } }
-                                ]);
-                                session.tempData = extractedData; // Store extracted data temporarily
-                                return res.sendStatus(200);
-    
-                            }
-                            aiResponse = "Do you want to change your information?";
-                            // Generate a ChatGPT response for the request
-                        aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-                        await sendToWhatsApp(from, `${aiResponse}\n\nPlease provide more details about your request.`);
-                        session.inRequest = true; // Set the session to indicate the user is in a request flow
-                        
+                        aiResponse = "Please provide your name."; // Set aiResponse for voice generation
+                        await sendToWhatsApp(from, aiResponse);
+                    } else {
+                        const extractedData = await extractInformationFromText(textRaw, session.language);
+                        if (Object.keys(extractedData).length > 0) {
+                            session.step = STATES.CHANGE_INFOO;
+                            aiResponse = "Do you want to change your information?"; // Set aiResponse for voice generation
+                            await sendInteractiveButtons(from, aiResponse, [
+                                { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                                { type: "reply", reply: { id: "no_change", title: "No" } }
+                            ]);
+                            session.tempData = extractedData; // Store extracted data temporarily
+                        } else {
+                            aiResponse = "Do you want to change your information?"; // Set aiResponse for voice generation
+                            await sendToWhatsApp(from, `${aiResponse}\n\nPlease provide more details about your request.`);
+                            session.inRequest = true; // Set the session to indicate the user is in a request flow
+                        }
                     }
-                    
-                    // Handle request logic
-
-        
-
                 } else if (classification === "greeting") {
                     // Generate a ChatGPT response for the greeting
                     aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
