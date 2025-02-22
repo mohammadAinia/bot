@@ -1902,6 +1902,7 @@ app.post('/webhook', async (req, res) => {
         // Check if the user's message contains information
 
         if (session.step === STATES.WELCOME && message.type === "text") {
+            const user = await checkUserRegistration(from);
             if (user && user.name) {
                 const extractedData = await extractInformationFromText(textRaw, session.language);
                 if (Object.keys(extractedData).length > 0) {
