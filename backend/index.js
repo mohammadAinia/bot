@@ -1441,7 +1441,7 @@ app.post('/webhook', async (req, res) => {
 
         if (message.type === "audio" && message.audio) {
             const mediaId = message.audio.id; // Get the media ID
-
+        
             // Fetch the media URL using the media ID
             const audioUrl = await fetchMediaUrl(mediaId);
             if (!audioUrl || !isValidUrl(audioUrl)) {
@@ -1449,54 +1449,45 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
                 return res.sendStatus(200);
             }
-
+        
             const filePath = `./temp/${messageId}.ogg`; // Temporary file path
-
+        
             // Download the voice file
             try {
                 await downloadFile(audioUrl, filePath);
                 console.log("🔹 Voice file downloaded successfully:", filePath);
-
+        
                 // Transcribe the voice file using OpenAI Whisper
                 const transcription = await transcribeVoiceMessage(filePath);
-                if (transcription) {
-                    textRaw = transcription; // Use the transcribed text as the message
-                    console.log(`🔹 Transcribed voice message: ${textRaw}`);
-
-                    // Process the transcribed text as if it were a text message
-                    const classification = await isQuestionOrRequest(textRaw);
-                    if (classification === "question") {
-                        const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-
-                        // Send text response
-                        if (session.inRequest) {
-                            await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
-                        } else {
-                            const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-                            await sendInteractiveButtons(from, reply, [
-                                { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-                                { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-                            ]);
-                        }
-
-                        // Generate audio response using OpenAI TTS
-                        const audioFilePath = `./temp/${messageId}_response.mp3`;
-                        await generateAudio(aiResponse, audioFilePath);
-
-                        // Upload audio file to WhatsApp's servers
-                        const mediaId = await uploadMediaToWhatsApp(audioFilePath);
-
-                        // Send audio to user using the media ID
-                        await sendAudioUsingMediaId(from, mediaId);
-
-                        // Clean up temporary files
-                        fs.unlinkSync(audioFilePath);
-                        console.log("✅ Temporary audio file deleted:", audioFilePath);
-
-                        return res.sendStatus(200);
+                if (!transcription) {
+                    console.error("❌ Failed to transcribe voice message. Transcription result is empty.");
+                    await sendToWhatsApp(from, "Sorry, I couldn't understand your voice message. Please try again.");
+                    return res.sendStatus(200);
+                }
+        
+                console.log(`🔹 Transcribed voice message: ${transcription}`);
+                textRaw = transcription; // Use the transcribed text as the message
+        
+                // Classify the transcribed text
+                const classification = await isQuestionOrRequest(textRaw);
+                let aiResponse = ""; // Declare aiResponse here to avoid scope issues
+        
+                // Handle each classification
+                if (classification === "question") {
+                    aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+        
+                    // Send text response
+                    if (session.inRequest) {
+                        await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
+                    } else {
+                        const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+                        await sendInteractiveButtons(from, reply, [
+                            { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+                            { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+                        ]);
                     }
-                    else if(classification === "request"){
-                    // Check if the user's message contains information
+                } else if (classification === "request") {
+                    // Handle request logic
                     if (session.step === STATES.WELCOME) {
                         const extractedData = await extractInformationFromText(textRaw, session.language);
                         if (Object.keys(extractedData).length > 0) {
@@ -1509,73 +1500,38 @@ app.post('/webhook', async (req, res) => {
                             return res.sendStatus(200);
                         }
                     }
-                        // Generate audio response using OpenAI TTS
-                        const audioFilePath = `./temp/${messageId}_response.mp3`;
-                        await generateAudio("Do you want to change your information?", audioFilePath);
-                    
-                        // Upload audio file to WhatsApp's servers
-                        const mediaId = await uploadMediaToWhatsApp(audioFilePath);
-                    
-                        // Send audio to user using the media ID
-                        await sendAudioUsingMediaId(from, mediaId);
-                    
-                        // Clean up temporary files
-                        fs.unlinkSync(audioFilePath);
-                        console.log("✅ Temporary audio file deleted:", audioFilePath);
-                    
-                        return res.sendStatus(200);
-                }
-                else if (classification === "greeting") {
+        
+                    // Generate a ChatGPT response for the request
+                    aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+                    await sendToWhatsApp(from, `${aiResponse}\n\nPlease provide more details about your request.`);
+                    session.inRequest = true; // Set the session to indicate the user is in a request flow
+                } else if (classification === "greeting") {
                     // Generate a ChatGPT response for the greeting
                     aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
                     await sendToWhatsApp(from, aiResponse);
-
-                    // Generate audio response using OpenAI TTS
-                    const audioFilePath = `./temp/${messageId}_response.mp3`;
-                    await generateAudio(aiResponse, audioFilePath);
-                    
-                    // Upload audio file to WhatsApp's servers
-                    const mediaId = await uploadMediaToWhatsApp(audioFilePath);
-                    
-                    // Send audio to user using the media ID
-                    await sendAudioUsingMediaId(from, mediaId);
-                    
-                    // Clean up temporary files
-                    fs.unlinkSync(audioFilePath);
-                    console.log("✅ Temporary audio file deleted:", audioFilePath);
-                    
-                    return res.sendStatus(200);
-                }
-                else if (classification === "other") {
+                } else if (classification === "other") {
                     // Generate a ChatGPT response for other cases
                     aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
                     await sendToWhatsApp(from, aiResponse);
-
-                    // Generate audio response using OpenAI TTS
+                }
+        
+                // Generate audio response using OpenAI TTS (for all cases except when returning early)
+                if (aiResponse) {
                     const audioFilePath = `./temp/${messageId}_response.mp3`;
                     await generateAudio(aiResponse, audioFilePath);
-                                        
+        
                     // Upload audio file to WhatsApp's servers
                     const mediaId = await uploadMediaToWhatsApp(audioFilePath);
-                                        
+        
                     // Send audio to user using the media ID
                     await sendAudioUsingMediaId(from, mediaId);
-                                        
+        
                     // Clean up temporary files
                     fs.unlinkSync(audioFilePath);
                     console.log("✅ Temporary audio file deleted:", audioFilePath);
-                                        
-                    return res.sendStatus(200);
                 }
-                
-                 else {
-                    console.error("❌ Failed to transcribe voice message.");
-                    await sendToWhatsApp(from, "Sorry, I couldn't understand your voice message. Please try again.");
-                    return res.sendStatus(200);
-                }
-                    }
-
-
+        
+                return res.sendStatus(200);
             } catch (error) {
                 console.error("❌ Error downloading or transcribing voice message:", error);
                 await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
