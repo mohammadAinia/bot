@@ -1926,26 +1926,18 @@ app.post('/webhook', async (req, res) => {
 
 
         // Check if the user's message contains information
-
+        
         if (session.step === STATES.WELCOME && message.type === "text") {
-            if (!session.data || !session.data.name) {  // Check if the user doesn't have any data
-                // Start collecting information immediately if the user is new and doesn't have data
-                session.inRequest = true;
-                session.step = STATES.NAME;
-                await sendToWhatsApp(from, "Please provide your name.");
-            } else {
-                const extractedData = await extractInformationFromText(textRaw, session.language);
-                if (Object.keys(extractedData).length > 0) {
-                    session.step = STATES.CHANGE_INFOO;
-                    await sendInteractiveButtons(from, "Do you want to change your information?", [
-                        { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                        { type: "reply", reply: { id: "no_change", title: "No" } }
-                    ]);
-                    session.tempData = extractedData; // Store extracted data temporarily
-                    return res.sendStatus(200);
-                }
+            const extractedData = await extractInformationFromText(textRaw, session.language);
+            if (Object.keys(extractedData).length > 0) {
+                session.step = STATES.CHANGE_INFOO;
+                await sendInteractiveButtons(from, "Do you want to change your information?", [
+                    { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                    { type: "reply", reply: { id: "no_change", title: "No" } }
+                ]);
+                session.tempData = extractedData; // Store extracted data temporarily
+                return res.sendStatus(200);
             }
-
         }
 
         // Handle CHANGE_INFO state
