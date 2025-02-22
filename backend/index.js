@@ -1898,32 +1898,38 @@ app.post('/webhook', async (req, res) => {
             }
             return res.sendStatus(200);
         } 
-        // else if (classification === "request") {
-        //     if (session.step === STATES.WELCOME && message.type === "text") {
-        //         const extractedData = await extractInformationFromText(textRaw, session.language);
-        //         if (Object.keys(extractedData).length > 0) {
-        //             session.step = STATES.CHANGE_INFOO;
-        //             await sendInteractiveButtons(from, "Do you want to change your information?", [
-        //                 { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-        //                 { type: "reply", reply: { id: "no_change", title: "No" } }
-        //             ]);
-        //             session.tempData = extractedData; // Store extracted data temporarily
-        //             return res.sendStatus(200);
-        //         }
-        //     }
-        // }
-        // else if (classification === "greeting") {
-        //     // Handle greetings
-        //     const greetingResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-        //     await sendToWhatsApp(from, greetingResponse);
-        //     return res.sendStatus(200);
-        // } else if (classification === "other") {
-        //     // Handle other cases
-        //     const otherResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-        //     await sendToWhatsApp(from, otherResponse);
-        //     return res.sendStatus(200);
-        // }
-
+        if (classification === "request") {
+            if (!session.data || !session.data.name) {
+                // User is not registered, prompt for registration
+                session.inRequest = true;
+                session.step = STATES.NAME;
+                await sendToWhatsApp(from, "Please provide your name.");
+            } else {
+                // User is registered, proceed with the request
+                session.inRequest = true;
+                const extractedData = await extractInformationFromText(textRaw, session.language);
+                session.data = {
+                    ...session.data, // Keep existing data including phone from WhatsApp
+                    ...extractedData,
+                    phone: extractedData.phone || session.data.phone // Only overwrite if new phone found
+                };
+                session.step = STATES.CHANGE_INFOO;
+                await sendInteractiveButtons(from, "Do you want to change your information?", [
+                    { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                    { type: "reply", reply: { id: "no_change", title: "No" } }
+                ]);
+        
+                const missingFields = getMissingFields(session.data);
+                if (missingFields.length === 0) {
+                    session.step = STATES.CONFIRMATION;
+                    await sendOrderSummary(from, session);
+                } else {
+                    session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                    await askForNextMissingField(session, from);
+                }
+            }
+            return res.sendStatus(200);
+        }
 
         // Check if the user's message contains information
         
