@@ -1438,9 +1438,10 @@ app.post('/webhook', async (req, res) => {
         }
 
         // Handle voice messages
+
         // if (message.type === "audio" && message.audio) {
         //     const mediaId = message.audio.id; // Get the media ID
-        
+
         //     // Fetch the media URL using the media ID
         //     const audioUrl = await fetchMediaUrl(mediaId);
         //     if (!audioUrl || !isValidUrl(audioUrl)) {
@@ -1448,17 +1449,14 @@ app.post('/webhook', async (req, res) => {
         //         await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
         //         return res.sendStatus(200);
         //     }
-        
+
         //     const filePath = `./temp/${messageId}.ogg`; // Unique temporary file path
-        
+
         //     try {
-        //         // Declare aiResponse at the beginning to ensure it's always defined
-        //         let aiResponse = "";
-        
         //         // Download the voice file
         //         await downloadFile(audioUrl, filePath);
         //         console.log("🔹 Voice file downloaded successfully:", filePath);
-        
+
         //         // Transcribe the voice file using OpenAI Whisper
         //         const transcription = await transcribeVoiceMessage(filePath);
         //         if (!transcription) {
@@ -1466,103 +1464,77 @@ app.post('/webhook', async (req, res) => {
         //             await sendToWhatsApp(from, "Sorry, I couldn't understand your voice message. Please try again.");
         //             return res.sendStatus(200);
         //         }
-        
+
         //         console.log(`🔹 Transcribed voice message: ${transcription}`);
         //         const transcribedText = transcription; // Use the transcribed text as the message
-        
+
         //         // Classify the transcribed text
         //         const classification = await isQuestionOrRequest(transcribedText);
-        
-        //         // Check if the user is in a request step
-        //         if (session.inRequest && session.step) {
-        //             if (classification === "question") {
-        //                 // Handle questions during request steps
-        //                 aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
-        //                 await sendToWhatsApp(from, `${aiResponse}\n\nPlease continue with your request.`);
+        //         let aiResponse = ""; // Declare aiResponse here to avoid scope issues
+
+        //         // Handle each classification
+        //         if (classification === "question") {
+        //             aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
+
+        //             // Send text response
+        //             if (session.inRequest) {
+        //                 await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
         //             } else {
-        //                 // Handle the transcribed text as an answer to the current step
-        //                 switch (session.step) {
-        //                     case STATES.NAME:
-        //                         if (transcribedText.trim().length > 0) {
-        //                             session.data.name = transcribedText;
-        //                             session.step = STATES.EMAIL;
-        //                             await sendToWhatsApp(from, getEmailMessage(session.language));
-        //                         } else {
-        //                             const errorMsg = session.language === 'ar'
-        //                                 ? "❌ يرجى تقديم اسم صحيح"
-        //                                 : "❌ Please provide a valid full name";
-        //                             await sendToWhatsApp(from, errorMsg);
-        //                         }
-        //                         break;
-        
-        //                     case STATES.EMAIL:
-        //                         if (transcribedText.trim().length > 0) {
-        //                             session.data.email = transcribedText;
-        //                             session.step = STATES.PHONE;
-        //                             await sendToWhatsApp(from, getPhoneMessage(session.language));
-        //                         } else {
-        //                             const errorMsg = session.language === 'ar'
-        //                                 ? "❌ يرجى تقديم بريد إلكتروني صحيح"
-        //                                 : "❌ Please provide a valid email address";
-        //                             await sendToWhatsApp(from, errorMsg);
-        //                         }
-        //                         break;
-        
-        //                     case STATES.PHONE:
-        //                         if (transcribedText.trim().length > 0) {
-        //                             session.data.phone = transcribedText;
-        //                             session.step = STATES.LOCATION;
-        //                             await sendToWhatsApp(from, getLocationMessage(session.language));
-        //                         } else {
-        //                             const errorMsg = session.language === 'ar'
-        //                                 ? "❌ يرجى تقديم رقم هاتف صحيح"
-        //                                 : "❌ Please provide a valid phone number";
-        //                             await sendToWhatsApp(from, errorMsg);
-        //                         }
-        //                         break;
-        
-        //                     // Add more cases for other steps (e.g., LOCATION, ADDRESS, etc.)
-        
-        //                     default:
-        //                         // Handle other steps or fallback to classification
-        //                         aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
-        //                         await sendToWhatsApp(from, aiResponse);
-        //                         break;
+        //                 const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+        //                 await sendInteractiveButtons(from, reply, [
+        //                     { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+        //                     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+        //                 ]);
+        //             }
+        //         } else if (classification === "request") {
+        //             if (!session.data || !session.data.name) {  // Check if the user doesn't have any data
+        //                 // Start collecting information immediately if the user is new and doesn't have data
+        //                 session.inRequest = true;
+        //                 session.step = STATES.NAME;
+        //                 aiResponse = "Please provide your name."; // Set aiResponse for voice generation
+        //                 await sendToWhatsApp(from, aiResponse);
+        //             } else {
+        //                 const extractedData = await extractInformationFromText(transcribedText, session.language);
+        //                 if (Object.keys(extractedData).length > 0) {
+        //                     session.step = STATES.CHANGE_INFOO;
+        //                     aiResponse = "Do you want to change your information?"; // Set aiResponse for voice generation
+        //                     await sendInteractiveButtons(from, aiResponse, [
+        //                         { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+        //                         { type: "reply", reply: { id: "no_change", title: "No" } }
+        //                     ]);
+        //                     session.tempData = extractedData; // Store extracted data temporarily
+        //                 } else {
+        //                     aiResponse = "Do you want to change your information?"; // Set aiResponse for voice generation
+        //                     await sendToWhatsApp(from, `${aiResponse}\n\nPlease provide more details about your request.`);
+        //                     session.inRequest = true; // Set the session to indicate the user is in a request flow
         //                 }
         //             }
-        //         } else {
-        //             // Handle voice message as usual (classify as question, request, greeting, or other)
-        //             if (classification === "question") {
-        //                 aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
-        //                 await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
-        //             } else if (classification === "request") {
-        //                 aiResponse = "Do you want to change your information?";
-        //                 await sendInteractiveButtons(from, aiResponse, [
-        //                     { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-        //                     { type: "reply", reply: { id: "no_change", title: "No" } }
-        //                 ]);
-        //             } else if (classification === "greeting" || classification === "other") {
-        //                 aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
-        //                 await sendToWhatsApp(from, aiResponse);
-        //             }
+        //         } else if (classification === "greeting") {
+        //             // Generate a ChatGPT response for the greeting
+        //             aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
+        //             await sendToWhatsApp(from, aiResponse);
+        //         } else if (classification === "other") {
+        //             // Generate a ChatGPT response for other cases
+        //             aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
+        //             await sendToWhatsApp(from, aiResponse);
         //         }
-        
+
         //         // Generate audio response using OpenAI TTS (for all cases except when returning early)
         //         if (aiResponse) {
         //             const audioFilePath = `./temp/${messageId}_response.mp3`;
         //             await generateAudio(aiResponse, audioFilePath);
-        
+
         //             // Upload audio file to WhatsApp's servers
         //             const uploadedMediaId = await uploadMediaToWhatsApp(audioFilePath);
-        
+
         //             // Send audio to user using the media ID
         //             await sendAudioUsingMediaId(from, uploadedMediaId);
-        
+
         //             // Clean up temporary files
         //             fs.unlinkSync(audioFilePath);
         //             console.log("✅ Temporary audio file deleted:", audioFilePath);
         //         }
-        
+
         //         return res.sendStatus(200);
         //     } catch (error) {
         //         console.error("❌ Error downloading or transcribing voice message:", error);
@@ -1575,10 +1547,11 @@ app.post('/webhook', async (req, res) => {
         //             console.log("✅ Temporary file deleted:", filePath);
         //         }
         //     }
-        // }//
+        // }
+
         if (message.type === "audio" && message.audio) {
             const mediaId = message.audio.id; // Get the media ID
-
+        
             // Fetch the media URL using the media ID
             const audioUrl = await fetchMediaUrl(mediaId);
             if (!audioUrl || !isValidUrl(audioUrl)) {
@@ -1586,14 +1559,14 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
                 return res.sendStatus(200);
             }
-
+        
             const filePath = `./temp/${messageId}.ogg`; // Unique temporary file path
-
+        
             try {
                 // Download the voice file
                 await downloadFile(audioUrl, filePath);
                 console.log("🔹 Voice file downloaded successfully:", filePath);
-
+        
                 // Transcribe the voice file using OpenAI Whisper
                 const transcription = await transcribeVoiceMessage(filePath);
                 if (!transcription) {
@@ -1601,77 +1574,105 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(from, "Sorry, I couldn't understand your voice message. Please try again.");
                     return res.sendStatus(200);
                 }
-
+        
                 console.log(`🔹 Transcribed voice message: ${transcription}`);
                 const transcribedText = transcription; // Use the transcribed text as the message
-
+        
                 // Classify the transcribed text
                 const classification = await isQuestionOrRequest(transcribedText);
-                let aiResponse = ""; // Declare aiResponse here to avoid scope issues
-
-                // Handle each classification
-                if (classification === "question") {
-                    aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
-
-                    // Send text response
-                    if (session.inRequest) {
-                        await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
+        
+                // Check if the user is in a request step
+                if (session.inRequest && session.step) {
+                    if (classification === "question") {
+                        // Handle questions during request steps
+                        const aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
+                        await sendToWhatsApp(from, `${aiResponse}\n\nPlease continue with your request.`);
                     } else {
-                        const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-                        await sendInteractiveButtons(from, reply, [
-                            { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-                            { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-                        ]);
-                    }
-                } else if (classification === "request") {
-                    if (!session.data || !session.data.name) {  // Check if the user doesn't have any data
-                        // Start collecting information immediately if the user is new and doesn't have data
-                        session.inRequest = true;
-                        session.step = STATES.NAME;
-                        aiResponse = "Please provide your name."; // Set aiResponse for voice generation
-                        await sendToWhatsApp(from, aiResponse);
-                    } else {
-                        const extractedData = await extractInformationFromText(transcribedText, session.language);
-                        if (Object.keys(extractedData).length > 0) {
-                            session.step = STATES.CHANGE_INFOO;
-                            aiResponse = "Do you want to change your information?"; // Set aiResponse for voice generation
-                            await sendInteractiveButtons(from, aiResponse, [
-                                { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                                { type: "reply", reply: { id: "no_change", title: "No" } }
-                            ]);
-                            session.tempData = extractedData; // Store extracted data temporarily
-                        } else {
-                            aiResponse = "Do you want to change your information?"; // Set aiResponse for voice generation
-                            await sendToWhatsApp(from, `${aiResponse}\n\nPlease provide more details about your request.`);
-                            session.inRequest = true; // Set the session to indicate the user is in a request flow
+                        // Handle the transcribed text as an answer to the current step
+                        switch (session.step) {
+                            case STATES.NAME:
+                                if (transcribedText.trim().length > 0) {
+                                    session.data.name = transcribedText;
+                                    session.step = STATES.EMAIL; // Move to the next step
+                                    await sendToWhatsApp(from, getEmailMessage(session.language));
+                                } else {
+                                    const errorMsg = session.language === 'ar'
+                                        ? "❌ يرجى تقديم اسم صحيح"
+                                        : "❌ Please provide a valid full name";
+                                    await sendToWhatsApp(from, errorMsg);
+                                }
+                                break;
+        
+                            case STATES.EMAIL:
+                                if (transcribedText.trim().length > 0) {
+                                    session.data.email = transcribedText;
+                                    session.step = STATES.PHONE; // Move to the next step
+                                    await sendToWhatsApp(from, getPhoneMessage(session.language));
+                                } else {
+                                    const errorMsg = session.language === 'ar'
+                                        ? "❌ يرجى تقديم بريد إلكتروني صحيح"
+                                        : "❌ Please provide a valid email address";
+                                    await sendToWhatsApp(from, errorMsg);
+                                }
+                                break;
+        
+                            case STATES.PHONE:
+                                if (transcribedText.trim().length > 0) {
+                                    session.data.phone = transcribedText;
+                                    session.step = STATES.LOCATION; // Move to the next step
+                                    await sendToWhatsApp(from, getLocationMessage(session.language));
+                                } else {
+                                    const errorMsg = session.language === 'ar'
+                                        ? "❌ يرجى تقديم رقم هاتف صحيح"
+                                        : "❌ Please provide a valid phone number";
+                                    await sendToWhatsApp(from, errorMsg);
+                                }
+                                break;
+        
+                            // Add more cases for other steps (e.g., LOCATION, ADDRESS, etc.)
+        
+                            default:
+                                // Handle other steps or fallback to classification
+                                const aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
+                                await sendToWhatsApp(from, aiResponse);
+                                break;
                         }
                     }
-                } else if (classification === "greeting") {
-                    // Generate a ChatGPT response for the greeting
-                    aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
-                    await sendToWhatsApp(from, aiResponse);
-                } else if (classification === "other") {
-                    // Generate a ChatGPT response for other cases
-                    aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
-                    await sendToWhatsApp(from, aiResponse);
+                } else {
+                    // Handle voice message as usual (classify as question, request, greeting, or other)
+                    let aiResponse = "";
+        
+                    if (classification === "question") {
+                        aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
+                        await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
+                    } else if (classification === "request") {
+                        aiResponse = "Do you want to change your information?";
+                        await sendInteractiveButtons(from, aiResponse, [
+                            { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                            { type: "reply", reply: { id: "no_change", title: "No" } }
+                        ]);
+                    } else if (classification === "greeting" || classification === "other") {
+                        aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
+                        await sendToWhatsApp(from, aiResponse);
+                    }
                 }
-
+        
                 // Generate audio response using OpenAI TTS (for all cases except when returning early)
                 if (aiResponse) {
                     const audioFilePath = `./temp/${messageId}_response.mp3`;
                     await generateAudio(aiResponse, audioFilePath);
-
+        
                     // Upload audio file to WhatsApp's servers
                     const uploadedMediaId = await uploadMediaToWhatsApp(audioFilePath);
-
+        
                     // Send audio to user using the media ID
                     await sendAudioUsingMediaId(from, uploadedMediaId);
-
+        
                     // Clean up temporary files
                     fs.unlinkSync(audioFilePath);
                     console.log("✅ Temporary audio file deleted:", audioFilePath);
                 }
-
+        
                 return res.sendStatus(200);
             } catch (error) {
                 console.error("❌ Error downloading or transcribing voice message:", error);
