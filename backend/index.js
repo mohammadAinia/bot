@@ -860,7 +860,89 @@ async function askForNextMissingField(session, from) {
 //     return response;
 // }
 
+
+
+// async function isQuestionOrRequest(text) {
+//     const prompt = `
+//     Classify the user's input into one of the following categories:
+    
+//     1️⃣ **"request"** → If the user is making a service request or wants to start a new request. Examples:
+//        - "I want to create a request"
+//        - "I want to create a new request"
+//        - "I have oil I want to get rid of"
+//        - "Hello, I have 50 liters of oil in Dubai"
+//        - "Please collect oil from my location"
+//        - "I need a pickup for used oil"
+//        - "New order request"
+//        - "I am Mohammad and I have 50 liters in Sharjah"
+//         - "أريد إنشاء طلب جديد"
+//         - "لدي زيت أريد التخلص منه"
+//         - "الرجاء جمع الزيت من موقعي"
+//         - "أحتاج إلى استلام الزيت المستعمل"
+//         - "طلب جديد"
+//         - "أنا محمد ولدي 50 لتر في الشارقة"
+    
+//     2️⃣ **"question"** → If the user is **asking for information** about the company, services, or anything general. Examples:
+//        - "What services do you provide?"
+//        - "How does your oil collection work?"
+//        - "Where are you located?"
+//        - "What is the cost of biodiesel?"
+    
+//     3️⃣ **"greeting"** → If the user is just saying hello. Examples:
+//        - "Hi"
+//        - "Hello"
+//        - "Good morning"
+    
+//     4️⃣ **"answer"** → If the user is providing an answer to a specific question. Examples:
+//        - "My name is John"
+//        - "John"
+//        - "khaled"
+//        - "ahmed"
+//        - "yazan"
+//        - "mohammad"
+//        - "ali"
+//        - "my name is ayman"
+//        - "mmyyttt@gmail.com"
+//        - "yazan@gmail.com"
+//        - "mohammaedAinia@gmail.com"
+
+    
+//     5️⃣ **"other"** → If the input does not fit the above categories.
+    
+//     Respond ONLY with one of these words: "request", "question", "greeting", "answer", or "other".
+
+//     **User Input:** "${text}"
+// `;
+
+//     const aiResponse = await getOpenAIResponse(prompt);
+//     const response = aiResponse.trim().toLowerCase();
+
+//     return response;
+// }
+
+
 async function isQuestionOrRequest(text) {
+    // Patterns for detecting answers
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // Basic email regex
+    const namePattern = /^[A-Za-z\s]{2,30}$/; // Simple name regex (2-30 characters, letters and spaces)
+    const quantityPattern = /(\d+)\s*liters?/i; // Matches "50 liters", "100 liter", etc.
+    const addressPattern = /(street|st\.|avenue|ave\.|road|rd\.|building|bldg\.|flat|apartment|apt\.)/i; // Matches common address terms
+
+    // Check if the input matches any answer pattern
+    if (emailPattern.test(text)) {
+        return "answer"; // Classify as answer if it's an email
+    }
+    if (namePattern.test(text)) {
+        return "answer"; // Classify as answer if it looks like a name
+    }
+    if (quantityPattern.test(text)) {
+        return "answer"; // Classify as answer if it's a quantity
+    }
+    if (addressPattern.test(text)) {
+        return "answer"; // Classify as answer if it looks like an address
+    }
+
+    // If no patterns match, use the OpenAI prompt for classification
     const prompt = `
     Classify the user's input into one of the following categories:
     
@@ -903,7 +985,22 @@ async function isQuestionOrRequest(text) {
        - "mmyyttt@gmail.com"
        - "yazan@gmail.com"
        - "mohammaedAinia@gmail.com"
-
+       - "Dubai"
+       - "Sharjah"
+       - "Abu Dhabi"
+       - "50 liters"
+       - "100 liters"
+       - "30 liters"
+       - "My address is 123 Main Street"
+       - "123 Main Street"
+       - "Building 5, Flat 12"
+       - "Flat 12, Building 5"
+       - "My email is example@example.com"
+       - "example@example.com"
+       - "My quantity is 50 liters"
+       - "50"
+       - "100"
+       - "30"
     
     5️⃣ **"other"** → If the input does not fit the above categories.
     
@@ -1032,6 +1129,7 @@ const detectRequestStart = async (text) => {
     const response = await getOpenAIResponse(prompt);
     return response.trim().toLowerCase() === "true";
 };
+
 function moveToNextStep(session, from) {  // ✅ Add parameters
     const missingFields = getMissingFields(session.data);
     if (missingFields.length === 0) {
@@ -1667,13 +1765,36 @@ app.post('/webhook', async (req, res) => {
                         await sendToWhatsApp(from, getEmailMessage(session.language));
                         await sendToWhatsApp(from, aiResponse);
                     } 
-                    // else if (session.step === STATES.NEXT_STEP) {
-                    //     // Handle the next step in the request flow
-                    //     // Example: session.data.address = transcribedText;
-                    //     // session.step = STATES.ANOTHER_STEP;
-                    //     // aiResponse = "Thank you. What is your phone number?";
-                    //     // await sendToWhatsApp(from, aiResponse);
-                    // }
+                    else if (session.step === STATES.EMAIL) {
+                        session.data.email = transcribedText;
+                        session.step = STATES.LONGITUDE;
+                        await sendToWhatsApp(from, getLocationMessage(session.language));
+                    }
+                    else if (session.step === STATES.STREET) {
+                        session.data.street = transcribedText;
+                        session.step = STATES.BUILDING_NAME;
+                        await sendToWhatsApp(from, getBuildingMessage(session.language));
+                    }
+                    else if (session.step === STATES.BUILDING_NAME) {
+                        session.data.building_name = transcribedText;
+                        session.step = STATES.FLAT_NO;
+                        await sendToWhatsApp(from, getFlatMessage(session.language));
+                    }
+                    else if (session.step === STATES.FLAT_NO) {
+                        session.data.flat_no = transcribedText;
+                        session.step = STATES.QUANTITY;
+                        return await sendQuantitySelection(from, session.language);
+                    }
+                    else if (session.step === STATES.QUANTITY) {
+                        const quantity = parseInt(transcribedText.trim(), 10);
+
+                        if (isNaN(quantity) || quantity < 10) {
+                            await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
+                            await sendQuantitySelection(from, session.language);
+                            return res.sendStatus(200);
+                        }
+                        session.data.quantity = quantity;
+                    }
                 } else if (classification === "request") {
                     // Handle requests
                     if (!session.data || !session.data.name) {  // Check if the user doesn't have any data
