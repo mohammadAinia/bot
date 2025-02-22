@@ -1903,8 +1903,10 @@ app.post('/webhook', async (req, res) => {
         }
         else if (classification === "request") {
             // Handle requests
-            if (!session.data || !session.data.name) {  // Check if the user doesn't have any data
-                // Start collecting information immediately if the user is new and doesn't have data
+            const isRegisteredUser = session.data && session.data.name && session.data.email && session.data.address; // Check if the user is registered
+        
+            if (!isRegisteredUser) {
+                // Start collecting information immediately if the user is new or doesn't have sufficient data
                 session.inRequest = true;
                 session.step = STATES.NAME;
                 aiResponse = "Please provide your name."; // Set aiResponse for voice generation
