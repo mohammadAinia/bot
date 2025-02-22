@@ -1592,7 +1592,7 @@ app.post('/webhook', async (req, res) => {
         }
 
         // Check if the user's message contains information
-        if (message.type === "text") {
+        if (session.step === STATES.WELCOME && message.type === "text") {
             const extractedData = await extractInformationFromText(textRaw, session.language);
             if (Object.keys(extractedData).length > 0) {
                 session.step = STATES.CHANGE_INFOO;
@@ -2671,93 +2671,7 @@ app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PO
 
 
 
-        // if (message.type === "audio" && message.audio) {
-        //     const mediaId = message.audio.id; // Get the media ID
 
-        //     // Fetch the media URL using the media ID
-        //     const audioUrl = await fetchMediaUrl(mediaId);
-        //     if (!audioUrl || !isValidUrl(audioUrl)) {
-        //         console.error("❌ Invalid or missing audio URL:", audioUrl);
-        //         await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
-        //         return res.sendStatus(200);
-        //     }
-
-        //     const filePath = `./temp/${messageId}.ogg`; // Temporary file path
-
-        //     // Download the voice file
-        //     try {
-        //         await downloadFile(audioUrl, filePath);
-        //         console.log("🔹 Voice file downloaded successfully:", filePath);
-
-        //         // Transcribe the voice file using OpenAI Whisper
-        //         const transcription = await transcribeVoiceMessage(filePath);
-        //         if (transcription) {
-        //             textRaw = transcription; // Use the transcribed text as the message
-        //             console.log(`🔹 Transcribed voice message: ${textRaw}`);
-
-        //             // Process the transcribed text as if it were a text message
-        //             const classification = await isQuestionOrRequest(textRaw);
-        //             if (classification === "question") {
-        //                 const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-
-        //                 // Send text response
-        //                 if (session.inRequest) {
-        //                     await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
-        //                 } else {
-        //                     const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-        //                     await sendInteractiveButtons(from, reply, [
-        //                         { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-        //                         { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-        //                     ]);
-        //                 }
-
-        //                 // Generate audio response using OpenAI TTS
-        //                 const audioFilePath = `./temp/${messageId}_response.mp3`;
-        //                 await generateAudio(aiResponse, audioFilePath);
-
-        //                 // Upload audio file to WhatsApp's servers
-        //                 const mediaId = await uploadMediaToWhatsApp(audioFilePath);
-
-        //                 // Send audio to user using the media ID
-        //                 await sendAudioUsingMediaId(from, mediaId);
-
-        //                 // Clean up temporary files
-        //                 fs.unlinkSync(audioFilePath);
-        //                 console.log("✅ Temporary audio file deleted:", audioFilePath);
-
-        //                 return res.sendStatus(200);
-        //             }
-
-        //             // Check if the user's message contains information
-        //             if (session.step === STATES.WELCOME) {
-        //                 const extractedData = await extractInformationFromText(textRaw, session.language);
-        //                 if (Object.keys(extractedData).length > 0) {
-        //                     session.step = STATES.CHANGE_INFOO;
-        //                     await sendInteractiveButtons(from, "Do you want to change your information?", [
-        //                         { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-        //                         { type: "reply", reply: { id: "no_change", title: "No" } }
-        //                     ]);
-        //                     session.tempData = extractedData; // Store extracted data temporarily
-        //                     return res.sendStatus(200);
-        //                 }
-        //             }
-        //         } else {
-        //             console.error("❌ Failed to transcribe voice message.");
-        //             await sendToWhatsApp(from, "Sorry, I couldn't understand your voice message. Please try again.");
-        //             return res.sendStatus(200);
-        //         }
-        //     } catch (error) {
-        //         console.error("❌ Error downloading or transcribing voice message:", error);
-        //         await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
-        //         return res.sendStatus(200);
-        //     } finally {
-        //         // Clean up the temporary file
-        //         if (fs.existsSync(filePath)) {
-        //             fs.unlinkSync(filePath);
-        //             console.log("✅ Temporary file deleted:", filePath);
-        //         }
-        //     }
-        // }
 
 
 
