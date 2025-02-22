@@ -1487,26 +1487,36 @@ app.post('/webhook', async (req, res) => {
                         ]);
                     }
                 } else if (classification === "request") {
-                    // Handle request logic
-                    if (session.step === STATES.WELCOME) {
-                        const extractedData = await extractInformationFromText(textRaw, session.language);
-                        if (Object.keys(extractedData).length > 0) {
-                            session.step = STATES.CHANGE_INFOO;
-                            await sendInteractiveButtons(from, "Do you want to change your information?", [
-                                { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                                { type: "reply", reply: { id: "no_change", title: "No" } }
-                            ]);
-                            session.tempData = extractedData; // Store extracted data temporarily
-                            return res.sendStatus(200);
-
-                        }
-                        aiResponse = "Do you want to change your information?";
+                    if (!session.data || !session.data.name) {  // Check if the user doesn't have any data
+                        // Start collecting information immediately if the user is new and doesn't have data
+                        session.inRequest = true;
+                        session.step = STATES.NAME;
+                        await sendToWhatsApp(from, "Please provide your name."); 
+                    } 
+                        else{
+                            const extractedData = await extractInformationFromText(textRaw, session.language);
+                            if (Object.keys(extractedData).length > 0) {
+                                session.step = STATES.CHANGE_INFOO;
+                                await sendInteractiveButtons(from, "Do you want to change your information?", [
+                                    { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                                    { type: "reply", reply: { id: "no_change", title: "No" } }
+                                ]);
+                                session.tempData = extractedData; // Store extracted data temporarily
+                                return res.sendStatus(200);
+    
+                            }
+                            aiResponse = "Do you want to change your information?";
+                            // Generate a ChatGPT response for the request
+                        aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+                        await sendToWhatsApp(from, `${aiResponse}\n\nPlease provide more details about your request.`);
+                        session.inRequest = true; // Set the session to indicate the user is in a request flow
+                        
                     }
+                    
+                    // Handle request logic
+
         
-                    // Generate a ChatGPT response for the request
-                    aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-                    await sendToWhatsApp(from, `${aiResponse}\n\nPlease provide more details about your request.`);
-                    session.inRequest = true; // Set the session to indicate the user is in a request flow
+
                 } else if (classification === "greeting") {
                     // Generate a ChatGPT response for the greeting
                     aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
