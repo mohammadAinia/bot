@@ -1440,7 +1440,7 @@ app.post('/webhook', async (req, res) => {
         // Handle voice messages
         if (message.type === "audio" && message.audio) {
             const mediaId = message.audio.id; // Get the media ID
-
+        
             // Fetch the media URL using the media ID
             const audioUrl = await fetchMediaUrl(mediaId);
             if (!audioUrl || !isValidUrl(audioUrl)) {
@@ -1448,14 +1448,17 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
                 return res.sendStatus(200);
             }
-
+        
             const filePath = `./temp/${messageId}.ogg`; // Unique temporary file path
-
+        
             try {
+                // Declare aiResponse at the beginning to ensure it's always defined
+                let aiResponse = "";
+        
                 // Download the voice file
                 await downloadFile(audioUrl, filePath);
                 console.log("🔹 Voice file downloaded successfully:", filePath);
-
+        
                 // Transcribe the voice file using OpenAI Whisper
                 const transcription = await transcribeVoiceMessage(filePath);
                 if (!transcription) {
@@ -1463,18 +1466,18 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(from, "Sorry, I couldn't understand your voice message. Please try again.");
                     return res.sendStatus(200);
                 }
-
+        
                 console.log(`🔹 Transcribed voice message: ${transcription}`);
                 const transcribedText = transcription; // Use the transcribed text as the message
-
+        
                 // Classify the transcribed text
                 const classification = await isQuestionOrRequest(transcribedText);
-
+        
                 // Check if the user is in a request step
                 if (session.inRequest && session.step) {
                     if (classification === "question") {
                         // Handle questions during request steps
-                        const aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
+                        aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
                         await sendToWhatsApp(from, `${aiResponse}\n\nPlease continue with your request.`);
                     } else {
                         // Handle the transcribed text as an answer to the current step
@@ -1491,7 +1494,7 @@ app.post('/webhook', async (req, res) => {
                                     await sendToWhatsApp(from, errorMsg);
                                 }
                                 break;
-
+        
                             case STATES.EMAIL:
                                 if (transcribedText.trim().length > 0) {
                                     session.data.email = transcribedText;
@@ -1504,7 +1507,7 @@ app.post('/webhook', async (req, res) => {
                                     await sendToWhatsApp(from, errorMsg);
                                 }
                                 break;
-
+        
                             case STATES.PHONE:
                                 if (transcribedText.trim().length > 0) {
                                     session.data.phone = transcribedText;
@@ -1517,20 +1520,18 @@ app.post('/webhook', async (req, res) => {
                                     await sendToWhatsApp(from, errorMsg);
                                 }
                                 break;
-
+        
                             // Add more cases for other steps (e.g., LOCATION, ADDRESS, etc.)
-
+        
                             default:
                                 // Handle other steps or fallback to classification
-                                const aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
+                                aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
                                 await sendToWhatsApp(from, aiResponse);
                                 break;
                         }
                     }
                 } else {
                     // Handle voice message as usual (classify as question, request, greeting, or other)
-                    let aiResponse = "";
-
                     if (classification === "question") {
                         aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
                         await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
@@ -1545,23 +1546,23 @@ app.post('/webhook', async (req, res) => {
                         await sendToWhatsApp(from, aiResponse);
                     }
                 }
-
+        
                 // Generate audio response using OpenAI TTS (for all cases except when returning early)
                 if (aiResponse) {
                     const audioFilePath = `./temp/${messageId}_response.mp3`;
                     await generateAudio(aiResponse, audioFilePath);
-
+        
                     // Upload audio file to WhatsApp's servers
                     const uploadedMediaId = await uploadMediaToWhatsApp(audioFilePath);
-
+        
                     // Send audio to user using the media ID
                     await sendAudioUsingMediaId(from, uploadedMediaId);
-
+        
                     // Clean up temporary files
                     fs.unlinkSync(audioFilePath);
                     console.log("✅ Temporary audio file deleted:", audioFilePath);
                 }
-
+        
                 return res.sendStatus(200);
             } catch (error) {
                 console.error("❌ Error downloading or transcribing voice message:", error);
