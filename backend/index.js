@@ -1912,17 +1912,17 @@ app.post('/webhook', async (req, res) => {
         //         }
         //     }
         // }
-        else if (classification === "greeting") {
-            // Handle greetings
-            const greetingResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-            await sendToWhatsApp(from, greetingResponse);
-            return res.sendStatus(200);
-        } else if (classification === "other") {
-            // Handle other cases
-            const otherResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-            await sendToWhatsApp(from, otherResponse);
-            return res.sendStatus(200);
-        }
+        // else if (classification === "greeting") {
+        //     // Handle greetings
+        //     const greetingResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+        //     await sendToWhatsApp(from, greetingResponse);
+        //     return res.sendStatus(200);
+        // } else if (classification === "other") {
+        //     // Handle other cases
+        //     const otherResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+        //     await sendToWhatsApp(from, otherResponse);
+        //     return res.sendStatus(200);
+        // }
 
 
         // Check if the user's message contains information
