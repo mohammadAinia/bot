@@ -1563,6 +1563,9 @@ app.post('/webhook', async (req, res) => {
             const filePath = `./temp/${messageId}.ogg`; // Unique temporary file path
         
             try {
+                // Declare aiResponse at the beginning to ensure it's always defined
+                let aiResponse = "";
+        
                 // Download the voice file
                 await downloadFile(audioUrl, filePath);
                 console.log("🔹 Voice file downloaded successfully:", filePath);
@@ -1585,7 +1588,7 @@ app.post('/webhook', async (req, res) => {
                 if (session.inRequest && session.step) {
                     if (classification === "question") {
                         // Handle questions during request steps
-                        const aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
+                        aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
                         await sendToWhatsApp(from, `${aiResponse}\n\nPlease continue with your request.`);
                     } else {
                         // Handle the transcribed text as an answer to the current step
@@ -1633,15 +1636,13 @@ app.post('/webhook', async (req, res) => {
         
                             default:
                                 // Handle other steps or fallback to classification
-                                const aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
+                                aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
                                 await sendToWhatsApp(from, aiResponse);
                                 break;
                         }
                     }
                 } else {
                     // Handle voice message as usual (classify as question, request, greeting, or other)
-                    let aiResponse = "";
-        
                     if (classification === "question") {
                         aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
                         await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
