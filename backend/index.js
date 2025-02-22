@@ -1498,7 +1498,9 @@ app.post('/webhook', async (req, res) => {
                             ]);
                             session.tempData = extractedData; // Store extracted data temporarily
                             return res.sendStatus(200);
+
                         }
+                        aiResponse = "Do you want to change your information?";
                     }
         
                     // Generate a ChatGPT response for the request
