@@ -1592,7 +1592,7 @@ app.post('/webhook', async (req, res) => {
         }
 
         // Check if the user's message contains information
-        if (session.step === STATES.WELCOME && message.type === "text") {
+        if (message.type === "text") {
             const extractedData = await extractInformationFromText(textRaw, session.language);
             if (Object.keys(extractedData).length > 0) {
                 session.step = STATES.CHANGE_INFOO;
@@ -1611,11 +1611,8 @@ app.post('/webhook', async (req, res) => {
                 const buttonId = message.interactive.button_reply.id;
                 if (buttonId === "yes_change") {
                     // Update session data with extracted information
-                    session.data = {
-                        ...session.data,
-                        ...Object.fromEntries(Object.entries(session.tempData).filter(([_, v]) => v !== null)) // Remove null values
-                    };                 
-                       delete session.tempData; // Clear temporary data
+                    session.data = { ...session.data, ...session.tempData };
+                    delete session.tempData; // Clear temporary data
 
                     // Ensure the phone number is not overwritten if already present
                     if (!session.data.phone) {
@@ -1636,7 +1633,7 @@ app.post('/webhook', async (req, res) => {
                 }
             }
             return res.sendStatus(200);
-        }//
+        }
 
         let latitude
         let longitude
