@@ -1897,12 +1897,10 @@ app.post('/webhook', async (req, res) => {
                 ]);
             }
             return res.sendStatus(200);
-        } 
+        }
 
         // Check if the user's message contains information
-        
         if (session.step === STATES.WELCOME && message.type === "text") {
-            
             const extractedData = await extractInformationFromText(textRaw, session.language);
             if (Object.keys(extractedData).length > 0) {
                 session.step = STATES.CHANGE_INFOO;
@@ -1914,14 +1912,6 @@ app.post('/webhook', async (req, res) => {
                 return res.sendStatus(200);
             }
         }
-
-                    // if (user && user.name) {
-
-            // }
-            // else{
-
-                
-            // }
 
         // Handle CHANGE_INFO state
         if (session.step === STATES.CHANGE_INFOO) {
@@ -4398,60 +4388,60 @@ app.post('/webhook', async (req, res) => {
 //         }
 
 
-//         if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-//             const buttonId = message.interactive.button_reply.id;
-//             if (buttonId === "new_request") {
-//                 if (!session.data || !session.data.name) {  // Check if the user doesn't have any data
-//                     // Start collecting information immediately if the user is new and doesn't have data
-//                     session.inRequest = true;
-//                     session.step = STATES.NAME;
-//                     await sendToWhatsApp(from, "Please provide your name.");
-//                 } else {
-//                     // Proceed to ask if the user wants to change information if they already have data
-//                     await sendInteractiveButtons(from, "Do you want to change your information?", [
-//                         { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-//                         { type: "reply", reply: { id: "no_change", title: "No" } }
-//                     ]);
-//                     session.step = STATES.CHANGE_INFO;
-//                 }
-//                 return res.sendStatus(200);
-//             }
+// if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+//     const buttonId = message.interactive.button_reply.id;
+//     if (buttonId === "new_request") {
+//         if (!session.data || !session.data.name) {  // Check if the user doesn't have any data
+//             // Start collecting information immediately if the user is new and doesn't have data
+//             session.inRequest = true;
+//             session.step = STATES.NAME;
+//             await sendToWhatsApp(from, "Please provide your name.");
+//         } else {
+//             // Proceed to ask if the user wants to change information if they already have data
+//             await sendInteractiveButtons(from, "Do you want to change your information?", [
+//                 { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+//                 { type: "reply", reply: { id: "no_change", title: "No" } }
+//             ]);
+//             session.step = STATES.CHANGE_INFO;
 //         }
+//         return res.sendStatus(200);
+//     }
+// }
 
-//         if (session.lastTimestamp && Number(message.timestamp) < session.lastTimestamp) {
-//             console.log(`Ignoring out-of-order message for user ${from}`);
-//             return res.sendStatus(200);
-//         }
-//         session.lastTimestamp = Number(message.timestamp);
+// if (session.lastTimestamp && Number(message.timestamp) < session.lastTimestamp) {
+//     console.log(`Ignoring out-of-order message for user ${from}`);
+//     return res.sendStatus(200);
+// }
+// session.lastTimestamp = Number(message.timestamp);
 
-//         const classification = await isQuestionOrRequest(textRaw);
-//         if (classification === "question") {
-//             const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-//             if (session.inRequest) {
-//                 await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
-//             } else {
-//                 const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-//                 await sendInteractiveButtons(from, reply, [
-//                     { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-//                     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-//                 ]);
-//             }
-//             return res.sendStatus(200);
-//         }
+// const classification = await isQuestionOrRequest(textRaw);
+// if (classification === "question") {
+//     const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+//     if (session.inRequest) {
+//         await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
+//     } else {
+//         const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+//         await sendInteractiveButtons(from, reply, [
+//             { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+//             { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+//         ]);
+//     }
+//     return res.sendStatus(200);
+// }
 
-//         // Check if the user's message contains information
-//         if (session.step === STATES.WELCOME && message.type === "text") {
-//             const extractedData = await extractInformationFromText(textRaw, session.language);
-//             if (Object.keys(extractedData).length > 0) {
-//                 session.step = STATES.CHANGE_INFOO;
-//                 await sendInteractiveButtons(from, "Do you want to change your information?", [
-//                     { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-//                     { type: "reply", reply: { id: "no_change", title: "No" } }
-//                 ]);
-//                 session.tempData = extractedData; // Store extracted data temporarily
-//                 return res.sendStatus(200);
-//             }
-//         }
+// // Check if the user's message contains information
+// if (session.step === STATES.WELCOME && message.type === "text") {
+//     const extractedData = await extractInformationFromText(textRaw, session.language);
+//     if (Object.keys(extractedData).length > 0) {
+//         session.step = STATES.CHANGE_INFOO;
+//         await sendInteractiveButtons(from, "Do you want to change your information?", [
+//             { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+//             { type: "reply", reply: { id: "no_change", title: "No" } }
+//         ]);
+//         session.tempData = extractedData; // Store extracted data temporarily
+//         return res.sendStatus(200);
+//     }
+// }
 
 //         // Handle CHANGE_INFO state
 //         if (session.step === STATES.CHANGE_INFOO) {
