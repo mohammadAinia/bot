@@ -1786,14 +1786,14 @@ app.post('/webhook', async (req, res) => {
                         return await sendQuantitySelection(from, session.language);
                     }
                     else if (session.step === STATES.QUANTITY) {
-                        const quantity = parseInt(transcribedText.trim(), 10);
+                        // const quantity = parseInt(transcribedText.trim(), 10);
 
-                        if (isNaN(quantity) || quantity < 10) {
+                        if (transcribedText < 10) {
                             await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
                             await sendQuantitySelection(from, session.language);
                             return res.sendStatus(200);
                         }
-                        session.data.quantity = quantity;
+                        session.data.quantity = transcribedText;
                         session.step = STATES.CONFIRMATION;
                     }
                 } else if (classification === "request") {
