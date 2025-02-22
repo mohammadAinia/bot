@@ -1766,6 +1766,10 @@ app.post('/webhook', async (req, res) => {
                         await sendToWhatsApp(from, aiResponse);
                     } 
                     else if (session.step === STATES.EMAIL) {
+                        if (!isValidEmail(transcribedText)) {
+                            await sendToWhatsApp(from, "❌ Please provide a valid email address (e.g., example@domain.com).");
+                            return res.sendStatus(200);
+                        }
                         session.data.email = transcribedText;
                         session.step = STATES.LONGITUDE;
                         await sendToWhatsApp(from, getLocationMessage(session.language));
@@ -1897,20 +1901,49 @@ app.post('/webhook', async (req, res) => {
             }
             return res.sendStatus(200);
         }
-
-        // Check if the user's message contains information
-        if (session.step === STATES.WELCOME && message.type === "text") {
-            const extractedData = await extractInformationFromText(textRaw, session.language);
-            if (Object.keys(extractedData).length > 0) {
-                session.step = STATES.CHANGE_INFOO;
-                await sendInteractiveButtons(from, "Do you want to change your information?", [
-                    { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                    { type: "reply", reply: { id: "no_change", title: "No" } }
-                ]);
-                session.tempData = extractedData; // Store extracted data temporarily
-                return res.sendStatus(200);
+        else if (classification === "request") {
+            // Handle requests
+            if (!session.data || !session.data.name) {  // Check if the user doesn't have any data
+                // Start collecting information immediately if the user is new and doesn't have data
+                session.inRequest = true;
+                session.step = STATES.NAME;
+                aiResponse = "Please provide your name."; // Set aiResponse for voice generation
+                await sendToWhatsApp(from, aiResponse);
+            } else {
+                const extractedData = await extractInformationFromText(transcribedText, session.language);
+                if (Object.keys(extractedData).length > 0) {
+                    session.step = STATES.CHANGE_INFOO;
+                    aiResponse = "Do you want to change your information?"; // Set aiResponse for voice generation
+                    await sendInteractiveButtons(from, aiResponse, [
+                        { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                        { type: "reply", reply: { id: "no_change", title: "No" } }
+                    ]);
+                    session.tempData = extractedData; // Store extracted data temporarily
+                } else {
+                    aiResponse = "Do you want to change your information?"; // Set aiResponse for voice generation
+                    await sendToWhatsApp(from, `${aiResponse}\n\nPlease provide more details about your request.`);
+                    session.inRequest = true; // Set the session to indicate the user is in a request flow
+                }
             }
+        } else if (classification === "greeting" || classification === "other") {
+            // Handle greetings or other cases
+            aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
+            await sendToWhatsApp(from, aiResponse);
         }
+
+        // // Check if the user's message contains information
+        // if (session.step === STATES.WELCOME && message.type === "text") {
+        //     const extractedData = await extractInformationFromText(textRaw, session.language);
+        //     if (Object.keys(extractedData).length > 0) {
+        //         session.step = STATES.CHANGE_INFOO;
+        //         await sendInteractiveButtons(from, "Do you want to change your information?", [
+        //             { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+        //             { type: "reply", reply: { id: "no_change", title: "No" } }
+        //         ]);
+        //         session.tempData = extractedData; // Store extracted data temporarily
+        //         return res.sendStatus(200);
+        //     }
+        // }
 
         // Handle CHANGE_INFO state
         if (session.step === STATES.CHANGE_INFOO) {
