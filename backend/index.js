@@ -1863,9 +1863,9 @@
 //             if (buttonId === "new_request") {
 //                 if (!session.data || !session.data.name) {  // Check if the user doesn't have any data
 //                     // Start collecting information immediately if the user is new and doesn't have data
-// session.inRequest = true;
-// session.step = STATES.NAME;
-// await sendToWhatsApp(from, "Please provide your name.");
+//                     session.inRequest = true;
+//                     session.step = STATES.NAME;
+//                     await sendToWhatsApp(from, "Please provide your name.");
 //                 } else {
 //                     // Proceed to ask if the user wants to change information if they already have data
 //                     await sendInteractiveButtons(from, "Do you want to change your information?", [
@@ -4431,25 +4431,16 @@ app.post('/webhook', async (req, res) => {
 
         // Check if the user's message contains information
         if (session.step === STATES.WELCOME && message.type === "text") {
-            const user = await checkUserRegistration(from);
-            if (user && user.name) {
-                const extractedData = await extractInformationFromText(textRaw, session.language);
-                if (Object.keys(extractedData).length > 0) {
-                    session.step = STATES.CHANGE_INFOO;
-                    await sendInteractiveButtons(from, "Do you want to change your information?", [
-                        { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                        { type: "reply", reply: { id: "no_change", title: "No" } }
-                    ]);
-                    session.tempData = extractedData; // Store extracted data temporarily
-                    return res.sendStatus(200);
-                }
+            const extractedData = await extractInformationFromText(textRaw, session.language);
+            if (Object.keys(extractedData).length > 0) {
+                session.step = STATES.CHANGE_INFOO;
+                await sendInteractiveButtons(from, "Do you want to change your information?", [
+                    { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                    { type: "reply", reply: { id: "no_change", title: "No" } }
+                ]);
+                session.tempData = extractedData; // Store extracted data temporarily
+                return res.sendStatus(200);
             }
-            else {
-                session.inRequest = true;
-                session.step = STATES.NAME;
-                await sendToWhatsApp(from, "Please provide your name.");
-            }
-
         }
 
         // Handle CHANGE_INFO state
