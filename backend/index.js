@@ -1794,6 +1794,7 @@ app.post('/webhook', async (req, res) => {
                             return res.sendStatus(200);
                         }
                         session.data.quantity = quantity;
+                        session.step = STATES.CONFIRMATION;
                     }
                 } else if (classification === "request") {
                     // Handle requests
