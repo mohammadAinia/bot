@@ -865,7 +865,7 @@ async function askForNextMissingField(session, from) {
 // async function isQuestionOrRequest(text) {
 //     const prompt = `
 //     Classify the user's input into one of the following categories:
-    
+
 //     1️⃣ **"request"** → If the user is making a service request or wants to start a new request. Examples:
 //        - "I want to create a request"
 //        - "I want to create a new request"
@@ -881,18 +881,18 @@ async function askForNextMissingField(session, from) {
 //         - "أحتاج إلى استلام الزيت المستعمل"
 //         - "طلب جديد"
 //         - "أنا محمد ولدي 50 لتر في الشارقة"
-    
+
 //     2️⃣ **"question"** → If the user is **asking for information** about the company, services, or anything general. Examples:
 //        - "What services do you provide?"
 //        - "How does your oil collection work?"
 //        - "Where are you located?"
 //        - "What is the cost of biodiesel?"
-    
+
 //     3️⃣ **"greeting"** → If the user is just saying hello. Examples:
 //        - "Hi"
 //        - "Hello"
 //        - "Good morning"
-    
+
 //     4️⃣ **"answer"** → If the user is providing an answer to a specific question. Examples:
 //        - "My name is John"
 //        - "John"
@@ -906,9 +906,9 @@ async function askForNextMissingField(session, from) {
 //        - "yazan@gmail.com"
 //        - "mohammaedAinia@gmail.com"
 
-    
+
 //     5️⃣ **"other"** → If the input does not fit the above categories.
-    
+
 //     Respond ONLY with one of these words: "request", "question", "greeting", "answer", or "other".
 
 //     **User Input:** "${text}"
@@ -1708,7 +1708,7 @@ app.post('/webhook', async (req, res) => {
 
         if (message.type === "audio" && message.audio) {
             const mediaId = message.audio.id; // Get the media ID
-        
+
             // Fetch the media URL using the media ID
             const audioUrl = await fetchMediaUrl(mediaId);
             if (!audioUrl || !isValidUrl(audioUrl)) {
@@ -1716,14 +1716,14 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
                 return res.sendStatus(200);
             }
-        
+
             const filePath = `./temp/${messageId}.ogg`; // Unique temporary file path
-        
+
             try {
                 // Download the voice file
                 await downloadFile(audioUrl, filePath);
                 console.log("🔹 Voice file downloaded successfully:", filePath);
-        
+
                 // Transcribe the voice file using OpenAI Whisper
                 const transcription = await transcribeVoiceMessage(filePath);
                 if (!transcription) {
@@ -1731,19 +1731,19 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(from, "Sorry, I couldn't understand your voice message. Please try again.");
                     return res.sendStatus(200);
                 }
-        
+
                 console.log(`🔹 Transcribed voice message: ${transcription}`);
                 const transcribedText = transcription; // Use the transcribed text as the message
-        
+
                 // Classify the transcribed text
                 const classification = await isQuestionOrRequest(transcribedText);
                 let aiResponse = ""; // Declare aiResponse here to avoid scope issues
-        
+
                 // Handle each classification in the specified order
                 if (classification === "question") {
                     // Handle questions
                     aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
-        
+
                     // Send text response
                     if (session.inRequest) {
                         await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
@@ -1761,7 +1761,7 @@ app.post('/webhook', async (req, res) => {
                         session.step = STATES.EMAIL;
                         await sendToWhatsApp(from, getEmailMessage(session.language));
                         await sendToWhatsApp(from, aiResponse);
-                    } 
+                    }
                     else if (session.step === STATES.EMAIL) {
                         if (!isValidEmail(transcribedText)) {
                             await sendToWhatsApp(from, "❌ Please provide a valid email address (e.g., example@domain.com).");
@@ -1826,23 +1826,23 @@ app.post('/webhook', async (req, res) => {
                     aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
                     await sendToWhatsApp(from, aiResponse);
                 }
-        
+
                 // Generate audio response using OpenAI TTS (for all cases except when returning early)
                 if (aiResponse) {
                     const audioFilePath = `./temp/${messageId}_response.mp3`;
                     await generateAudio(aiResponse, audioFilePath);
-        
+
                     // Upload audio file to WhatsApp's servers
                     const uploadedMediaId = await uploadMediaToWhatsApp(audioFilePath);
-        
+
                     // Send audio to user using the media ID
                     await sendAudioUsingMediaId(from, uploadedMediaId);
-        
+
                     // Clean up temporary files
                     fs.unlinkSync(audioFilePath);
                     console.log("✅ Temporary audio file deleted:", audioFilePath);
                 }
-        
+
                 return res.sendStatus(200);
             } catch (error) {
                 console.error("❌ Error downloading or transcribing voice message:", error);
@@ -1897,7 +1897,21 @@ app.post('/webhook', async (req, res) => {
                 ]);
             }
             return res.sendStatus(200);
-        } else if (classification === "greeting") {
+        } else if (classification === "request") {
+            if (session.step === STATES.WELCOME && message.type === "text") {
+                const extractedData = await extractInformationFromText(textRaw, session.language);
+                if (Object.keys(extractedData).length > 0) {
+                    session.step = STATES.CHANGE_INFOO;
+                    await sendInteractiveButtons(from, "Do you want to change your information?", [
+                        { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+                        { type: "reply", reply: { id: "no_change", title: "No" } }
+                    ]);
+                    session.tempData = extractedData; // Store extracted data temporarily
+                    return res.sendStatus(200);
+                }
+            }
+        }
+        else if (classification === "greeting") {
             // Handle greetings
             const greetingResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
             await sendToWhatsApp(from, greetingResponse);
@@ -1908,21 +1922,21 @@ app.post('/webhook', async (req, res) => {
             await sendToWhatsApp(from, otherResponse);
             return res.sendStatus(200);
         }
-        
+
 
         // Check if the user's message contains information
-        if (session.step === STATES.WELCOME && message.type === "text") {
-            const extractedData = await extractInformationFromText(textRaw, session.language);
-            if (Object.keys(extractedData).length > 0) {
-                session.step = STATES.CHANGE_INFOO;
-                await sendInteractiveButtons(from, "Do you want to change your information?", [
-                    { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                    { type: "reply", reply: { id: "no_change", title: "No" } }
-                ]);
-                session.tempData = extractedData; // Store extracted data temporarily
-                return res.sendStatus(200);
-            }
-        }
+        // if (session.step === STATES.WELCOME && message.type === "text") {
+        //     const extractedData = await extractInformationFromText(textRaw, session.language);
+        //     if (Object.keys(extractedData).length > 0) {
+        //         session.step = STATES.CHANGE_INFOO;
+        //         await sendInteractiveButtons(from, "Do you want to change your information?", [
+        //             { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+        //             { type: "reply", reply: { id: "no_change", title: "No" } }
+        //         ]);
+        //         session.tempData = extractedData; // Store extracted data temporarily
+        //         return res.sendStatus(200);
+        //     }
+        // }
 
         // Handle CHANGE_INFO state
         if (session.step === STATES.CHANGE_INFOO) {
