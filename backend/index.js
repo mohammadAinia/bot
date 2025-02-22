@@ -1908,7 +1908,7 @@ app.post('/webhook', async (req, res) => {
         
                 // Extract information from the user's message
                 const extractedData = await extractInformationFromText(textRaw, session.language);
-        
+                session.data = { ...session.data, ...extractedData };
                 // Check if the user is registered
                 const user = await checkUserRegistration(from);
                 if (user && user.name) {
@@ -1921,7 +1921,7 @@ app.post('/webhook', async (req, res) => {
                     session.tempData = extractedData; // Store extracted data temporarily
                 } else {
                     // User is not registered, start collecting information
-                    session.data = { ...session.data, ...extractedData }; // Merge extracted data with session data
+                    // session.data = { ...session.data, ...extractedData }; // Merge extracted data with session data
                     const missingFields = getMissingFields(session.data);
                     if (missingFields.length > 0) {
                         session.step = `ASK_${missingFields[0].toUpperCase()}`;
@@ -1949,8 +1949,14 @@ app.post('/webhook', async (req, res) => {
                 const buttonId = message.interactive.button_reply.id;
                 if (buttonId === "yes_change") {
                     // User wants to change information, reset the session and start collecting all information
-                    session.data = { phone: from }; // Reset session data, keeping only the phone number
-                    session.step = STATES.NAME;
+                    const missingFields = getMissingFields(session.data);
+                    if (missingFields.length > 0) {
+                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                        await askForNextMissingField(session, from);
+                    } else {
+                        session.step = STATES.QUANTITY;
+                        await sendQuantitySelection(from, session.language);
+                    }
                     await sendToWhatsApp(from, "Please provide your name.");
                 } else if (buttonId === "no_change") {
                     // User does not want to change information, proceed to quantity selection
