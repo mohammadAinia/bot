@@ -1908,20 +1908,20 @@ app.post('/webhook', async (req, res) => {
         
                 // Extract information from the user's message
                 const extractedData = await extractInformationFromText(textRaw, session.language);
-                session.data = { ...session.data, ...extractedData };
+        
                 // Check if the user is registered
                 const user = await checkUserRegistration(from);
                 if (user && user.name) {
                     // User is registered, ask if they want to change their information
                     session.step = STATES.CHANGE_INFOO;
+                    session.tempData = extractedData; // Store extracted data temporarily
                     await sendInteractiveButtons(from, "Do you want to change your information?", [
                         { type: "reply", reply: { id: "yes_change", title: "Yes" } },
                         { type: "reply", reply: { id: "no_change", title: "No" } }
                     ]);
-                    session.tempData = extractedData; // Store extracted data temporarily
                 } else {
                     // User is not registered, start collecting information
-                    // session.data = { ...session.data, ...extractedData }; // Merge extracted data with session data
+                    session.data = { ...session.data, ...extractedData }; // Merge extracted data with session data
                     const missingFields = getMissingFields(session.data);
                     if (missingFields.length > 0) {
                         session.step = `ASK_${missingFields[0].toUpperCase()}`;
@@ -1948,7 +1948,11 @@ app.post('/webhook', async (req, res) => {
             if (message.type === "interactive" && message.interactive?.type === "button_reply") {
                 const buttonId = message.interactive.button_reply.id;
                 if (buttonId === "yes_change") {
-                    // User wants to change information, reset the session and start collecting all information
+                    // User wants to change information, update session data with extracted information
+                    session.data = { ...session.data, ...session.tempData }; // Merge extracted data with session data
+                    delete session.tempData; // Clear temporary data
+        
+                    // Check for missing fields
                     const missingFields = getMissingFields(session.data);
                     if (missingFields.length > 0) {
                         session.step = `ASK_${missingFields[0].toUpperCase()}`;
@@ -1957,7 +1961,6 @@ app.post('/webhook', async (req, res) => {
                         session.step = STATES.QUANTITY;
                         await sendQuantitySelection(from, session.language);
                     }
-                    await sendToWhatsApp(from, "Please provide your name.");
                 } else if (buttonId === "no_change") {
                     // User does not want to change information, proceed to quantity selection
                     session.step = STATES.QUANTITY;
