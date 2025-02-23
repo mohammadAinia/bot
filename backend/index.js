@@ -2012,10 +2012,11 @@ if (isCancellationRequest(textRaw)) {
                 session.inRequest = true;
         
                 const lang = session?.language || "en"; // Define lang based on session.language
-
+        
                 await sendToWhatsApp(from, lang === 'ar'
                     ? "🔹 يمكنك إلغاء الطلب في أي وقت عن طريق كتابة 'إلغاء'."
                     : "🔹 You can cancel your order at any time by typing 'cancel'.");
+        
                 // Extract information from the user's message
                 const extractedData = await extractInformationFromText(textRaw, session.language);
         
@@ -2032,11 +2033,14 @@ if (isCancellationRequest(textRaw)) {
                 } else {
                     // User is not registered, start collecting information
                     session.data = { ...session.data, ...extractedData }; // Merge extracted data with session data
+        
+                    // Check for missing fields
                     const missingFields = getMissingFields(session.data);
                     if (missingFields.length > 0) {
                         session.step = `ASK_${missingFields[0].toUpperCase()}`;
                         await askForNextMissingField(session, from);
                     } else {
+                        // If no missing fields, proceed to quantity selection
                         session.step = STATES.QUANTITY;
                         await sendQuantitySelection(from, session.language);
                     }
@@ -2073,6 +2077,7 @@ if (isCancellationRequest(textRaw)) {
                         session.step = `ASK_${missingFields[0].toUpperCase()}`;
                         await askForNextMissingField(session, from);
                     } else {
+                        // If no missing fields, proceed to quantity selection
                         session.step = STATES.QUANTITY;
                         await sendQuantitySelection(from, session.language);
                     }
