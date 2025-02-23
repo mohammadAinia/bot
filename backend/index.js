@@ -1573,12 +1573,41 @@ const isCancellationRequest = (text) => {
         "الغاء الطلب",
         "لا أريد الطلب",
         "لقد ألغيت الطلب",
-        "لم أعد أرغب في الطلب"
+        "لم أعد أرغب في الطلب",
+        "الغي الطلب"
     ];
 
     const normalizedText = text.toLowerCase().trim();
     return cancellationPhrases.some(phrase => normalizedText.includes(phrase));
 };
+
+async function handleCancellationRequest(from, session) {
+    // Logic to cancel the order (e.g., update database, notify admin, etc.)
+    console.log("🔹 Cancelling order for user:", from);
+
+    // Notify the user
+    const cancellationMessage = "Your order has been cancelled successfully. If you have any questions, feel free to contact us.";
+    await sendToWhatsApp(from, cancellationMessage);
+
+    // Generate audio response for cancellation
+    const audioFilePath = `./temp/${Date.now()}_cancellation_response.mp3`;
+    await generateAudio(cancellationMessage, audioFilePath);
+
+    // Upload audio file to WhatsApp's servers
+    const uploadedMediaId = await uploadMediaToWhatsApp(audioFilePath);
+
+    // Send audio to user using the media ID
+    await sendAudioUsingMediaId(from, uploadedMediaId);
+
+    // Clean up temporary files
+    fs.unlinkSync(audioFilePath);
+    console.log("✅ Temporary audio file deleted:", audioFilePath);
+
+    // Reset session data if needed
+    session.inRequest = false;
+    session.step = null;
+    session.data = null;
+}
 
 // Webhook endpoint
 app.post('/webhook', async (req, res) => {
@@ -1705,6 +1734,13 @@ app.post('/webhook', async (req, res) => {
                 console.log(`🔹 Transcribed voice message: ${transcription}`);
                 const transcribedText = transcription; // Use the transcribed text as the message
 
+
+                if (isCancellationRequest(transcribedText)) {
+                    console.log("🔹 Cancellation request detected.");
+                    await handleCancellationRequest(from, session); // Handle cancellation
+                    return res.sendStatus(200);
+                }
+
                 // Classify the transcribed text
                 const classification = await isQuestionOrRequest(transcribedText);
                 let aiResponse = ""; // Declare aiResponse here to avoid scope issues
@@ -1827,7 +1863,6 @@ app.post('/webhook', async (req, res) => {
             }
         }
 
-
         if (message.type === "interactive" && message.interactive?.type === "button_reply") {
             const buttonId = message.interactive.button_reply.id;
             if (buttonId === "new_request") {
@@ -1869,7 +1904,13 @@ app.post('/webhook', async (req, res) => {
         if (classification === "question") {
             const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
             if (session.inRequest) {
-                await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
+                // await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
+
+                const lang = session?.language || "en"; // Define lang based on session.language
+                await sendToWhatsApp(from, lang ==='ar' ? `${aiResponse}\n\nمن فضلك اكمل معلومات الطلب.`:
+                    `${aiResponse}\n\nPlease complete the request information.`
+                );
+
             } else {
                 const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
                 await sendInteractiveButtons(from, reply, [
@@ -1893,11 +1934,21 @@ if (isCancellationRequest(textRaw)) {
         };
 
         // Notify the user
-        await sendToWhatsApp(from, "Your order has been cancelled. You can start a new request anytime.");
+        const lang = session?.language || "en"; // Define lang based on session.language
+
+        await sendToWhatsApp(from, lang === 'ar'
+            ? "🔹 تم الغاء الطلب بنجاح'."
+            : "🔹Your order has been cancelled. You can start a new request anytime.");
+        // await sendToWhatsApp(from, "Your order has been cancelled. You can start a new request anytime.");
         return res.sendStatus(200);
     } else {
         // If the user is not in a request, inform them
-        await sendToWhatsApp(from, "You don't have an active order to cancel.");
+        const lang = session?.language || "en"; // Define lang based on session.language
+
+        await sendToWhatsApp(from, lang === 'ar'
+            ? "🔹ليس لدك طلب للالغاء'."
+            : "🔹You don't have an active order to cancel.");
+        // await sendToWhatsApp(from, "You don't have an active order to cancel.");
         return res.sendStatus(200);
     }
 }
