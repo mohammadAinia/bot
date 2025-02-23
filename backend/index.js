@@ -1581,32 +1581,72 @@ const isCancellationRequest = (text) => {
     return cancellationPhrases.some(phrase => normalizedText.includes(phrase));
 };
 
-async function handleCancellationRequest(from, session) {
-    // Logic to cancel the order (e.g., update database, notify admin, etc.)
-    console.log("🔹 Cancelling order for user:", from);
+async function handleCancellationRequest(from, session, message) {
+    try {
+        // Check if the user is in a request flow
+        if (session.inRequest) {
+            // Reset the session
+            userSessions[from] = {
+                step: STATES.WELCOME,
+                data: {},
+                language: session.language,
+                inRequest: false,
+                lastTimestamp: Number(message.timestamp)
+            };
 
-    // Notify the user
-    const cancellationMessage = "Your order has been cancelled successfully. If you have any questions, feel free to contact us.";
-    await sendToWhatsApp(from, cancellationMessage);
+            // Notify the user in text
+            const lang = session?.language || "en"; // Define lang based on session.language
+            const cancellationMessage = lang === 'ar'
+                ? "🔹 تم إلغاء الطلب بنجاح. يمكنك بدء طلب جديد في أي وقت."
+                : "🔹 Your order has been cancelled. You can start a new request anytime.";
 
-    // Generate audio response for cancellation
-    const audioFilePath = `./temp/${Date.now()}_cancellation_response.mp3`;
-    await generateAudio(cancellationMessage, audioFilePath);
+            await sendToWhatsApp(from, cancellationMessage);
 
-    // Upload audio file to WhatsApp's servers
-    const uploadedMediaId = await uploadMediaToWhatsApp(audioFilePath);
+            // Generate audio response for cancellation
+            const audioFilePath = `./temp/${Date.now()}_cancellation_response.mp3`;
+            await generateAudio(cancellationMessage, audioFilePath);
 
-    // Send audio to user using the media ID
-    await sendAudioUsingMediaId(from, uploadedMediaId);
+            // Upload audio file to WhatsApp's servers
+            const uploadedMediaId = await uploadMediaToWhatsApp(audioFilePath);
 
-    // Clean up temporary files
-    fs.unlinkSync(audioFilePath);
-    console.log("✅ Temporary audio file deleted:", audioFilePath);
+            // Send audio to user using the media ID
+            await sendAudioUsingMediaId(from, uploadedMediaId);
 
-    // Reset session data if needed
-    session.inRequest = false;
-    session.step = null;
-    session.data = null;
+            // Clean up temporary files
+            fs.unlinkSync(audioFilePath);
+            console.log("✅ Temporary audio file deleted:", audioFilePath);
+
+            return res.sendStatus(200);
+        } else {
+            // If the user is not in a request, inform them
+            const lang = session?.language || "en"; // Define lang based on session.language
+            const noActiveOrderMessage = lang === 'ar'
+                ? "🔹 ليس لديك طلب نشط للإلغاء."
+                : "🔹 You don't have an active order to cancel.";
+
+            await sendToWhatsApp(from, noActiveOrderMessage);
+
+            // Generate audio response for no active order
+            const audioFilePath = `./temp/${Date.now()}_no_active_order_response.mp3`;
+            await generateAudio(noActiveOrderMessage, audioFilePath);
+
+            // Upload audio file to WhatsApp's servers
+            const uploadedMediaId = await uploadMediaToWhatsApp(audioFilePath);
+
+            // Send audio to user using the media ID
+            await sendAudioUsingMediaId(from, uploadedMediaId);
+
+            // Clean up temporary files
+            fs.unlinkSync(audioFilePath);
+            console.log("✅ Temporary audio file deleted:", audioFilePath);
+
+            return res.sendStatus(200);
+        }
+    } catch (error) {
+        console.error("❌ Error handling cancellation request:", error);
+        await sendToWhatsApp(from, "Sorry, something went wrong while processing your request. Please try again.");
+        return res.sendStatus(200);
+    }
 }
 
 // Webhook endpoint
@@ -1737,7 +1777,7 @@ app.post('/webhook', async (req, res) => {
 
                 if (isCancellationRequest(transcribedText)) {
                     console.log("🔹 Cancellation request detected.");
-                    await handleCancellationRequest(from, session); // Handle cancellation
+                    await handleCancellationRequest(from, session, message); // Handle cancellation
                     return res.sendStatus(200);
                 }
 
