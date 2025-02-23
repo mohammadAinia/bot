@@ -1833,14 +1833,19 @@ app.post('/webhook', async (req, res) => {
             if (buttonId === "new_request") {
                 if (!session.data || !session.data.name) {  // Check if the user doesn't have any data
                     // Start collecting information immediately if the user is new and doesn't have data
-                    await sendToWhatsApp(from, "Your order has been cancelled. You can start a new request anytime.");
+                    await sendToWhatsApp(from, lang === 'ar'
+                        ? "🔹 يمكنك إلغاء الطلب في أي وقت عن طريق كتابة 'إلغاء'."
+                        : "🔹 You can cancel your order at any time by typing 'cancel'.");
                     session.inRequest = true;
                     session.step = STATES.NAME;
                     await sendToWhatsApp(from, "Please provide your name.");
                 } else {
                     // Proceed to ask if the user wants to change information if they already have data
-                    await sendToWhatsApp(from, "Your order has been cancelled. You can start a new request anytime.");
-                    await sendInteractiveButtons(from, "Do you want to change your information?", [
+                    await sendToWhatsApp(from, lang === 'ar'
+                        ? "🔹 يمكنك إلغاء الطلب في أي وقت عن طريق كتابة 'إلغاء'."
+                        : "🔹 You can cancel your order at any time by typing 'cancel'.");
+                        session.inRequest = true;
+                        await sendInteractiveButtons(from, "Do you want to change your information?", [
                         { type: "reply", reply: { id: "yes_change", title: "Yes" } },
                         { type: "reply", reply: { id: "no_change", title: "No" } }
                     ]);
@@ -1900,8 +1905,9 @@ if (isCancellationRequest(textRaw)) {
             if (isRequestStart) {
                 session.inRequest = true;
         
-                await sendToWhatsApp(from, "You can cancel your order at any time by typing 'cancel'.");
-
+                await sendToWhatsApp(from, lang === 'ar'
+                    ? "🔹 يمكنك إلغاء الطلب في أي وقت عن طريق كتابة 'إلغاء'."
+                    : "🔹 You can cancel your order at any time by typing 'cancel'.");
                 // Extract information from the user's message
                 const extractedData = await extractInformationFromText(textRaw, session.language);
         
