@@ -1581,7 +1581,7 @@ const isCancellationRequest = (text) => {
     return cancellationPhrases.some(phrase => normalizedText.includes(phrase));
 };
 
-async function handleCancellationRequest(from, session, message) {
+async function handleCancellationRequest(from, session, message, res) {
     try {
         // Check if the user is in a request flow
         if (session.inRequest) {
@@ -1777,8 +1777,8 @@ app.post('/webhook', async (req, res) => {
 
                 if (isCancellationRequest(transcribedText)) {
                     console.log("🔹 Cancellation request detected.");
-                    await handleCancellationRequest(from, session, message); // Handle cancellation
-                    return res.sendStatus(200);
+                    await handleCancellationRequest(from, session, message, res); // Pass `res` here
+                    return;
                 }
 
                 // Classify the transcribed text
