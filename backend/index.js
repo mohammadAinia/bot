@@ -1833,6 +1833,8 @@ app.post('/webhook', async (req, res) => {
             if (buttonId === "new_request") {
                 if (!session.data || !session.data.name) {  // Check if the user doesn't have any data
                     // Start collecting information immediately if the user is new and doesn't have data
+                    const lang = session?.language || "en"; // Define lang based on session.language
+
                     await sendToWhatsApp(from, lang === 'ar'
                         ? "🔹 يمكنك إلغاء الطلب في أي وقت عن طريق كتابة 'إلغاء'."
                         : "🔹 You can cancel your order at any time by typing 'cancel'.");
@@ -1841,6 +1843,8 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(from, "Please provide your name.");
                 } else {
                     // Proceed to ask if the user wants to change information if they already have data
+                    const lang = session?.language || "en"; // Define lang based on session.language
+
                     await sendToWhatsApp(from, lang === 'ar'
                         ? "🔹 يمكنك إلغاء الطلب في أي وقت عن طريق كتابة 'إلغاء'."
                         : "🔹 You can cancel your order at any time by typing 'cancel'.");
@@ -1905,6 +1909,8 @@ if (isCancellationRequest(textRaw)) {
             if (isRequestStart) {
                 session.inRequest = true;
         
+                const lang = session?.language || "en"; // Define lang based on session.language
+
                 await sendToWhatsApp(from, lang === 'ar'
                     ? "🔹 يمكنك إلغاء الطلب في أي وقت عن طريق كتابة 'إلغاء'."
                     : "🔹 You can cancel your order at any time by typing 'cancel'.");
