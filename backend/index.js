@@ -832,6 +832,11 @@ async function askForNextMissingField(session, from) {
         const nextField = missingFields[0];
         session.step = `ASK_${nextField.toUpperCase()}`;
 
+                // Add a reminder about cancellation
+                await sendToWhatsApp(from, lang === 'ar'
+                    ? "🔹 يمكنك إلغاء الطلب في أي وقت عن طريق كتابة 'إلغاء'."
+                    : "🔹 You can cancel your order at any time by typing 'cancel'.");
+
         switch (nextField) {
             case "city":
                 await sendCitySelection(from, lang);
@@ -1555,6 +1560,26 @@ const sendAudioUsingMediaId = async (to, mediaId) => {
     }
 };
 
+const isCancellationRequest = (text) => {
+    const cancellationPhrases = [
+        "cancel",
+        "cancel the order",
+        "i want to cancel the order",
+        "i don't want the order",
+        "i have cancelled the order",
+        "i no longer want",
+        "i no longer want the order",
+        "أريد إلغاء الطلب",
+        "الغاء الطلب",
+        "لا أريد الطلب",
+        "لقد ألغيت الطلب",
+        "لم أعد أرغب في الطلب"
+    ];
+
+    const normalizedText = text.toLowerCase().trim();
+    return cancellationPhrases.some(phrase => normalizedText.includes(phrase));
+};
+
 // Webhook endpoint
 app.post('/webhook', async (req, res) => {
     try {
@@ -1844,6 +1869,28 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(200);
         }
 
+        // Check for cancellation requests
+if (isCancellationRequest(textRaw)) {
+    if (session.inRequest) {
+        // Reset the session
+        userSessions[from] = {
+            step: STATES.WELCOME,
+            data: {},
+            language: session.language,
+            inRequest: false,
+            lastTimestamp: Number(message.timestamp)
+        };
+
+        // Notify the user
+        await sendToWhatsApp(from, "Your order has been cancelled. You can start a new request anytime.");
+        return res.sendStatus(200);
+    } else {
+        // If the user is not in a request, inform them
+        await sendToWhatsApp(from, "You don't have an active order to cancel.");
+        return res.sendStatus(200);
+    }
+}
+
         // Check if the user's message contains information
         if (session.step === STATES.WELCOME && message.type === "text") {
             // Check if the user's message indicates the start of a request
@@ -1851,6 +1898,8 @@ app.post('/webhook', async (req, res) => {
             if (isRequestStart) {
                 session.inRequest = true;
         
+                await sendToWhatsApp(from, "You can cancel your order at any time by typing 'cancel'.");
+
                 // Extract information from the user's message
                 const extractedData = await extractInformationFromText(textRaw, session.language);
         
@@ -1919,36 +1968,6 @@ app.post('/webhook', async (req, res) => {
             }
             return res.sendStatus(200);
         }
-
-        // Handle CHANGE_INFO state
-        // if (session.step === STATES.CHANGE_INFOO) {
-        //     if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-        //         const buttonId = message.interactive.button_reply.id;
-        //         if (buttonId === "yes_change") {
-        //             // Update session data with extracted information
-        //             session.data = { ...session.data, ...session.tempData };
-        //             delete session.tempData; // Clear temporary data
-
-        //             // Ensure the phone number is not overwritten if already present
-        // if (!session.data.phone) {
-        //     session.data.phone = from; // Use the WhatsApp number as the default phone number
-        // }
-
-        //             const missingFields = getMissingFields(session.data);
-        //             if (missingFields.length > 0) {
-        //                 session.step = `ASK_${missingFields[0].toUpperCase()}`;
-        //                 await askForNextMissingField(session, from);
-        //             } else {
-        //                 session.step = STATES.QUANTITY;
-        //                 await sendQuantitySelection(from, session.language);
-        //             }
-        //         } else if (buttonId === "no_change") {
-        //             session.step = STATES.QUANTITY;
-        //             await sendQuantitySelection(from, session.language);
-        //         }
-        //     }
-        //     return res.sendStatus(200);
-        // }
 
         let latitude
         let longitude
