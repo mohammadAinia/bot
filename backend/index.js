@@ -574,56 +574,14 @@ const sendInteractiveButtons2 = async (to, message, buttons) => {
 };
 
 
-// function extractQuantity(text) {
-//     // Match both Western Arabic (0-9) and Eastern Arabic (٠-٩) numerals
-//     const match = text.match(/[\d\u0660-\u0669]+/);
-//     if (match) {
-//         // Convert Eastern Arabic numerals to Western Arabic numerals
-//         return convertArabicNumbers(match[0]);
-//     }
-//     return null;
-// }
 function extractQuantity(text) {
-    // Match quantities like "23 liter", "23 liters", "23 L", etc.
-    const quantityMatch = text.match(/(\d+)\s*(?:liter|l|liters?)/i);
-    return quantityMatch ? parseInt(quantityMatch[1], 10) : null;
-}
-
-function extractName(text) {
-    // Match names in both English and Arabic
-    const nameMatch = text.match(/(?:انا|اسمي|my name is|name is|i am)\s+([\u0600-\u06FF\s]+|[a-zA-Z\s]+)/i);
-    return nameMatch ? nameMatch[1].trim() : null;
-}
-
-function extractEmail(text) {
-    // Match email addresses
-    const emailMatch = text.match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
-    return emailMatch ? emailMatch[0] : null;
-}
-function validateExtractedData(extractedData) {
-    const validatedData = { ...extractedData };
-
-    // Validate quantity
-    if (validatedData.quantity !== null && (isNaN(validatedData.quantity) || validatedData.quantity <= 0)) {
-        validatedData.quantity = null;
+    // Match both Western Arabic (0-9) and Eastern Arabic (٠-٩) numerals
+    const match = text.match(/[\d\u0660-\u0669]+/);
+    if (match) {
+        // Convert Eastern Arabic numerals to Western Arabic numerals
+        return convertArabicNumbers(match[0]);
     }
-
-    // Validate name
-    if (validatedData.name !== null && validatedData.name.trim() === "") {
-        validatedData.name = null;
-    }
-
-    // Validate email
-    if (validatedData.email !== null && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(validatedData.email)) {
-        validatedData.email = null;
-    }
-
-    // Validate phone
-    if (validatedData.phone !== null && !/^(?:\+971|0)?(?:5\d|4\d)\d{6}$/.test(validatedData.phone)) {
-        validatedData.phone = null;
-    }
-
-    return validatedData;
+    return null;
 }
 
 function convertArabicNumbers(arabicNumber) {
@@ -711,16 +669,10 @@ function extractCity(text, language = "en") {
     return null;
 }//
 async function extractInformationFromText(text, language = "en") {
-
     const extractedData = {
-        quantity: extractQuantity(text),
-        name: extractName(text),
-        email: extractEmail(text),
+        quantity: extractQuantity(text), // Extract quantity
+        // city: extractCity(text, language) // Extract city
     };
-    // const extractedData = {
-    //     quantity: extractQuantity(text), // Extract quantity
-    //     city: extractCity(text, language) // Extract city
-    // };
 
     // Extract name using regex or simple logic
     const nameMatch = text.match(/(?:انا|اسمي|my name is|name is)\s+([\u0600-\u06FF\s]+|[a-zA-Z\s]+)/i);
@@ -740,21 +692,27 @@ async function extractInformationFromText(text, language = "en") {
     Extract the following information from the text and return a valid JSON object:
     {
       "name": "The user's full name or null",
+      "phone": "The user's phone number or null",
       "email": "The user's email address or null",
+      "address": "The user's full address or null",
+      "city": "The user's city (e.g., Dubai, Sharjah, Abu Dhabi) or null",
       "street": "The user's street name or null",
       "building_name": "The user's building name or null",
       "flat_no": "The user's flat number or null",
+      "latitude": "The user's latitude or null",
+      "longitude": "The user's longitude or null",
       "quantity": "The user's quantity (in liters) or null"
     }
     
-    **Rules:**
-    1. Extract the quantity even if it is part of a sentence (e.g., "I have 23 liters" → quantity: 23).
-    3. Extract the name even if it is part of a sentence (e.g., "My name is Yazan" → name: Yazan).
-    4. Extract the email if it is part of a sentence (e.g., "my email is yazan@gmail.com" → email: yazan@gmail.com).
-    5. If any information is missing, assign null to that field.
-    
-    **Text:** ${text}
-    `;
+    If any information is missing, assign null to that field.
+
+    **Rules for Arabic Text:**
+    1. Recognize city names in Arabic: دبي (Dubai), أبو ظبي (Abu Dhabi), الشارقة (Sharjah).
+    2. Extract names written in Arabic script.
+    3. Extract phone numbers in UAE format (e.g., +9715xxxxxxxx).
+
+    Text: ${text}
+`;
 
     const aiResponse = await getOpenAIResponse(prompt, ``, language); // Pass prompt, not textRaw
 
