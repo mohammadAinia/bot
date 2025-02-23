@@ -1649,6 +1649,15 @@ async function handleCancellationRequest(from, session, message, res) {
     }
 }
 
+const getTranslation = (key, language) => {
+    const translations = {
+        change_information: { en: "Do you want to change your information?", ar: "هل ترغب في تغيير معلوماتك؟" },
+        yes: { en: "Yes", ar: "نعم" },
+        no: { en: "No", ar: "لا" }
+    };
+    return translations[key][language];
+};
+
 // Webhook endpoint
 app.post('/webhook', async (req, res) => {
     try {
@@ -1910,13 +1919,15 @@ app.post('/webhook', async (req, res) => {
                     // Start collecting information immediately if the user is new and doesn't have data
                     const lang = session?.language || "en"; // Define lang based on session.language
 
-                    await sendToWhatsApp(from, lang === 'ar'
+                    await sendToWhatsApp(from, session.language === 'ar'
                         ? "🔹 يمكنك إلغاء الطلب في أي وقت عن طريق كتابة 'إلغاء'."
                         : "🔹 You can cancel your order at any time by typing 'cancel'.");
                     session.inRequest = true;
                     session.step = STATES.NAME;
-                    await sendToWhatsApp(from, "Please provide your name.");
-                } else {
+                    await sendToWhatsApp(from, session.language === 'ar'
+                        ? "من فضلك قم بإدخال اسمك."
+                        : "Please provide your name.");
+                    } else {
                     // Proceed to ask if the user wants to change information if they already have data
                     const lang = session?.language || "en"; // Define lang based on session.language
 
@@ -1924,10 +1935,10 @@ app.post('/webhook', async (req, res) => {
                         ? "🔹 يمكنك إلغاء الطلب في أي وقت عن طريق كتابة 'إلغاء'."
                         : "🔹 You can cancel your order at any time by typing 'cancel'.");
                         session.inRequest = true;
-                        await sendInteractiveButtons(from, "Do you want to change your information?", [
-                        { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                        { type: "reply", reply: { id: "no_change", title: "No" } }
-                    ]);
+                        await sendInteractiveButtons(from, getTranslation("change_information", session.language), [
+                            { type: "reply", reply: { id: "yes_change", title: getTranslation("yes", session.language) } },
+                            { type: "reply", reply: { id: "no_change", title: getTranslation("no", session.language) } }
+                        ]);
                     session.step = STATES.CHANGE_INFO;
                 }
                 return res.sendStatus(200);
@@ -2014,9 +2025,9 @@ if (isCancellationRequest(textRaw)) {
                     // User is registered, ask if they want to change their information
                     session.step = STATES.CHANGE_INFOO;
                     session.tempData = extractedData; // Store extracted data temporarily
-                    await sendInteractiveButtons(from, "Do you want to change your information?", [
-                        { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                        { type: "reply", reply: { id: "no_change", title: "No" } }
+                    await sendInteractiveButtons(from, getTranslation("change_information", session.language), [
+                        { type: "reply", reply: { id: "yes_change", title: getTranslation("yes", session.language) } },
+                        { type: "reply", reply: { id: "no_change", title: getTranslation("no", session.language) } }
                     ]);
                 } else {
                     // User is not registered, start collecting information
