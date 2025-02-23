@@ -716,7 +716,6 @@ async function extractInformationFromText(text, language = "en") {
         quantity: extractQuantity(text),
         name: extractName(text),
         email: extractEmail(text),
-        phone: extractPhone(text)
     };
     // const extractedData = {
     //     quantity: extractQuantity(text), // Extract quantity
