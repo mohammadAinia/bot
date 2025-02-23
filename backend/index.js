@@ -669,10 +669,10 @@ function extractCity(text, language = "en") {
     return null;
 }//
 async function extractInformationFromText(text, language = "en") {
-    const extractedData = {
-        quantity: extractQuantity(text), // Extract quantity
-        // city: extractCity(text, language) // Extract city
-    };
+    // const extractedData = {
+    //     quantity: extractQuantity(text), // Extract quantity
+    //     // city: extractCity(text, language) // Extract city
+    // };
 
     // Extract name using regex or simple logic
     const nameMatch = text.match(/(?:انا|اسمي|my name is|name is)\s+([\u0600-\u06FF\s]+|[a-zA-Z\s]+)/i);
