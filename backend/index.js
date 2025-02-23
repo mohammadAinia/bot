@@ -675,17 +675,17 @@ async function extractInformationFromText(text, language = "en") {
     // };
 
     // Extract name using regex or simple logic
-    const nameMatch = text.match(/(?:انا|اسمي|my name is|name is)\s+([\u0600-\u06FF\s]+|[a-zA-Z\s]+)/i);
-    if (nameMatch && nameMatch[1]) {
-        extractedData.name = nameMatch[1].trim();
-    }
+    // const nameMatch = text.match(/(?:انا|اسمي|my name is|name is)\s+([\u0600-\u06FF\s]+|[a-zA-Z\s]+)/i);
+    // if (nameMatch && nameMatch[1]) {
+    //     extractedData.name = nameMatch[1].trim();
+    // }
 
-    // Extract phone number using regex
-    const phoneRegex = /(?:\+971|0)?(?:5\d|4\d)\s?\d{3}\s?\d{3}/; // Matches UAE phone numbers
-    const phoneMatch = text.match(phoneRegex);
-    if (phoneMatch) {
-        extractedData.phone = formatPhoneNumber(phoneMatch[0]); // Format the phone number
-    }
+    // // Extract phone number using regex
+    // const phoneRegex = /(?:\+971|0)?(?:5\d|4\d)\s?\d{3}\s?\d{3}/; // Matches UAE phone numbers
+    // const phoneMatch = text.match(phoneRegex);
+    // if (phoneMatch) {
+    //     extractedData.phone = formatPhoneNumber(phoneMatch[0]); // Format the phone number
+    // }
 
     // Use OpenAI for additional extraction
     const prompt = `
@@ -721,7 +721,7 @@ async function extractInformationFromText(text, language = "en") {
         return { ...aiExtractedData, ...extractedData };
     } catch (e) {
         console.error("❌ Failed to parse AI response as JSON:", aiResponse);
-        return extractedData; // Return at least the manually extracted data
+        // return extractedData; // Return at least the manually extracted data
     }
 }
 // async function extractInformationFromText(text, language = "en") {
