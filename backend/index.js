@@ -667,7 +667,7 @@ function extractCity(text, language = "en") {
     }
     console.log("No city matched.");
     return null;
-}
+}//
 async function extractInformationFromText(text, language = "en") {
     const extractedData = {
         quantity: extractQuantity(text), // Extract quantity
