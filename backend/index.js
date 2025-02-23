@@ -668,84 +668,8 @@ function extractCity(text, language = "en") {
     console.log("No city matched.");
     return null;
 }
-// async function extractInformationFromText(text, language = "en") {
-//     // Use OpenAI for extraction
-//     const prompt = `
-//     Extract the following information from the text and return a valid JSON object:
-//     {
-//       "name": "The user's full name or null",
-//       "phone": "The user's phone number or null",
-//       "email": "The user's email address or null",
-//       "address": "The user's full address or null",
-//       "street": "The user's street name or null",
-//       "building_name": "The user's building name or null",
-//       "flat_no": "The user's flat number or null",
-//       "quantity": "The user's quantity (in liters) or null"
-//     }
-    
-//     **Rules:**
-//     1. Extract the name even if it is part of a sentence (e.g., "My name is Yazan" → name: Yazan).
-//     2. Extract the email if it is part of a sentence (e.g., "my email is yazan@gmail.com" → email: yazan@gmail.com).
-//     3. Extract the quantity even if it is part of a sentence (e.g., "I have 23 liters" → quantity: 23).
-//     4. Extract the street name if it is part of a sentence (e.g., "I live on Main Street" → street: Main Street).
-//     5. Extract the apartment number if it is part of a sentence (e.g., "My flat number is 12" → flat_no: 12).
-//     6. If any information is missing, assign null to that field.
-
-//     **Examples:**
-//     1. Input: "My name is Yazan and I have 23 liters. My email is yazan@gmail.com, and I live on Main Street, flat 12."
-//        Output: { "name": "Yazan", "phone": null, "email": "yazan@gmail.com", "address": null, "street": "Main Street", "building_name": null, "flat_no": "12", "quantity": 23 }
-
-//     2. Input: "I am Mohammad and I have 50 liters. My phone is 0501234567."
-//        Output: { "name": "Mohammad", "phone": "0501234567", "email": null, "address": null, "street": null, "building_name": null, "flat_no": null, "quantity": 50 }
-
-//     3. Input: "أنا خالد ولدي 40 لتر. بريدي الإلكتروني هو khaled@gmail.com."
-//        Output: { "name": "خالد", "phone": null, "email": "khaled@gmail.com", "address": null, "street": null, "building_name": null, "flat_no": null, "quantity": 40 }
-
-//     4. Input: "I need a pickup for used oil."
-//        Output: { "name": null, "phone": null, "email": null, "address": null, "street": null, "building_name": null, "flat_no": null, "quantity": null }
-
-//     **Text:** ${text}
-//     `;
-
-//     const aiResponse = await getOpenAIResponse(prompt, ``, language); // Pass prompt, not textRaw
-
-//     try {
-//         const aiExtractedData = JSON.parse(aiResponse);
-//         return aiExtractedData;
-//     } catch (e) {
-//         console.error("❌ Failed to parse AI response as JSON:", aiResponse);
-//         return {
-//             name: null,
-//             phone: null,
-//             email: null,
-//             address: null,
-//             street: null,
-//             building_name: null,
-//             flat_no: null,
-//             quantity: null
-//         }; // Return an empty object if parsing fails
-//     }
-// }
 async function extractInformationFromText(text, language = "en") {
-    const extractedData = {
-        quantity: extractQuantity(text), // Extract quantity
-        city: extractCity(text, language) // Extract city
-    };
-
-    // Extract name using regex or simple logic
-    const nameMatch = text.match(/(?:انا|اسمي|my name is|name is)\s+([\u0600-\u06FF\s]+|[a-zA-Z\s]+)/i);
-    if (nameMatch && nameMatch[1]) {
-        extractedData.name = nameMatch[1].trim();
-    }
-
-    // Extract phone number using regex
-    const phoneRegex = /(?:\+971|0)?(?:5\d|4\d)\s?\d{3}\s?\d{3}/; // Matches UAE phone numbers
-    const phoneMatch = text.match(phoneRegex);
-    if (phoneMatch) {
-        extractedData.phone = formatPhoneNumber(phoneMatch[0]); // Format the phone number
-    }
-
-    // Use OpenAI for additional extraction
+    // Use OpenAI for extraction
     const prompt = `
     Extract the following information from the text and return a valid JSON object:
     {
@@ -753,35 +677,115 @@ async function extractInformationFromText(text, language = "en") {
       "phone": "The user's phone number or null",
       "email": "The user's email address or null",
       "address": "The user's full address or null",
-      "city": "The user's city (e.g., Dubai, Sharjah, Abu Dhabi) or null",
       "street": "The user's street name or null",
       "building_name": "The user's building name or null",
       "flat_no": "The user's flat number or null",
-      "latitude": "The user's latitude or null",
-      "longitude": "The user's longitude or null",
       "quantity": "The user's quantity (in liters) or null"
     }
     
-    If any information is missing, assign null to that field.
+    **Rules:**
+    1. Extract the name even if it is part of a sentence (e.g., "My name is Yazan" → name: Yazan).
+    2. Extract the email if it is part of a sentence (e.g., "my email is yazan@gmail.com" → email: yazan@gmail.com).
+    3. Extract the quantity even if it is part of a sentence (e.g., "I have 23 liters" → quantity: 23).
+    4. Extract the street name if it is part of a sentence (e.g., "I live on Main Street" → street: Main Street).
+    5. Extract the apartment number if it is part of a sentence (e.g., "My flat number is 12" → flat_no: 12).
+    6. If any information is missing, assign null to that field.
 
-    **Rules for Arabic Text:**
-    1. Recognize city names in Arabic: دبي (Dubai), أبو ظبي (Abu Dhabi), الشارقة (Sharjah).
-    2. Extract names written in Arabic script.
-    3. Extract phone numbers in UAE format (e.g., +9715xxxxxxxx).
+    **Examples:**
+    1. Input: "My name is Yazan and I have 23 liters. My email is yazan@gmail.com, and I live on Main Street, flat 12."
+       Output: { "name": "Yazan", "phone": null, "email": "yazan@gmail.com", "address": null, "street": "Main Street", "building_name": null, "flat_no": "12", "quantity": 23 }
 
-    Text: ${text}
-`;
+    2. Input: "I am Mohammad and I have 50 liters. My phone is 0501234567."
+       Output: { "name": "Mohammad", "phone": "0501234567", "email": null, "address": null, "street": null, "building_name": null, "flat_no": null, "quantity": 50 }
+
+    3. Input: "أنا خالد ولدي 40 لتر. بريدي الإلكتروني هو khaled@gmail.com."
+       Output: { "name": "خالد", "phone": null, "email": "khaled@gmail.com", "address": null, "street": null, "building_name": null, "flat_no": null, "quantity": 40 }
+
+    4. Input: "I need a pickup for used oil."
+       Output: { "name": null, "phone": null, "email": null, "address": null, "street": null, "building_name": null, "flat_no": null, "quantity": null }
+
+    **Text:** ${text}
+    `;
 
     const aiResponse = await getOpenAIResponse(prompt, ``, language); // Pass prompt, not textRaw
 
     try {
         const aiExtractedData = JSON.parse(aiResponse);
-        return { ...aiExtractedData, ...extractedData };
+        return aiExtractedData;
     } catch (e) {
         console.error("❌ Failed to parse AI response as JSON:", aiResponse);
-        return extractedData; // Return at least the manually extracted data
+        return {
+            name: null,
+            phone: null,
+            email: null,
+            address: null,
+            street: null,
+            building_name: null,
+            flat_no: null,
+            quantity: null
+        }; // Return an empty object if parsing fails
     }
 }
+
+
+
+
+// async function extractInformationFromText(text, language = "en") {
+//     const extractedData = {
+//         quantity: extractQuantity(text), // Extract quantity
+//         city: extractCity(text, language) // Extract city
+//     };
+
+//     // Extract name using regex or simple logic
+//     const nameMatch = text.match(/(?:انا|اسمي|my name is|name is)\s+([\u0600-\u06FF\s]+|[a-zA-Z\s]+)/i);
+//     if (nameMatch && nameMatch[1]) {
+//         extractedData.name = nameMatch[1].trim();
+//     }
+
+//     // Extract phone number using regex
+//     const phoneRegex = /(?:\+971|0)?(?:5\d|4\d)\s?\d{3}\s?\d{3}/; // Matches UAE phone numbers
+//     const phoneMatch = text.match(phoneRegex);
+//     if (phoneMatch) {
+//         extractedData.phone = formatPhoneNumber(phoneMatch[0]); // Format the phone number
+//     }
+
+//     // Use OpenAI for additional extraction
+//     const prompt = `
+//     Extract the following information from the text and return a valid JSON object:
+//     {
+//       "name": "The user's full name or null",
+//       "phone": "The user's phone number or null",
+//       "email": "The user's email address or null",
+//       "address": "The user's full address or null",
+//       "city": "The user's city (e.g., Dubai, Sharjah, Abu Dhabi) or null",
+//       "street": "The user's street name or null",
+//       "building_name": "The user's building name or null",
+//       "flat_no": "The user's flat number or null",
+//       "latitude": "The user's latitude or null",
+//       "longitude": "The user's longitude or null",
+//       "quantity": "The user's quantity (in liters) or null"
+//     }
+    
+//     If any information is missing, assign null to that field.
+
+//     **Rules for Arabic Text:**
+//     1. Recognize city names in Arabic: دبي (Dubai), أبو ظبي (Abu Dhabi), الشارقة (Sharjah).
+//     2. Extract names written in Arabic script.
+//     3. Extract phone numbers in UAE format (e.g., +9715xxxxxxxx).
+
+//     Text: ${text}
+// `;
+
+//     const aiResponse = await getOpenAIResponse(prompt, ``, language); // Pass prompt, not textRaw
+
+//     try {
+//         const aiExtractedData = JSON.parse(aiResponse);
+//         return { ...aiExtractedData, ...extractedData };
+//     } catch (e) {
+//         console.error("❌ Failed to parse AI response as JSON:", aiResponse);
+//         return extractedData; // Return at least the manually extracted data
+//     }
+// }
 // async function extractInformationFromText(text, language = "en") {
 //     const extractedData = {
 //         quantity: extractQuantity(text), // Extract quantity
@@ -2082,12 +2086,13 @@ if (isCancellationRequest(textRaw)) {
                 const user = await checkUserRegistration(from);
                 if (user && user.name) {
                     // User is registered, ask if they want to change their information
-                    session.step = STATES.CHANGE_INFOO;
                     session.tempData = extractedData; // Store extracted data temporarily
                     await sendInteractiveButtons(from, getTranslation("change_information", session.language), [
                         { type: "reply", reply: { id: "yes_change", title: getTranslation("yes", session.language) } },
                         { type: "reply", reply: { id: "no_change", title: getTranslation("no", session.language) } }
                     ]);
+                    session.step = STATES.CHANGE_INFOO;
+
                 } else {
                     // User is not registered, start collecting information
                     session.data = { ...session.data, ...extractedData }; // Merge extracted data with session data
