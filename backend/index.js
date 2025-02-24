@@ -1509,7 +1509,7 @@ const getTranslation = (key, language) => {
     return translations[key][language];
 };
 
-const SESSION_TIMEOUT = 2 * 60 * 1000; // 2 minutes in milliseconds (for testing)
+const SESSION_TIMEOUT = 15 * 60 * 1000; // 2 minutes in milliseconds (for testing)
 
 // Function to clean up inactive sessions
 const cleanupInactiveSessions = async () => {
@@ -1532,7 +1532,7 @@ const cleanupInactiveSessions = async () => {
 };
 
 // Run the cleanup function every 1 minute (for testing)
-setInterval(cleanupInactiveSessions, 1 * 60 * 1000);
+setInterval(cleanupInactiveSessions, 5 * 60 * 1000);
 
 // Webhook endpoint
 app.post('/webhook', async (req, res) => {
