@@ -1533,7 +1533,7 @@ const fetchMediaUrl = async (mediaId) => {
     }
 };
 
-const generateAudio = async (text, filePath) => {
+const generateAudio = async (text, filePath, language) => {
     try {
         const mp3 = await openai.audio.speech.create({
             model: "tts-1",
