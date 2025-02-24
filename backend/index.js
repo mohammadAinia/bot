@@ -1994,8 +1994,8 @@ app.post('/webhook', async (req, res) => {
                     const lang = session?.language || "en"; // Define lang based on session.language
 
                     await sendToWhatsApp(from, lang === 'ar'
-                        ? "🔹 يمكنك إلغاء الطلب في أي وقت عن طريق كتابة 'إلغاء'."
-                        : "🔹 You can cancel your order at any time by typing 'cancel'.");
+                        ? "🔹 يمكنك إلغاء الطلب في أي وقت عن طريق كتابة 'إلغاء'او التسجيل الصوتي."
+                        : "🔹 You can cancel the order at any time by writing cancel or recording a voice message..");
                         session.inRequest = true;
                         await sendInteractiveButtons(from, getTranslation("change_information", session.language), [
                             { type: "reply", reply: { id: "yes_change", title: getTranslation("yes", session.language) } },
@@ -2076,8 +2076,8 @@ if (isCancellationRequest(textRaw)) {
                 const lang = session?.language || "en"; // Define lang based on session.language
         
                 await sendToWhatsApp(from, lang === 'ar'
-                    ? "🔹 يمكنك إلغاء الطلب في أي وقت عن طريق كتابة 'إلغاء'."
-                    : "🔹 You can cancel your order at any time by typing 'cancel'.");
+                    ? "🔹 يمكنك إلغاء الطلب في أي وقت عن طريق كتابة 'إلغاء'او التسجيل الصوتي."
+                    : "🔹 You can cancel the order at any time by writing cancel or recording a voice message..");
         
                 // Extract information from the user's message
                 const extractedData = await extractInformationFromText(textRaw, session.language);
