@@ -1505,11 +1505,12 @@ const downloadFile = async (url, filePath) => {
 };
 
 // Function to transcribe a voice file using OpenAI's Whisper API
-const transcribeVoiceMessage = async (filePath) => {
+const transcribeVoiceMessage = async (filePath, language) => {
     try {
         const transcription = await openai.audio.transcriptions.create({
             file: fs.createReadStream(filePath),
             model: "whisper-1",
+            language: language === 'ar' ? 'ar' : 'en', // Specify the language
         });
         return transcription.text;
     } catch (error) {
@@ -1536,7 +1537,7 @@ const generateAudio = async (text, filePath) => {
     try {
         const mp3 = await openai.audio.speech.create({
             model: "tts-1",
-            voice: "alloy", // Options: alloy, echo, fable, onyx, nova, shimmer
+            voice: language === 'ar' ? 'alloy' : 'alloy', // Use a voice suitable for the language
             input: text,
         });
 
@@ -1680,7 +1681,7 @@ async function handleCancellationRequest(from, session, message, res) {
 
             // Generate audio response for cancellation
             const audioFilePath = `./temp/${Date.now()}_cancellation_response.mp3`;
-            await generateAudio(cancellationMessage, audioFilePath);
+            await generateAudio(aiResponse, audioFilePath, session.language);
 
             // Upload audio file to WhatsApp's servers
             const uploadedMediaId = await uploadMediaToWhatsApp(audioFilePath);
@@ -1849,7 +1850,7 @@ app.post('/webhook', async (req, res) => {
                 console.log("🔹 Voice file downloaded successfully:", filePath);
 
                 // Transcribe the voice file using OpenAI Whisper
-                const transcription = await transcribeVoiceMessage(filePath);
+                const transcription = await transcribeVoiceMessage(filePath, session.language);
                 if (!transcription) {
                     console.error("❌ Failed to transcribe voice message. Transcription result is empty.");
                     await sendToWhatsApp(from, "Sorry, I couldn't understand your voice message. Please try again.");
@@ -2176,7 +2177,12 @@ if (isCancellationRequest(textRaw)) {
                     const buttonId = message.interactive.button_reply.id;
                     if (buttonId === "yes_change") {
                         session.step = STATES.NAME;
-                        await sendToWhatsApp(from, "Please provide your new name.");
+                        const lang = session?.language || "en"; // Define lang based on session.language
+        
+                        await sendToWhatsApp(from, lang === 'ar'
+                            ? "🔹 من فضلك زودنا بالاسم الجديد."
+                            : "🔹 Please provide your new name.");
+                        // await sendToWhatsApp(from, "Please provide your new name.");
                     } else if (buttonId === "no_change") {
                         session.step = STATES.QUANTITY;
                         await sendQuantitySelection(from, session.language);
@@ -2256,7 +2262,12 @@ if (isCancellationRequest(textRaw)) {
                 break;
             case STATES.EMAIL:
                 if (!isValidEmail(textRaw)) {
-                    await sendToWhatsApp(from, "❌ Please provide a valid email address (e.g., example@domain.com).");
+                    const lang = session?.language || "en"; // Define lang based on session.language
+        
+                    await sendToWhatsApp(from, lang === 'ar'
+                        ? "🔹 من فضلك قم بادخال عنوان بريد صالح (مثلا example@domain.com)."
+                        : "🔹 ❌ Please provide a valid email address (e.g., example@domain.com).");
+                    // await sendToWhatsApp(from, "❌ Please provide a valid email address (e.g., example@domain.com).");
                     return res.sendStatus(200);
                 }
                 session.data.email = textRaw;
@@ -2454,7 +2465,12 @@ if (isCancellationRequest(textRaw)) {
             case "ASK_NAME":
                 // If the user hasn't provided a name yet, ask for it
                 if (!textRaw) {
-                    await sendToWhatsApp(from, "👤 Please provide your full name.");
+                    const lang = session?.language || "en"; // Define lang based on session.language
+        
+                    await sendToWhatsApp(from, lang === 'ar'
+                        ? "👤 من فضلك زودنا بالاسم"
+                        : "👤 Please provide your full name.");
+                    // await sendToWhatsApp(from, "👤 Please provide your full name.");
                     return res.sendStatus(200); // Exit and wait for the user's response
                 }
                 // If the name is provided, store it and proceed to the next step
@@ -2472,6 +2488,10 @@ if (isCancellationRequest(textRaw)) {
             case "ASK_PHONE":
                 // If the user hasn't provided a phone number yet, ask for it
                 if (!textRaw) {
+                    const lang = session?.language || "en"; // Define lang based on session.language
+                    await sendToWhatsApp(from, lang === 'ar'
+                        ? "📞 زودنا برقم هاتفك"
+                        : "📞 Please provide your phone number.");
                     await sendToWhatsApp(from, "📞 Please provide your phone number.");
                     return res.sendStatus(200); // Exit and wait for the user's response
                 }
@@ -2495,12 +2515,20 @@ if (isCancellationRequest(textRaw)) {
             case "ASK_EMAIL":
                 // If the user hasn't provided an email yet, ask for it
                 if (!textRaw) {
-                    await sendToWhatsApp(from, "✉️ Could you please share your email address? We'll use it for sending updates on your order.");
+                    const lang = session?.language || "en"; // Define lang based on session.language
+        
+                    await sendToWhatsApp(from, lang === 'ar'
+                        ? "✉️ من فضلك زودنا ببريدك الالكتروني"
+                        : "✉️ Could you please share your email address?");
+                    // await sendToWhatsApp(from, "✉️ Could you please share your email address? We'll use it for sending updates on your order.");
                     return res.sendStatus(200); // Exit and wait for the user's response
                 }
                 // Validate the email after the user provides it
                 if (!isValidEmail(textRaw)) {
-                    await sendToWhatsApp(from, "❌ Invalid email address, please enter a valid one (e.g., example@domain.com).");
+                    await sendToWhatsApp(from, lang === 'ar'
+                        ? "🔹 من فضلك قم بادخال عنوان بريد صالح (مثلا example@domain.com)."
+                        : "🔹 ❌ Please provide a valid email address (e.g., example@domain.com).");
+                    // await sendToWhatsApp(from, "❌ Invalid email address, please enter a valid one (e.g., example@domain.com).");
                     return res.sendStatus(200); // Exit and wait for the user to correct their input
                 }
                 // If the email is valid, store it and proceed to the next step
@@ -2617,7 +2645,9 @@ if (isCancellationRequest(textRaw)) {
                             if (!validation.isValid) {
                                 await sendToWhatsApp(
                                     from,
-                                    `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`
+                                    session.language === 'ar'
+                                        ? `❌ المدينة المحددة (${session.data.city}) لا تتطابق مع موقعك الفعلي (${validation.actualCity}). يرجى اختيار المدينة الصحيحة.`
+                                        : `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`
                                 );
                                 return res.sendStatus(200);
                             }
@@ -2625,7 +2655,12 @@ if (isCancellationRequest(textRaw)) {
 
                         moveToNextStep(session, from);
                     } else {
-                        await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
+                        await sendToWhatsApp(
+                            from,
+                            session.language === 'ar'
+                                ? "❌ مدينة غير صالحة. يرجى اختيار مدينة صالحة من الخيارات المتاحة."
+                                : "❌ Invalid city. Please select a valid city from the options."
+                        );
                         await sendCitySelection(from, session.language);
                     }
                 }
@@ -2647,7 +2682,9 @@ if (isCancellationRequest(textRaw)) {
                             if (!validation.isValid) {
                                 await sendToWhatsApp(
                                     from,
-                                    `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`
+                                    session.language === 'ar'
+                                        ? `❌ المدينة المحددة (${session.data.city}) لا تتطابق مع موقعك الفعلي (${validation.actualCity}). يرجى اختيار المدينة الصحيحة.`
+                                        : `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`
                                 );
                                 return res.sendStatus(200);
                             }
@@ -2655,21 +2692,36 @@ if (isCancellationRequest(textRaw)) {
 
                         moveToNextStep(session, from);
                     } else {
-                        await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
-                        await sendCitySelection(from, session.language);
+                        await sendToWhatsApp(
+                            from,
+                            session.language === 'ar'
+                                ? "❌ مدينة غير صالحة. يرجى اختيار مدينة صالحة من الخيارات المتاحة."
+                                : "❌ Invalid city. Please select a valid city from the options."
+                        );                      
+                          await sendCitySelection(from, session.language);
                     }
                 }
                 // Handle invalid input
                 else {
-                    await sendToWhatsApp(from, "❌ Invalid input. Please select a city from the options.");
-                    await sendCitySelection(from, session.language);
+                    await sendToWhatsApp(
+                        from,
+                        session.language === 'ar'
+                            ? "❌ إدخال غير صالح. يرجى اختيار مدينة من الخيارات المتاحة."
+                            : "❌ Invalid input. Please select a city from the options."
+                    );
+                                        await sendCitySelection(from, session.language);
                 }
                 break;
             case "ASK_STREET":
                 // If the user hasn't provided a street name yet, ask for it
                 if (!textRaw) {
-                    await sendToWhatsApp(from, "🛣️ Please provide your street name.");
-                    return res.sendStatus(200); // Exit and wait for the user's response
+                    await sendToWhatsApp(
+                        from,
+                        session.language === 'ar'
+                            ? "🛣️ يرجى تقديم اسم الشارع الخاص بك."
+                            : "🛣️ Please provide your street name."
+                    );
+                     return res.sendStatus(200); // Exit and wait for the user's response
                 }
                 // If the street name is provided, store it and proceed to the next step
                 session.data.street = textRaw;
@@ -2686,7 +2738,12 @@ if (isCancellationRequest(textRaw)) {
             case "ASK_BUILDING_NAME":
                 // If the user hasn't provided a building name yet, ask for it
                 if (!textRaw) {
-                    await sendToWhatsApp(from, "🏢 Please provide your building name.");
+                    await sendToWhatsApp(
+                        from,
+                        session.language === 'ar'
+                            ? "🏢 يرجى تقديم اسم المبنى الخاص بك."
+                            : "🏢 Please provide your building name."
+                    );
                     return res.sendStatus(200); // Exit and wait for the user's response
                 }
                 // If the building name is provided, store it and proceed to the next step
@@ -2704,7 +2761,12 @@ if (isCancellationRequest(textRaw)) {
             case "ASK_FLAT_NO":
                 // If the user hasn't provided a flat number yet, ask for it
                 if (!textRaw) {
-                    await sendToWhatsApp(from, "🏠 Please provide your flat number.");
+                    await sendToWhatsApp(
+                        from,
+                        session.language === 'ar'
+                            ? "🏠 يرجى تقديم رقم الشقة الخاص بك."
+                            : "🏠 Please provide your flat number."
+                    );
                     return res.sendStatus(200); // Exit and wait for the user's response
                 }
                 // If the flat number is provided, store it and proceed to the next step
@@ -2795,8 +2857,13 @@ if (isCancellationRequest(textRaw)) {
 
                             if (response.status === 200) {
                                 console.log('API Response:', response.data);
-                                await sendToWhatsApp(from, "✅ Your request has been successfully submitted! We will contact you soon.");
-                            } else {
+                                await sendToWhatsApp(
+                                    from,
+                                    session.language === 'ar'
+                                        ? "✅ تم تقديم طلبك بنجاح! سنتواصل معك قريبًا."
+                                        : "✅ Your request has been successfully submitted! We will contact you soon."
+                                );
+                                } else {
                                 console.error(`❌ API returned unexpected status code: ${response.status}`);
                                 await sendToWhatsApp(from, "❌ An error occurred. Please try again later.");
                             }
@@ -2806,21 +2873,41 @@ if (isCancellationRequest(textRaw)) {
                                 console.error('API Status Code:', error.response.status);
                                 // Explicitly check for status code 422
                                 if (error.response.status === 422) {
-                                    await sendToWhatsApp(from, "❌ Your phone number must be Emirati to proceed with this request.");
-                                } else {
-                                    await sendToWhatsApp(from, "❌ An error occurred while submitting your request. Please try again later.");
-                                }
+                                    await sendToWhatsApp(
+                                        from,
+                                        session.language === 'ar'
+                                            ? "❌ يجب أن يكون رقم هاتفك إماراتيًا للمتابعة في هذا الطلب."
+                                            : "❌ Your phone number must be Emirati to proceed with this request."
+                                    );                                } 
+                                    else {
+                                        await sendToWhatsApp(
+                                            from,
+                                            session.language === 'ar'
+                                                ? "❌ حدث خطأ أثناء تقديم طلبك. يرجى المحاولة مرة أخرى لاحقًا."
+                                                : "❌ An error occurred while submitting your request. Please try again later."
+                                        );
+                                                                    }
                             } else {
                                 console.error('Network or request error:', error.message);
-                                await sendToWhatsApp(from, "❌ Unable to reach the server. Please check your internet connection and try again.");
-                            }
+                                await sendToWhatsApp(
+                                    from,
+                                    session.language === 'ar'
+                                        ? "❌ تعذر الوصول إلى الخادم. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى."
+                                        : "❌ Unable to reach the server. Please check your internet connection and try again."
+                                );
+                                                        }
                         }
                         delete userSessions[from];
 
                     } else if (buttonId === "no_correct") {
                         session.step = STATES.MODIFY;
-                        await sendToWhatsApp(from, "Which information would you like to modify? Please reply with the corresponding number:\n\n1. Location\n2. Street\n3. Building Name\n4. Flat No\n5. Quantity");
-                    }
+                        await sendToWhatsApp(
+                            from,
+                            session.language === 'ar'
+                                ? "أي معلومات تريد تعديلها؟ يرجى الرد بالرقم المقابل:\n\n1. الموقع\n2. الشارع\n3. اسم المبنى\n4. رقم الشقة\n5. الكمية"
+                                : "Which information would you like to modify? Please reply with the corresponding number:\n\n1. Location\n2. Street\n3. Building Name\n4. Flat No\n5. Quantity"
+                        );
+                                        }
                 }
                 break;
 
@@ -2829,8 +2916,12 @@ if (isCancellationRequest(textRaw)) {
                 const normalizedText = convertArabicNumbers(text);
                 const fieldToModify = parseInt(normalizedText);
                 if (isNaN(fieldToModify) || fieldToModify < 1 || fieldToModify > 6) {
-                    await sendToWhatsApp(from, "❌ Invalid option. Please choose a number between 1 and 11.");
-                    return res.sendStatus(200);
+                    await sendToWhatsApp(
+                        from,
+                        session.language === 'ar'
+                            ? "❌ خيار غير صالح. يرجى اختيار رقم بين 1 و 5."
+                            : "❌ Invalid option. Please choose a number between 1 and 5."
+                    );                    return res.sendStatus(200);
                 }
 
                 const fieldMap = {
@@ -2858,8 +2949,13 @@ if (isCancellationRequest(textRaw)) {
                 else {
                     session.modifyField = selectedField;
                     session.step = `MODIFY_${selectedField.toUpperCase()}`;
-                    await sendToWhatsApp(from, `🔹 Please provide the new value for ${selectedField.replace(/_/g, " ")}.`);
-                }
+                    await sendToWhatsApp(
+                        from,
+                        session.language === 'ar'
+                            ? `🔹 يرجى تقديم القيمة الجديدة لـ ${selectedField.replace(/_/g, " ")}.`
+                            : `🔹 Please provide the new value for ${selectedField.replace(/_/g, " ")}.`
+                    );
+                                }
                 break;
             case "MODIFY_LOCATION":
                 // If the user hasn't shared their location yet, ask for it
@@ -2934,7 +3030,9 @@ if (isCancellationRequest(textRaw)) {
                             if (!validation.isValid) {
                                 await sendToWhatsApp(
                                     from,
-                                    `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`
+                                    session.language === 'ar'
+                                        ? `❌ المدينة المحددة (${session.data.city}) لا تتطابق مع موقعك الفعلي (${validation.actualCity}). يرجى اختيار المدينة الصحيحة.`
+                                        : `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`
                                 );
                                 return res.sendStatus(200);
                             }
@@ -2942,8 +3040,13 @@ if (isCancellationRequest(textRaw)) {
 
                         moveToNextStep(session, from);
                     } else {
-                        await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
-                        await sendCitySelection(from, session.language);
+                        await sendToWhatsApp(
+                            from,
+                            session.language === 'ar'
+                                ? "❌ مدينة غير صالحة. يرجى اختيار مدينة صالحة من الخيارات المتاحة."
+                                : "❌ Invalid city. Please select a valid city from the options."
+                        );
+                                                await sendCitySelection(from, session.language);
                     }
                 }
                 // Handle text input
@@ -2966,7 +3069,9 @@ if (isCancellationRequest(textRaw)) {
                             if (!validation.isValid) {
                                 await sendToWhatsApp(
                                     from,
-                                    `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`
+                                    session.language === 'ar'
+                                        ? `❌ المدينة المحددة (${session.data.city}) لا تتطابق مع موقعك الفعلي (${validation.actualCity}). يرجى اختيار المدينة الصحيحة.`
+                                        : `❌ Your selected city (${session.data.city}) does not match your detected location (${validation.actualCity}). Please select the correct city.`
                                 );
                                 return res.sendStatus(200);
                             }
@@ -2974,14 +3079,24 @@ if (isCancellationRequest(textRaw)) {
 
                         moveToNextStep(session, from);
                     } else {
-                        await sendToWhatsApp(from, "❌ Invalid city. Please select a valid city from the options.");
-                        await sendCitySelection(from, session.language);
+                        await sendToWhatsApp(
+                            from,
+                            session.language === 'ar'
+                                ? "❌ مدينة غير صالحة. يرجى اختيار مدينة صالحة من الخيارات المتاحة."
+                                : "❌ Invalid city. Please select a valid city from the options."
+                        );
+                                                await sendCitySelection(from, session.language);
                     }
                 }
                 // Handle invalid input
                 else {
-                    await sendToWhatsApp(from, "❌ Invalid input. Please select a city from the options.");
-                    await sendCitySelection(from, session.language);
+                    await sendToWhatsApp(
+                        from,
+                        session.language === 'ar'
+                            ? "❌ إدخال غير صالح. يرجى اختيار مدينة من الخيارات المتاحة."
+                            : "❌ Invalid input. Please select a city from the options."
+                    );
+                                        await sendCitySelection(from, session.language);
                 }
                 break;
             case "MODIFY_STREET":
