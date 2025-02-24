@@ -2407,8 +2407,8 @@ if (isCancellationRequest(textRaw)) {
                         await sendQuantitySelection(from, session.language);
                         return res.sendStatus(200);
                     }
-
-                    const quantity = parseInt(textRaw.trim(), 10);
+                    const convertedTextRaw = convertArabicNumbers(textRaw.trim());
+                    const quantity = parseInt(convertedTextRaw.trim(), 10);
 
                     if (isNaN(quantity) || quantity < 10) {
                         console.log("🔹 Invalid quantity or less than 10 provided. Asking for a valid quantity.");
@@ -2729,8 +2729,8 @@ if (isCancellationRequest(textRaw)) {
                         await sendQuantitySelection(from, session.language);
                         return res.sendStatus(200);
                     }
-
-                    const quantity = parseInt(textRaw.trim(), 10);
+                    const convertedTextRaw = convertArabicNumbers(textRaw.trim());
+                    const quantity = parseInt(convertedTextRaw.trim(), 10);
 
                     if (isNaN(quantity) || quantity < 10) {
                         console.log("🔹 Invalid quantity or less than 10 provided. Asking for a valid quantity.");
