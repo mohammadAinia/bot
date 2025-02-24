@@ -1278,13 +1278,27 @@ const validateCityAndLocation = async (latitude, longitude, selectedCity) => {
         );
         const actualCity = response.data.city;
 
+        // Map Arabic city names to their English equivalents
+        const cityMap = {
+            "أبو ظبي": "Abu Dhabi",
+            "دبي": "Dubai",
+            "الشارقة": "Sharjah",
+            "عجمان": "Ajman",
+            "أم القيوين": "Umm Al Quwain",
+            "رأس الخيمة": "Ras Al Khaimah",
+            "الفجيرة": "Fujairah"
+        };
+
+        // Normalize selected city (convert Arabic to English if necessary)
+        const normalizedSelectedCity = cityMap[selectedCity] || selectedCity;
+
         // Normalize city names for comparison
-        const normalizedSelectedCity = selectedCity.toLowerCase().trim();
-        const normalizedActualCity = actualCity.toLowerCase().trim();
+        const normalizedSelectedCityLower = normalizedSelectedCity.toLowerCase().trim();
+        const normalizedActualCityLower = actualCity.toLowerCase().trim();
 
         // Return both the validation result and the actual city name
         return {
-            isValid: normalizedSelectedCity === normalizedActualCity,
+            isValid: normalizedSelectedCityLower === normalizedActualCityLower,
             actualCity: actualCity
         };
     } catch (error) {
@@ -3036,6 +3050,7 @@ if (isCancellationRequest(textRaw)) {
         res.sendStatus(500);
     }
 })
+app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
 
 
 
@@ -5792,7 +5807,6 @@ if (isCancellationRequest(textRaw)) {
         // }
 
 
-app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
 
 
 
