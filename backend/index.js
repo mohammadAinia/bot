@@ -1455,7 +1455,7 @@ async function handleCancellationRequest(from, session, message, res) {
 
             // Generate audio response for cancellation
             const audioFilePath = `./temp/${Date.now()}_cancellation_response.mp3`;
-            await generateAudio(aiResponse, audioFilePath, session.language);
+            await generateAudio(cancellationMessage, audioFilePath, session.language);
 
             // Upload audio file to WhatsApp's servers
             const uploadedMediaId = await uploadMediaToWhatsApp(audioFilePath);
