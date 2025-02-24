@@ -1509,7 +1509,7 @@ const getTranslation = (key, language) => {
     return translations[key][language];
 };
 
-const SESSION_TIMEOUT = 60 * 60 * 1000; // 2 minutes in milliseconds (for testing)
+const SESSION_TIMEOUT = 60 * 60 * 1000; // 1 hour in milliseconds (for testing)
 
 // Function to clean up inactive sessions
 const cleanupInactiveSessions = async () => {
