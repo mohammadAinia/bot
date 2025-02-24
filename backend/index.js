@@ -32,7 +32,7 @@ if (!fs.existsSync('./temp')) {
 }
 
 const app = express();
-const PORT = process.env.PORT || 51030;
+const PORT = process.env.PORT || 5000;
 const VERIFY_TOKEN = "Mohammad";
 
 app.use(cors());
