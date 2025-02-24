@@ -1509,21 +1509,30 @@ const getTranslation = (key, language) => {
     return translations[key][language];
 };
 
-const SESSION_TIMEOUT = 2 * 60 * 1000; // 15 minutes in milliseconds
+const SESSION_TIMEOUT = 2 * 60 * 1000; // 2 minutes in milliseconds (for testing)
 
 // Function to clean up inactive sessions
-const cleanupInactiveSessions = () => {
+const cleanupInactiveSessions = async () => {
     const now = Date.now();
     for (const [user, session] of Object.entries(userSessions)) {
         if (now - session.lastActivityTimestamp > SESSION_TIMEOUT) {
             console.log(`💥 Destroying inactive session for user ${user}`);
+
+            // Notify the user that their session has expired
+            await sendToWhatsApp(
+                user,
+                session.language === 'ar'
+                    ? "❌ انتهت جلستك بسبب عدم النشاط. يرجى البدء من جديد إذا كنت بحاجة إلى المساعدة."
+                    : "❌ Your session has expired due to inactivity. Please start over if you need assistance."
+            );
+
             delete userSessions[user]; // Remove the session
         }
     }
 };
 
-// Run the cleanup function every 5 minutes
-setInterval(cleanupInactiveSessions, 3 * 60 * 1000);
+// Run the cleanup function every 1 minute (for testing)
+setInterval(cleanupInactiveSessions, 1 * 60 * 1000);
 
 // Webhook endpoint
 app.post('/webhook', async (req, res) => {
@@ -1558,9 +1567,6 @@ app.post('/webhook', async (req, res) => {
 
         if (session && Date.now() - session.lastActivityTimestamp > SESSION_TIMEOUT) {
             console.log(`💥 Session expired for user ${from}. Starting a new session.`);
-            await sendToWhatsApp(from, session.language === 'ar'
-                ? "💥انتهت صلاحية الجلسة لعدم نشاطك نرجو البدء من جديد"
-                : "💥Session expired due to inactivity. Please start again.");
             delete userSessions[from]; // Destroy the expired session
             session = null; // Force the creation of a new session
 
