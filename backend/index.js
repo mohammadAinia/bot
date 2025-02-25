@@ -1940,12 +1940,22 @@ app.post('/webhook', async (req, res) => {
             } else {
                 // If the message is not a request, treat it as a general message
                 const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-                const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
 
-                await sendInteractiveButtons(from, reply, [
-                    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-                    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-                ]);
+                if (session.inRequest) {
+                    // User has started a request
+                    const lang = session?.language || "en"; // Define lang based on session.language
+                    await sendToWhatsApp(from, `${aiResponse}\n\n${lang === 'ar'
+                        ? "🔹من فضلك اكمل اجراءات الطلب"
+                        : "🔹Please complete the application process."}`);
+                } else {
+                    // User has not started a request
+                    const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+                    await sendInteractiveButtons(from, reply, [
+                        { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+                        { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+                    ]);
+                }
+
             }
             return res.sendStatus(200);
         }
