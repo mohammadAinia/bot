@@ -1571,6 +1571,7 @@ app.post('/webhook', async (req, res) => {
             session = null; // Force the creation of a new session
 
         }
+        console.log("🔹 Session State:", session); // Log the session state
 
         // Update lastActivityTimestamp for active sessions
         if (session) {
@@ -1579,6 +1580,8 @@ app.post('/webhook', async (req, res) => {
 
         const messageId = message.id; // Get the message ID for reactions
         let textRaw = message.text?.body || "";
+        console.log("🔹 User Action:", textRaw); // Log the user's message
+
 
         // Get an emoji reaction based on the user's message
         const emoji = await getEmojiReaction(textRaw, session?.language || "en");
