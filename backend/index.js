@@ -10,9 +10,6 @@ import mime from 'mime-types';
 import path from 'path';
 import FormData from 'form-data';
 
-//
-//
-//
 
 dotenv.config();
 
