@@ -33,7 +33,7 @@ if (!fs.existsSync('./temp')) {
 
 const app = express();
 const PORT = process.env.PORT || 51030;
-const VERIFY_TOKEN = "Mohammad";
+const VERIFY_TOKEN = "5IG[@ZFuM754";
 
 app.use(cors());
 app.use(bodyParser.json());
