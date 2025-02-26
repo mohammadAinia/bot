@@ -39,10 +39,10 @@ app.use(bodyParser.json());
 app.get("/webhook", (req, res) => {
     if (req.query["hub.mode"] === "subscribe" && req.query["hub.verify_token"] === VERIFY_TOKEN) {
         console.log("Webhook verified successfully!");
-        res.send('webhook is running');
-        res.status(200).send(req.query["hub.challenge"]);
+        res.status(200).send(req.query["hub.challenge"]); // Send the challenge
     } else {
-        res.sendStatus(403);
+        console.log("Webhook verification failed!");
+        res.sendStatus(403); // Send 403 Forbidden
     }
 });
 
