@@ -2995,4 +2995,24 @@ app.post('/webhook', async (req, res) => {
         res.sendStatus(500);
     }
 })
+app.post('/test-openai', async (req, res) => {
+    try {
+        const { userMessage, context, language } = req.body;
+        const response = await getOpenAIResponse(userMessage, context, language);
+        res.status(200).json({ response });
+    } catch (error) {
+        console.error('❌ Error testing OpenAI:', error);
+        res.status(500).json({ error: 'Failed to get OpenAI response' });
+    }
+});
+app.post('/test-whatsapp', async (req, res) => {
+    try {
+        const { to, message } = req.body;
+        await sendToWhatsApp(to, message);
+        res.status(200).json({ success: true, message: 'Message sent to WhatsApp' });
+    } catch (error) {
+        console.error('❌ Error sending WhatsApp message:', error);
+        res.status(500).json({ error: 'Failed to send WhatsApp message' });
+    }
+});
 app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
