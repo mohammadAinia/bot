@@ -12,7 +12,7 @@ import FormData from 'form-data';
 
 //
 //
-
+//
 
 dotenv.config();
 
@@ -39,13 +39,13 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Webhook verification
-// app.get("/webhook", (req, res) => {
-//     if (req.query["hub.mode"] === "subscribe" && req.query["hub.verify_token"] === VERIFY_TOKEN) {
-//         res.status(200).send(req.query["hub.challenge"]);
-//     } else {
-//         res.sendStatus(403);
-//     }
-// });
+app.get("/webhook", (req, res) => {
+    if (req.query["hub.mode"] === "subscribe" && req.query["hub.verify_token"] === VERIFY_TOKEN) {
+        res.status(200).send(req.query["hub.challenge"]);
+    } else {
+        res.sendStatus(403);
+    }
+});
 
 // Default route
 app.get('/', (req, res) => {
