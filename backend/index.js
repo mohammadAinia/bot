@@ -30,7 +30,7 @@ if (!fs.existsSync('./temp')) {
 
 const app = express();
 const PORT = process.env.PORT || 51030;
-const VERIFY_TOKEN = "ahmed";
+const VERIFY_TOKEN = "5IG[@ZFuM754";
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -38,6 +38,7 @@ app.use(bodyParser.json());
 // Webhook verification
 app.get("/webhook", (req, res) => {
     if (req.query["hub.mode"] === "subscribe" && req.query["hub.verify_token"] === VERIFY_TOKEN) {
+        console.log("Webhook verified successfully!");
         res.status(200).send(req.query["hub.challenge"]);
     } else {
         res.sendStatus(403);
