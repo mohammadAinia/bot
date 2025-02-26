@@ -1436,13 +1436,13 @@ async function handleCancellationRequest(from, session, message, res) {
     try {
         // Check if the user is in a request flow
         if (session.inRequest) {
+            // Check if the user is registered
+            const user = await checkUserRegistration(from);
+
             // Reset the session but preserve user registration data
             userSessions[from] = {
                 step: STATES.WELCOME,
-                data: {
-                    ...session.data, // <-- Preserve existing user data (e.g., name, phone, etc.)
-                    // Clear request-specific data here if needed
-                },
+                data: user || { ...session.data }, // Use registered user data if available, otherwise preserve existing data
                 language: session.language,
                 inRequest: false,
                 lastTimestamp: Number(message.timestamp)
@@ -1872,13 +1872,13 @@ app.post('/webhook', async (req, res) => {
         // Check for cancellation requests
         if (isCancellationRequest(textRaw)) {
             if (session.inRequest) {
+                // Check if the user is registered
+                const user = await checkUserRegistration(from);
+        
                 // Reset the session but preserve user registration data
                 userSessions[from] = {
                     step: STATES.WELCOME,
-                    data: {
-                        ...session.data, // <-- Preserve existing user data (e.g., name, phone, etc.)
-                        // Clear request-specific data here if needed
-                    },
+                    data: user || { ...session.data }, // Use registered user data if available, otherwise preserve existing data
                     language: session.language,
                     inRequest: false,
                     lastTimestamp: Number(message.timestamp)
