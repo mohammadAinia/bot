@@ -1814,6 +1814,9 @@ app.post('/webhook', async (req, res) => {
                         ? "🔹 يمكنك إلغاء الطلب في أي وقت عن طريق كتابة 'إلغاء'."
                         : "🔹 You can cancel your order at any time by typing 'cancel'.");
                     session.inRequest = true;
+                    if (!session.data.phone) {
+                        session.data.phone = from; // Use the WhatsApp number as the default phone number
+                    }
                     session.step = STATES.NAME;
                     await sendToWhatsApp(from, session.language === 'ar'
                         ? "من فضلك قم بإدخال اسمك."
@@ -1925,6 +1928,9 @@ app.post('/webhook', async (req, res) => {
                 } else {
                     // User is not registered, start collecting information
                     session.data = { ...session.data, ...extractedData }; // Merge extracted data with session data
+                    if (!session.data.phone) {
+                        session.data.phone = from; // Use the WhatsApp number as the default phone number
+                    }
 
                     // Check for missing fields
                     const missingFields = getMissingFields(session.data);
