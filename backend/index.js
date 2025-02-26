@@ -1436,10 +1436,13 @@ async function handleCancellationRequest(from, session, message, res) {
     try {
         // Check if the user is in a request flow
         if (session.inRequest) {
-            // Reset the session
+            // Reset the session but preserve user registration data
             userSessions[from] = {
                 step: STATES.WELCOME,
-                data: {},
+                data: {
+                    ...session.data, // <-- Preserve existing user data (e.g., name, phone, etc.)
+                    // Clear request-specific data here if needed
+                },
                 language: session.language,
                 inRequest: false,
                 lastTimestamp: Number(message.timestamp)
@@ -1869,31 +1872,32 @@ app.post('/webhook', async (req, res) => {
         // Check for cancellation requests
         if (isCancellationRequest(textRaw)) {
             if (session.inRequest) {
-                // Reset the session
+                // Reset the session but preserve user registration data
                 userSessions[from] = {
                     step: STATES.WELCOME,
-                    data: {},
+                    data: {
+                        ...session.data, // <-- Preserve existing user data (e.g., name, phone, etc.)
+                        // Clear request-specific data here if needed
+                    },
                     language: session.language,
                     inRequest: false,
                     lastTimestamp: Number(message.timestamp)
                 };
-
+        
                 // Notify the user
                 const lang = session?.language || "en"; // Define lang based on session.language
-
+        
                 await sendToWhatsApp(from, lang === 'ar'
-                    ? "🔹 تم الغاء الطلب بنجاح'."
-                    : "🔹Your order has been cancelled. You can start a new request anytime.");
-                // await sendToWhatsApp(from, "Your order has been cancelled. You can start a new request anytime.");
+                    ? "🔹 تم إلغاء الطلب بنجاح. يمكنك بدء طلب جديد في أي وقت."
+                    : "🔹 Your order has been cancelled. You can start a new request anytime.");
                 return res.sendStatus(200);
             } else {
                 // If the user is not in a request, inform them
                 const lang = session?.language || "en"; // Define lang based on session.language
-
+        
                 await sendToWhatsApp(from, lang === 'ar'
-                    ? "🔹ليس لدك طلب للالغاء'."
-                    : "🔹You don't have an active order to cancel.");
-                // await sendToWhatsApp(from, "You don't have an active order to cancel.");
+                    ? "🔹 ليس لديك طلب نشط للإلغاء."
+                    : "🔹 You don't have an active order to cancel.");
                 return res.sendStatus(200);
             }
         }
