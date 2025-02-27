@@ -477,13 +477,25 @@ const sendInteractiveButtons = async (to, message, buttons) => {
             to: to,
             type: "interactive",
             interactive: {
-                type: "cta_url", // Use "cta_url" for location request buttons
+                type: "button",
                 body: { text: truncatedMessage }, // Use truncated message
                 action: {
-                    name: "location_request",
-                    parameters: {
-                        type: "location"
-                    }
+                    buttons: buttons.map(button => {
+                        if (button.type === "location_request") {
+                            return {
+                                type: "location_request",
+                                title: button.title || "📍 Send Location"
+                            };
+                        } else {
+                            return {
+                                type: "reply",
+                                reply: {
+                                    id: button.reply.id,
+                                    title: button.reply.title
+                                }
+                            };
+                        }
+                    })
                 }
             }
         };
@@ -907,7 +919,9 @@ const getButtonTitle = (buttonId, language) => {
     return buttonTitles[buttonId]?.[language] || buttonTitles[buttonId]?.en || buttonId;
 };
 function getContactMessage(language) {
-    return language === 'ar' ? '📞 يمكنك الاتصال بنا على info@lootahbiofuels.com أو الاتصال على +971 589826398.' : '📞 You can contact us at info@lootahbiofuels.com or call +971 589826398.';
+    return language === 'ar'
+        ? 'نحن سعداء بالتواصل معك عبر البريد الإلكتروني:\ninfo@lootahbiofuels.com\nأو رقم الهاتف:\n+971 589826398'
+        : 'We are happy to communicate with you via email:\ninfo@lootahbiofuels.com\nor mobile number:\n+971 589826398';
 }
 function getNameMessage(language) {
     return language === 'ar' ? '🔹 يرجى تقديم اسمك الكامل.' : '🔹 Please provide your full name.';
@@ -2101,48 +2115,47 @@ app.post('/webhook', async (req, res) => {
                 session.step = STATES.LONGITUDE;
                 await sendToWhatsApp(from, getLocationMessage(session.language)); // Ask for location
                 break;
-                case STATES.LONGITUDE:
-                    if (message.location) {
-                        const { latitude: lat, longitude: lng } = message.location; // Use different variable names
-                        latitude = lat;
-                        longitude = lng;
-                
-                        // Validate UAE location
-                        const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
-                        if (
-                            latitude >= UAE_BOUNDS.minLat &&
-                            latitude <= UAE_BOUNDS.maxLat &&
-                            longitude >= UAE_BOUNDS.minLng &&
-                            longitude <= UAE_BOUNDS.maxLng
-                        ) {
-                            // Reverse Geocode to get address
-                            const address = await getAddressFromCoordinates(latitude, longitude);
-                            if (address) {
-                                session.data.address = address;
-                                session.data.street = extractStreetName(address); // Store street name separately
-                            }
-                
-                            session.data.latitude = latitude;
-                            session.data.longitude = longitude;
-                            session.data.address = address; // Auto-fill address
-                            session.step = STATES.CITY; // Proceed to city selection
-                
-                            return await sendCitySelection(from, session.language); // ✅ Ask user to select city
-                        } else {
-                            await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
+            case STATES.LONGITUDE:
+                if (message.location) {
+                    const { latitude: lat, longitude: lng } = message.location; // Use different variable names
+                    latitude = lat;
+                    longitude = lng;
+
+                    // Validate UAE location
+                    const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
+                    if (
+                        latitude >= UAE_BOUNDS.minLat &&
+                        latitude <= UAE_BOUNDS.maxLat &&
+                        longitude >= UAE_BOUNDS.minLng &&
+                        longitude <= UAE_BOUNDS.maxLng
+                    ) {
+                        // Reverse Geocode to get address
+                        const address = await getAddressFromCoordinates(latitude, longitude);
+                        if (address) {
+                            session.data.address = address;
+                            session.data.street = extractStreetName(address); // Store street name separately
                         }
-                    } else if (message.text && isLink(message.text)) {
-                        // If the user sends a link instead of a location
-                        await sendToWhatsApp(from, getLocationMessage(session.language));
-                        await sendInteractiveButtons(from, getLocationMessage(session.language), []); // No buttons needed for location request
-                        session.locationPromptSent = true;
+
+                        session.data.latitude = latitude;
+                        session.data.longitude = longitude;
+                        session.data.address = address; // Auto-fill address
+                        session.step = STATES.CITY; // Proceed to city selection
+
+                        return await sendCitySelection(from, session.language); // ✅ Ask user to select city
                     } else {
-                        if (!session.locationPromptSent) {
-                            await sendInteractiveButtons(from, getLocationMessage(session.language), []); // No buttons needed for location request
-                            session.locationPromptSent = true;
-                        }
+                        await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
                     }
-                    break;
+                } else if (message.text && isLink(message.text)) {
+                    // If the user sends a link instead of a location
+                    await sendToWhatsApp(from, getLocationMessage(session.language));
+                    await sendToWhatsApp(from, "Please share your location directly using the location feature in WhatsApp. Do not send links.");
+                } else {
+                    if (!session.locationPromptSent) {
+                        await sendToWhatsApp(from, getLocationMessage(session.language));
+                        session.locationPromptSent = true;
+                    }
+                }
+                break;
 
 
             case STATES.CITY:
@@ -2375,32 +2388,17 @@ app.post('/webhook', async (req, res) => {
                 if (!message.location) {
                     // Check if the user sent a link or invalid input
                     if (message.text && isLink(message.text)) {
+                        // If the user sends a link, guide them to share their location directly
                         await sendToWhatsApp(from, getLocationMessage(session.language));
-                        await sendInteractiveButtons(from, getLocationMessage(session.language), [
-                            {
-                                type: "location_request",
-                                title: getButtonTitle("send_site", session.language) // "Send Location" button
-                            }
-                        ]);
+                        await sendToWhatsApp(from, "Please share your location directly using the location feature in WhatsApp. Do not send links.");
                         return res.sendStatus(200); // Exit and wait for the user's response
                     } else if (message.text) {
-                        // If the user sent text (not a link), prompt them to use the location button
-                        await sendToWhatsApp(from, "Please use the 'Send Location' button to share your location.");
-                        await sendInteractiveButtons(from, getLocationMessage(session.language), [
-                            {
-                                type: "location_request",
-                                title: getButtonTitle("send_site", session.language) // "Send Location" button
-                            }
-                        ]);
+                        // If the user sent text (not a link), prompt them to share their location
+                        await sendToWhatsApp(from, "Please share your location directly using the location feature in WhatsApp.");
                         return res.sendStatus(200); // Exit and wait for the user's response
                     } else {
                         // If no location is shared, prompt the user to share their location
-                        await sendInteractiveButtons(from, getLocationMessage(session.language), [
-                            {
-                                type: "location_request",
-                                title: getButtonTitle("send_site", session.language) // "Send Location" button
-                            }
-                        ]);
+                        await sendToWhatsApp(from, getLocationMessage(session.language));
                         return res.sendStatus(200); // Exit and wait for the user's response
                     }
                 }
