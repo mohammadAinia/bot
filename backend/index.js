@@ -2259,6 +2259,7 @@ app.post('/webhook', async (req, res) => {
                         return res.sendStatus(200);
                     }
                 }
+                //
                 // ✅ Handle manual input
                 else {
                     if (!textRaw || textRaw.trim() === "") {
