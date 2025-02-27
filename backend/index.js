@@ -482,11 +482,12 @@ const sendInteractiveButtons = async (to, message, buttons) => {
                 action: {
                     buttons: buttons.map(button => {
                         if (button.type === "location_request") {
+                            // For location request buttons, only include the type
                             return {
-                                type: "location_request",
-                                title: button.title || "📍 Send Location"
+                                type: "location_request"
                             };
                         } else {
+                            // For reply buttons, include the reply object
                             return {
                                 type: "reply",
                                 reply: {
@@ -2113,58 +2114,56 @@ app.post('/webhook', async (req, res) => {
                 session.step = STATES.LONGITUDE;
                 await sendToWhatsApp(from, getLocationMessage(session.language)); // Ask for location
                 break;
-            case STATES.LONGITUDE:
-                if (message.location) {
-                    const { latitude: lat, longitude: lng } = message.location; // Use different variable names
-                    latitude = lat;
-                    longitude = lng;
-
-                    // Validate UAE location
-                    const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
-                    if (
-                        latitude >= UAE_BOUNDS.minLat &&
-                        latitude <= UAE_BOUNDS.maxLat &&
-                        longitude >= UAE_BOUNDS.minLng &&
-                        longitude <= UAE_BOUNDS.maxLng
-                    ) {
-                        // Reverse Geocode to get address
-                        const address = await getAddressFromCoordinates(latitude, longitude);
-                        if (address) {
-                            session.data.address = address;
-                            session.data.street = extractStreetName(address); // Store street name separately
+                case STATES.LONGITUDE:
+                    if (message.location) {
+                        const { latitude: lat, longitude: lng } = message.location; // Use different variable names
+                        latitude = lat;
+                        longitude = lng;
+                
+                        // Validate UAE location
+                        const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
+                        if (
+                            latitude >= UAE_BOUNDS.minLat &&
+                            latitude <= UAE_BOUNDS.maxLat &&
+                            longitude >= UAE_BOUNDS.minLng &&
+                            longitude <= UAE_BOUNDS.maxLng
+                        ) {
+                            // Reverse Geocode to get address
+                            const address = await getAddressFromCoordinates(latitude, longitude);
+                            if (address) {
+                                session.data.address = address;
+                                session.data.street = extractStreetName(address); // Store street name separately
+                            }
+                
+                            session.data.latitude = latitude;
+                            session.data.longitude = longitude;
+                            session.data.address = address; // Auto-fill address
+                            session.step = STATES.CITY; // Proceed to city selection
+                
+                            return await sendCitySelection(from, session.language); // ✅ Ask user to select city
+                        } else {
+                            await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
                         }
-
-                        session.data.latitude = latitude;
-                        session.data.longitude = longitude;
-                        session.data.address = address; // Auto-fill address
-                        session.step = STATES.CITY; // Proceed to city selection
-
-                        return await sendCitySelection(from, session.language); // ✅ Ask user to select city
-                    } else {
-                        await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
-                    }
-                } else if (message.text && isLink(message.text)) {
-                    // If the user sends a link instead of a location
-                    await sendToWhatsApp(from, getLocationMessage(session.language));
-                    await sendInteractiveButtons(from, getLocationMessage(session.language), [
-                        {
-                            type: "location_request",
-                            title: getButtonTitle("send_site", session.language) // "Send Location" button
-                        }
-                    ]);
-                    session.locationPromptSent = true;
-                } else {
-                    if (!session.locationPromptSent) {
+                    } else if (message.text && isLink(message.text)) {
+                        // If the user sends a link instead of a location
+                        await sendToWhatsApp(from, getLocationMessage(session.language));
                         await sendInteractiveButtons(from, getLocationMessage(session.language), [
                             {
-                                type: "location_request",
-                                title: getButtonTitle("send_site", session.language) // "Send Location" button
+                                type: "location_request" // No title needed for location request buttons
                             }
                         ]);
                         session.locationPromptSent = true;
+                    } else {
+                        if (!session.locationPromptSent) {
+                            await sendInteractiveButtons(from, getLocationMessage(session.language), [
+                                {
+                                    type: "location_request" // No title needed for location request buttons
+                                }
+                            ]);
+                            session.locationPromptSent = true;
+                        }
                     }
-                }
-                break;
+                    break;
 
 
             case STATES.CITY:
