@@ -477,26 +477,13 @@ const sendInteractiveButtons = async (to, message, buttons) => {
             to: to,
             type: "interactive",
             interactive: {
-                type: "button",
+                type: "cta_url", // Use "cta_url" for location request buttons
                 body: { text: truncatedMessage }, // Use truncated message
                 action: {
-                    buttons: buttons.map(button => {
-                        if (button.type === "location_request") {
-                            // For location request buttons, only include the type
-                            return {
-                                type: "location_request"
-                            };
-                        } else {
-                            // For reply buttons, include the reply object
-                            return {
-                                type: "reply",
-                                reply: {
-                                    id: button.reply.id,
-                                    title: button.reply.title
-                                }
-                            };
-                        }
-                    })
+                    name: "location_request",
+                    parameters: {
+                        type: "location"
+                    }
                 }
             }
         };
@@ -2147,19 +2134,11 @@ app.post('/webhook', async (req, res) => {
                     } else if (message.text && isLink(message.text)) {
                         // If the user sends a link instead of a location
                         await sendToWhatsApp(from, getLocationMessage(session.language));
-                        await sendInteractiveButtons(from, getLocationMessage(session.language), [
-                            {
-                                type: "location_request" // No title needed for location request buttons
-                            }
-                        ]);
+                        await sendInteractiveButtons(from, getLocationMessage(session.language), []); // No buttons needed for location request
                         session.locationPromptSent = true;
                     } else {
                         if (!session.locationPromptSent) {
-                            await sendInteractiveButtons(from, getLocationMessage(session.language), [
-                                {
-                                    type: "location_request" // No title needed for location request buttons
-                                }
-                            ]);
+                            await sendInteractiveButtons(from, getLocationMessage(session.language), []); // No buttons needed for location request
                             session.locationPromptSent = true;
                         }
                     }
