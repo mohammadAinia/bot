@@ -2176,8 +2176,8 @@ app.post('/webhook', async (req, res) => {
                                 session.data.city = address.city; // Store city name separately
                             }
                             const address2 = await getAddressFromCoordinates2(latitude, longitude);
-                            if (address) {
-                                session.data.address = address;
+                            if (address2) {
+                                session.data.address = address2;
                                 // session.data.street = extractStreetName(address); // Store street name separately
                             }
                 
