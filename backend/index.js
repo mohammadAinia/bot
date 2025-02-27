@@ -919,7 +919,7 @@ const getButtonTitle = (buttonId, language) => {
     return buttonTitles[buttonId]?.[language] || buttonTitles[buttonId]?.en || buttonId;
 };
 function getContactMessage(language) {
-    return language === 'ar' ? '📞 يمكنك الاتصال بنا على support@example.com أو الاتصال على +1234567890.' : '📞 You can contact us at support@example.com or call +1234567890.';
+    return language === 'ar' ? '📞 يمكنك الاتصال بنا على info@lootahbiofuels.com أو الاتصال على +971 589826398.' : '📞 You can contact us at info@lootahbiofuels.com or call +971 589826398.';
 }
 function getNameMessage(language) {
     return language === 'ar' ? '🔹 يرجى تقديم اسمك الكامل.' : '🔹 Please provide your full name.';
@@ -978,7 +978,7 @@ function getQuantityMessage(language) {
 }
 
 function getInvalidQuantityMessage(language) {
-    return language === 'ar' ? '❌ يرجى إدخال كمية صالحة (أرقام فقط).' : '❌ Please enter a valid quantity (numeric values only).';
+    return language === 'ar' ? '❌ يرجى ادخال كمية اكبر من 10 لتر.' : '❌ Please enter quantity greater than 10 liters (numeric values only).';
 }
 
 function getConfirmationMessage(language) {
@@ -1537,6 +1537,11 @@ const cleanupInactiveSessions = async () => {
 // Run the cleanup function every 1 minute (for testing)
 setInterval(cleanupInactiveSessions, 5 * 60 * 1000);
 
+const isLink = (text) => {
+    const urlPattern = /https?:\/\/[^\s]+/;
+    return urlPattern.test(text);
+};
+
 // Webhook endpoint
 app.post('/webhook', async (req, res) => {
     try {
@@ -1874,7 +1879,7 @@ app.post('/webhook', async (req, res) => {
             if (session.inRequest) {
                 // Check if the user is registered
                 const user = await checkUserRegistration(from);
-        
+
                 // Reset the session but preserve user registration data
                 userSessions[from] = {
                     step: STATES.WELCOME,
@@ -1883,10 +1888,10 @@ app.post('/webhook', async (req, res) => {
                     inRequest: false,
                     lastTimestamp: Number(message.timestamp)
                 };
-        
+
                 // Notify the user
                 const lang = session?.language || "en"; // Define lang based on session.language
-        
+
                 await sendToWhatsApp(from, lang === 'ar'
                     ? "🔹 تم إلغاء الطلب بنجاح. يمكنك بدء طلب جديد في أي وقت."
                     : "🔹 Your order has been cancelled. You can start a new request anytime.");
@@ -1894,7 +1899,7 @@ app.post('/webhook', async (req, res) => {
             } else {
                 // If the user is not in a request, inform them
                 const lang = session?.language || "en"; // Define lang based on session.language
-        
+
                 await sendToWhatsApp(from, lang === 'ar'
                     ? "🔹 ليس لديك طلب نشط للإلغاء."
                     : "🔹 You don't have an active order to cancel.");
@@ -2129,7 +2134,6 @@ app.post('/webhook', async (req, res) => {
                             session.data.street = extractStreetName(address); // Store street name separately
                         }
 
-
                         session.data.latitude = latitude;
                         session.data.longitude = longitude;
                         session.data.address = address; // Auto-fill address
@@ -2139,6 +2143,16 @@ app.post('/webhook', async (req, res) => {
                     } else {
                         await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
                     }
+                } else if (message.text && isLink(message.text)) {
+                    // If the user sends a link instead of a location
+                    await sendToWhatsApp(from, getLocationMessage(session.language));
+                    await sendInteractiveButtons(from, getLocationMessage(session.language), [
+                        {
+                            type: "location_request",
+                            title: getButtonTitle("send_site", session.language) // "Send Location" button
+                        }
+                    ]);
+                    session.locationPromptSent = true;
                 } else {
                     if (!session.locationPromptSent) {
                         await sendInteractiveButtons(from, getLocationMessage(session.language), [
@@ -2381,19 +2395,44 @@ app.post('/webhook', async (req, res) => {
             case "ASK_LOCATION":
                 // If the user hasn't shared their location yet, ask for it
                 if (!message.location) {
-                    // Send a message with a button to share location
-                    await sendInteractiveButtons(from, getLocationMessage(session.language), [
-                        {
-                            type: "location_request",
-                            title: getButtonTitle("send_site", session.language) // "Send Location" button
-                        }
-                    ]);
-                    return res.sendStatus(200); // Exit and wait for the user's response
+                    // Check if the user sent a link or invalid input
+                    if (message.text && isLink(message.text)) {
+                        await sendToWhatsApp(from, getLocationMessage(session.language));
+                        await sendInteractiveButtons(from, getLocationMessage(session.language), [
+                            {
+                                type: "location_request",
+                                title: getButtonTitle("send_site", session.language) // "Send Location" button
+                            }
+                        ]);
+                        return res.sendStatus(200); // Exit and wait for the user's response
+                    } else if (message.text) {
+                        // If the user sent text (not a link), prompt them to use the location button
+                        await sendToWhatsApp(from, "Please use the 'Send Location' button to share your location.");
+                        await sendInteractiveButtons(from, getLocationMessage(session.language), [
+                            {
+                                type: "location_request",
+                                title: getButtonTitle("send_site", session.language) // "Send Location" button
+                            }
+                        ]);
+                        return res.sendStatus(200); // Exit and wait for the user's response
+                    } else {
+                        // If no location is shared, prompt the user to share their location
+                        await sendInteractiveButtons(from, getLocationMessage(session.language), [
+                            {
+                                type: "location_request",
+                                title: getButtonTitle("send_site", session.language) // "Send Location" button
+                            }
+                        ]);
+                        return res.sendStatus(200); // Exit and wait for the user's response
+                    }
                 }
+
                 // If the location is shared, store it and proceed to the next step
                 const { latitude: lat2, longitude: lng2 } = message.location; // Use different variable names
                 latitude = lat2;
-                longitude = lng2;                // Validate UAE location
+                longitude = lng2;
+
+                // Validate UAE location
                 const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
                 if (
                     latitude >= UAE_BOUNDS.minLat &&
@@ -2401,28 +2440,40 @@ app.post('/webhook', async (req, res) => {
                     longitude >= UAE_BOUNDS.minLng &&
                     longitude <= UAE_BOUNDS.maxLng
                 ) {
-                    const address = await getAddressFromCoordinates(latitude, longitude);
-                    if (address) {
-                        session.data.address = address;
-                        // session.data.street = extractStreetName(address); // Store street name separately
-                    }
-                    session.data.address = address; // Auto-fill address
-                    session.data.latitude = latitude;
-                    session.data.longitude = longitude;
-                    // Check for other missing fields
-                    const missingFields = getMissingFields(session.data);
-                    if (missingFields.length === 0) {
-                        session.step = STATES.CONFIRMATION;
-                        await sendOrderSummary(from, session);
-                    } else {
-                        console.log("hi" + session.data.latitude, "hii" + session.data.latitude)
-                        session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                        await askForNextMissingField(session, from);
+                    try {
+                        // Reverse geocode to get the address
+                        const address = await getAddressFromCoordinates(latitude, longitude);
+                        if (address) {
+                            session.data.address = address;
+                            // session.data.street = extractStreetName(address); // Uncomment if needed
+                        }
+
+                        // Store location data in the session
+                        session.data.latitude = latitude;
+                        session.data.longitude = longitude;
+
+                        // Check for other missing fields
+                        const missingFields = getMissingFields(session.data);
+                        if (missingFields.length === 0) {
+                            // If no fields are missing, proceed to confirmation
+                            session.step = STATES.CONFIRMATION;
+                            await sendOrderSummary(from, session);
+                        } else {
+                            // If there are missing fields, ask for the next one
+                            session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                            await askForNextMissingField(session, from);
+                        }
+                    } catch (error) {
+                        // Handle errors in fetching the address
+                        console.error("Error fetching address from coordinates:", error);
+                        await sendToWhatsApp(from, "Sorry, we couldn't process your location. Please try again.");
                     }
                 } else {
+                    // If the location is outside UAE bounds, notify the user
                     await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
                 }
                 break;
+
             case "ASK_ADDRESS":
                 // If the user hasn't provided an address yet, ask for it
                 if (!textRaw) {
