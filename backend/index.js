@@ -2184,7 +2184,7 @@ app.post('/webhook', async (req, res) => {
                     }
                     break;
 
-
+//
             case STATES.CITY:
                 if (message.interactive && message.interactive.type === "list_reply") {
                     const citySelection = message.interactive.list_reply.id; // Get selected city ID
