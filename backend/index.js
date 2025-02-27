@@ -1177,6 +1177,23 @@ async function getAddressFromCoordinates(latitude, longitude) {
         return null;
     }
 }
+async function getAddressFromCoordinates2(latitude, longitude) {
+    try {
+        const response = await axios.get(`https://nominatim.openstreetmap.org/reverse`, {
+            params: { lat: latitude, lon: longitude, format: "json" }
+        });
+
+        if (response.data && response.data.address) {
+            console.log("🔍 Address API Response:", response.data.address); // Debugging
+
+            return formatAddress(response.data.address);
+        }
+        return null;
+    } catch (error) {
+        console.error("❌ Reverse Geocoding Error:", error);
+        return null;
+    }
+}
 
 
 // Function to format the address into a readable string
@@ -2154,16 +2171,23 @@ app.post('/webhook', async (req, res) => {
                             // Reverse Geocode to get address
                             const address = await getAddressFromCoordinates(latitude, longitude);
                             if (address) {
-                                session.data.address = address.fullAddress;
+                                // session.data.address = address.fullAddress;
                                 session.data.street = address.street; // Store street name separately
                                 session.data.city = address.city; // Store city name separately
+                            }
+                            const address2 = await getAddressFromCoordinates2(latitude, longitude);
+                            if (address) {
+                                session.data.address = address;
+                                // session.data.street = extractStreetName(address); // Store street name separately
                             }
                 
                             session.data.latitude = latitude;
                             session.data.longitude = longitude;
                             session.step = STATES.BUILDING_NAME; // Proceed to city selection
+                            await sendToWhatsApp(from, getBuildingMessage(session.language)); // Ask for building name
+
                 
-                            return await sendCitySelection(from, session.language); // ✅ Ask user to select city
+                            // return await sendCitySelection(from, session.language); // ✅ Ask user to select city
                         } else {
                             await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
                         }
