@@ -1180,13 +1180,13 @@ async function getAddressFromCoordinates(latitude, longitude) {
 
 
 // Function to format the address into a readable string
-function formatAddress(address) {
-    const street = address.road || address.street || address.neighbourhood || address.suburb || "";
-    const city = address.city || address.town || address.village || address.state || "";
-    const country = address.country || "";
+// function formatAddress(address) {
+//     const street = address.road || address.street || address.neighbourhood || address.suburb || "";
+//     const city = address.city || address.town || address.village || address.state || "";
+//     const country = address.country || "";
 
-    return [street, city, country].filter(Boolean).join(", "); // Join non-empty parts
-}
+//     return [street, city, country].filter(Boolean).join(", "); // Join non-empty parts
+// }
 
 function extractStreetName(address) {
     if (!address) return "Unknown Street";
