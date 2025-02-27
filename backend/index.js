@@ -1138,6 +1138,29 @@ async function checkUserRegistration(phoneNumber) {
     }
 }
 
+// async function getAddressFromCoordinates(latitude, longitude) {
+//     try {
+//         const response = await axios.get(`https://nominatim.openstreetmap.org/reverse`, {
+//             params: { lat: latitude, lon: longitude, format: "json" }
+//         });
+
+//         if (response.data && response.data.address) {
+//             console.log("🔍 Address API Response:", response.data.address); // Debugging
+
+//             return formatAddress(response.data.address);
+//         }
+//         return null;
+//     } catch (error) {
+//         console.error("❌ Reverse Geocoding Error:", error);
+//         return null;
+//     }
+// }
+function formatAddress(address) {
+    const city = address.city || address.town || address.village || address.county || '';
+    const street = address.road || '';
+    return { city, street, fullAddress: address };
+}
+
 async function getAddressFromCoordinates(latitude, longitude) {
     try {
         const response = await axios.get(`https://nominatim.openstreetmap.org/reverse`, {
@@ -1146,7 +1169,6 @@ async function getAddressFromCoordinates(latitude, longitude) {
 
         if (response.data && response.data.address) {
             console.log("🔍 Address API Response:", response.data.address); // Debugging
-
             return formatAddress(response.data.address);
         }
         return null;
@@ -2115,54 +2137,52 @@ app.post('/webhook', async (req, res) => {
                 session.step = STATES.LONGITUDE;
                 await sendToWhatsApp(from, getLocationMessage(session.language)); // Ask for location
                 break;
-            case STATES.LONGITUDE:
-                if (message.location) {
-                    const { latitude: lat, longitude: lng } = message.location; // Use different variable names
-                    latitude = lat;
-                    longitude = lng;
-
-                    // Validate UAE location
-                    const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
-                    if (
-                        latitude >= UAE_BOUNDS.minLat &&
-                        latitude <= UAE_BOUNDS.maxLat &&
-                        longitude >= UAE_BOUNDS.minLng &&
-                        longitude <= UAE_BOUNDS.maxLng
-                    ) {
-                        // Reverse Geocode to get address
-                        const address = await getAddressFromCoordinates(latitude, longitude);
-                        if (address) {
-                            session.data.address = address;
-                            session.data.street = extractStreetName(address); // Store street name separately
+                case STATES.LONGITUDE:
+                    if (message.location) {
+                        const { latitude: lat, longitude: lng } = message.location;
+                        latitude = lat;
+                        longitude = lng;
+                
+                        // Validate UAE location
+                        const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
+                        if (
+                            latitude >= UAE_BOUNDS.minLat &&
+                            latitude <= UAE_BOUNDS.maxLat &&
+                            longitude >= UAE_BOUNDS.minLng &&
+                            longitude <= UAE_BOUNDS.maxLng
+                        ) {
+                            // Reverse Geocode to get address
+                            const address = await getAddressFromCoordinates(latitude, longitude);
+                            if (address) {
+                                session.data.address = address.fullAddress;
+                                session.data.street = address.street; // Store street name separately
+                                session.data.city = address.city; // Store city name separately
+                            }
+                
+                            session.data.latitude = latitude;
+                            session.data.longitude = longitude;
+                            session.step = STATES.BUILDING_NAME; // Proceed to city selection
+                
+                            return await sendCitySelection(from, session.language); // ✅ Ask user to select city
+                        } else {
+                            await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
                         }
-
-                        session.data.latitude = latitude;
-                        session.data.longitude = longitude;
-                        session.data.address = address; // Auto-fill address
-                        session.step = STATES.CITY; // Proceed to city selection
-
-                        return await sendCitySelection(from, session.language); // ✅ Ask user to select city
-                    } else {
-                        await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
-                    }
-                } else if (message.text && isLink(message.text)) {
-                    // If the user sends a link instead of a location
-                    await sendToWhatsApp(from, session.language === 'ar'
-                        ? "يرجى مشاركة الموقع باستخدام زر 'إرسال الموقع' على واتساب. لا ترسل روابط."
-                        : "Please share your location using the 'Send Site' button on WhatsApp. Do not send links."
-                    );
-                    // await sendToWhatsApp(from, getLocationMessage(session.language));
-                } else {
-                    if (!session.locationPromptSent) {
-                        // await sendToWhatsApp(from, getLocationMessage(session.language));
+                    } else if (message.text && isLink(message.text)) {
+                        // If the user sends a link instead of a location
                         await sendToWhatsApp(from, session.language === 'ar'
                             ? "يرجى مشاركة الموقع باستخدام زر 'إرسال الموقع' على واتساب. لا ترسل روابط."
                             : "Please share your location using the 'Send Site' button on WhatsApp. Do not send links."
                         );
-                        session.locationPromptSent = true;
+                    } else {
+                        if (!session.locationPromptSent) {
+                            await sendToWhatsApp(from, session.language === 'ar'
+                                ? "يرجى مشاركة الموقع باستخدام زر 'إرسال الموقع' على واتساب. لا ترسل روابط."
+                                : "Please share your location using the 'Send Site' button on WhatsApp. Do not send links."
+                            );
+                            session.locationPromptSent = true;
+                        }
                     }
-                }
-                break;
+                    break;
 
 
             case STATES.CITY:
