@@ -2147,8 +2147,11 @@ app.post('/webhook', async (req, res) => {
                     }
                 } else if (message.text && isLink(message.text)) {
                     // If the user sends a link instead of a location
+                    await sendToWhatsApp(from, session.language === 'ar'
+                        ? "يرجى مشاركة الموقع باستخدام زر 'إرسال الموقع' على واتساب. لا ترسل روابط."
+                        : "Please share your location using the 'Send Site' button on WhatsApp. Do not send links."
+                    );
                     await sendToWhatsApp(from, getLocationMessage(session.language));
-                    await sendToWhatsApp(from, "Please share your location directly using the location feature in WhatsApp. Do not send links.");
                 } else {
                     if (!session.locationPromptSent) {
                         await sendToWhatsApp(from, getLocationMessage(session.language));
@@ -2383,72 +2386,84 @@ app.post('/webhook', async (req, res) => {
                     await askForNextMissingField(session, from);
                 }
                 break;
-            case "ASK_LOCATION":
-                // If the user hasn't shared their location yet, ask for it
-                if (!message.location) {
-                    // Check if the user sent a link or invalid input
-                    if (message.text && isLink(message.text)) {
-                        // If the user sends a link, guide them to share their location directly
-                        await sendToWhatsApp(from, getLocationMessage(session.language));
-                        await sendToWhatsApp(from, "Please share your location directly using the location feature in WhatsApp. Do not send links.");
-                        return res.sendStatus(200); // Exit and wait for the user's response
-                    } else if (message.text) {
-                        // If the user sent text (not a link), prompt them to share their location
-                        await sendToWhatsApp(from, "Please share your location directly using the location feature in WhatsApp.");
-                        return res.sendStatus(200); // Exit and wait for the user's response
-                    } else {
-                        // If no location is shared, prompt the user to share their location
-                        await sendToWhatsApp(from, getLocationMessage(session.language));
-                        return res.sendStatus(200); // Exit and wait for the user's response
-                    }
-                }
-
-                // If the location is shared, store it and proceed to the next step
-                const { latitude: lat2, longitude: lng2 } = message.location; // Use different variable names
-                latitude = lat2;
-                longitude = lng2;
-
-                // Validate UAE location
-                const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
-                if (
-                    latitude >= UAE_BOUNDS.minLat &&
-                    latitude <= UAE_BOUNDS.maxLat &&
-                    longitude >= UAE_BOUNDS.minLng &&
-                    longitude <= UAE_BOUNDS.maxLng
-                ) {
-                    try {
-                        // Reverse geocode to get the address
-                        const address = await getAddressFromCoordinates(latitude, longitude);
-                        if (address) {
-                            session.data.address = address;
-                            // session.data.street = extractStreetName(address); // Uncomment if needed
-                        }
-
-                        // Store location data in the session
-                        session.data.latitude = latitude;
-                        session.data.longitude = longitude;
-
-                        // Check for other missing fields
-                        const missingFields = getMissingFields(session.data);
-                        if (missingFields.length === 0) {
-                            // If no fields are missing, proceed to confirmation
-                            session.step = STATES.CONFIRMATION;
-                            await sendOrderSummary(from, session);
+                case "ASK_LOCATION":
+                    // If the user hasn't shared their location yet, ask for it
+                    if (!message.location) {
+                        // Check if the user sent a link or invalid input
+                        if (message.text && isLink(message.text)) {
+                            // If the user sends a link, guide them to share their location directly
+                            await sendToWhatsApp(from, getLocationMessage(session.language));
+                            await sendToWhatsApp(from, session.language === 'ar' 
+                                ? "يرجى مشاركة الموقع باستخدام زر 'إرسال الموقع' على واتساب. لا ترسل روابط."
+                                : "Please share your location using the 'Send Site' button on WhatsApp. Do not send links."
+                            );
+                            return res.sendStatus(200); // Exit and wait for the user's response
+                        } else if (message.text) {
+                            // If the user sent text (not a link), prompt them to share their location
+                            await sendToWhatsApp(from, session.language === 'ar' 
+                                ? "يرجى مشاركة موقعك باستخدام زر 'إرسال الموقع' على واتساب."
+                                : "Please share your location using the 'Send Site' button on WhatsApp."
+                            );
+                            return res.sendStatus(200); // Exit and wait for the user's response
                         } else {
-                            // If there are missing fields, ask for the next one
-                            session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                            await askForNextMissingField(session, from);
+                            // If no location is shared, prompt the user to share their location
+                            if (!session.locationPromptSent) {
+                                await sendToWhatsApp(from, getLocationMessage(session.language));
+                                session.locationPromptSent = true; // Mark prompt as sent
+                            }
+                            return res.sendStatus(200); // Exit and wait for the user's response
                         }
-                    } catch (error) {
-                        // Handle errors in fetching the address
-                        console.error("Error fetching address from coordinates:", error);
-                        await sendToWhatsApp(from, "Sorry, we couldn't process your location. Please try again.");
                     }
-                } else {
-                    // If the location is outside UAE bounds, notify the user
-                    await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
-                }
-                break;
+                
+                    // If the location is shared, store it and proceed to the next step
+                    const { latitude: lat2, longitude: lng2 } = message.location; // Use different variable names
+                    latitude = lat2;
+                    longitude = lng2;
+                
+                    // Validate UAE location
+                    const UAE_BOUNDS = { minLat: 22.5, maxLat: 26.5, minLng: 51.6, maxLng: 56.5 };
+                    if (
+                        latitude >= UAE_BOUNDS.minLat &&
+                        latitude <= UAE_BOUNDS.maxLat &&
+                        longitude >= UAE_BOUNDS.minLng &&
+                        longitude <= UAE_BOUNDS.maxLng
+                    ) {
+                        try {
+                            // Reverse geocode to get the address
+                            const address = await getAddressFromCoordinates(latitude, longitude);
+                            if (address) {
+                                session.data.address = address;
+                                // session.data.street = extractStreetName(address); // Uncomment if needed
+                            }
+                
+                            // Store location data in the session
+                            session.data.latitude = latitude;
+                            session.data.longitude = longitude;
+                
+                            // Check for other missing fields
+                            const missingFields = getMissingFields(session.data);
+                            if (missingFields.length === 0) {
+                                // If no fields are missing, proceed to confirmation
+                                session.step = STATES.CONFIRMATION;
+                                await sendOrderSummary(from, session);
+                            } else {
+                                // If there are missing fields, ask for the next one
+                                session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                                await askForNextMissingField(session, from);
+                            }
+                        } catch (error) {
+                            // Handle errors in fetching the address
+                            console.error("Error fetching address from coordinates:", error);
+                            await sendToWhatsApp(from, session.language === 'ar' 
+                                ? "عذرًا، حدث خطأ أثناء معالجة موقعك. يرجى المحاولة مرة أخرى."
+                                : "Sorry, we couldn't process your location. Please try again."
+                            );
+                        }
+                    } else {
+                        // If the location is outside UAE bounds, notify the user
+                        await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
+                    }
+                    break;
 
             case "ASK_ADDRESS":
                 // If the user hasn't provided an address yet, ask for it
