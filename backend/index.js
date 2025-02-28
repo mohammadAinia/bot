@@ -890,6 +890,29 @@ async function isQuestionOrRequest(text) {
        - "50"
        - "100"
        - "30"
+       - "b5" (interpreted as Building 5)
+       - "flat 12" (interpreted as Flat 12)
+       - "12" (interpreted as Flat 12)
+       - "building 5" (interpreted as Building 5)
+       - "tower 3" (interpreted as Building 3)
+       - "block 7" (interpreted as Building 7)
+       - "apartment 12" (interpreted as Flat 12)
+       - "suite 5" (interpreted as Flat 5)
+       - "bldg 10" (interpreted as Building 10)
+       - "fl 12" (interpreted as Flat 12)
+       - "apt 12" (interpreted as Flat 12)
+       - "123" (interpreted as Flat 123 or Building 123, depending on context)
+       - "5th floor" (interpreted as Flat 5 or Building 5)
+       - "level 5" (interpreted as Flat 5 or Building 5)
+       - "building A" (interpreted as Building A)
+       - "flat B" (interpreted as Flat B)
+       - "block C" (interpreted as Building C)
+       - "tower D" (interpreted as Building D)
+       - "suite E" (interpreted as Flat E)
+       - "apartment F" (interpreted as Flat F)
+       - "bldg G" (interpreted as Building G)
+       - "fl H" (interpreted as Flat H)
+       - "apt I" (interpreted as Flat I)
     
     5️⃣ **"other"** → If the input does not fit the above categories.
     
