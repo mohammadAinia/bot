@@ -1745,17 +1745,6 @@ app.post('/webhook', async (req, res) => {
                 };
 
             } else {
-                // if (isGreeting) {
-                //     const welcomeMessage = await getOpenAIResponse(
-                //         "Generate a WhatsApp welcome message for Lootah Biofuels.",
-                //         "",
-                //         detectedLanguage
-                //     );
-                //     await sendInteractiveButtons(from, welcomeMessage, [
-                //         { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
-                //         { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
-                //     ]);
-                // }
                 userSessions[from] = {
                     step: STATES.WELCOME,
                     data: { phone: from },
@@ -1770,8 +1759,8 @@ app.post('/webhook', async (req, res) => {
         }
 
         const isGreeting = await isGreetingOrGeneralInquiry(textRaw);
-        const user = await checkUserRegistration(from);
         if (isGreeting) {
+            const user = await checkUserRegistration(from);
             if (user && user.name) {
 
                 let welcomeMessage = await getOpenAIResponse(
