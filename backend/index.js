@@ -1702,6 +1702,7 @@ app.post('/webhook', async (req, res) => {
         } catch (error) {
             console.log("⚠️ Language detection failed. Defaulting to English.", error);
         }
+        console.log("🔹 Detected Language:", detectedLanguage);
         // Initialize or retrieve the user session
         let session = userSessions[from];
         if (!session || (session && Date.now() - session.lastActivityTimestamp > SESSION_TIMEOUT)) {
@@ -1735,7 +1736,7 @@ app.post('/webhook', async (req, res) => {
 
 
         // Update the session language
-        // session.language = detectedLanguage;
+        session.language = detectedLanguage;
 
 
 
