@@ -824,6 +824,7 @@ async function isQuestionOrRequest(text) {
     const namePattern = /^[A-Za-z\s]{2,30}$/; // Simple name regex (2-30 characters, letters and spaces)
     const quantityPattern = /(\d+)\s*liters?/i; // Matches "50 liters", "100 liter", etc.
     const addressPattern = /(street|st\.|avenue|ave\.|road|rd\.|building|bldg\.|flat|apartment|apt\.)/i; // Matches common address terms
+    const nameAndQuantityPattern = /(\b[A-Za-z]+\b).*?(\d+)\s*liters?/i; // Matches "I am Khaled and I have 40 liters of oil."
 
     // Check if the input matches any answer pattern
     if (emailPattern.test(text)) {
@@ -838,6 +839,15 @@ async function isQuestionOrRequest(text) {
     if (addressPattern.test(text)) {
         return "answer"; // Classify as answer if it looks like an address
     }
+    if (nameAndQuantityPattern.test(text)) {
+        return "request"; // Classify as request if it contains both name and quantity
+    }
+
+    // Fallback mechanism
+    const fallbackKeywords = ["oil", "liters", "pickup", "collect"];
+    if (fallbackKeywords.some(keyword => text.toLowerCase().includes(keyword))) {
+        return "request";
+    }
 
     // If no patterns match, use the OpenAI prompt for classification
     const prompt = `
@@ -845,7 +855,6 @@ async function isQuestionOrRequest(text) {
     
     1️⃣ **"request"** → If the user is making a service request or wants to start a new request. Examples:
        - "I want to create a request"
-       - "I want to create a new request"
        - "I have oil I want to get rid of"
        - "Hello, I have 50 liters of oil in Dubai"
        - "Please collect oil from my location"
