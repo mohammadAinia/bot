@@ -1734,7 +1734,7 @@ app.post('/webhook', async (req, res) => {
         }
 
         // Update the session language
-        session.language = detectedLanguage;
+        // session.language = detectedLanguage;
 
 
 
