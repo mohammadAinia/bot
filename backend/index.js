@@ -2569,8 +2569,14 @@ app.post('/webhook', async (req, res) => {
                         // Reverse geocode to get the address
                         const address = await getAddressFromCoordinates(latitude, longitude);
                         if (address) {
-                            session.data.address = address;
-                            // session.data.street = extractStreetName(address); // Uncomment if needed
+                            // session.data.address = address.fullAddress;
+                            session.data.street = address.street; // Store street name separately
+                            session.data.city = address.city; // Store city name separately
+                        }
+                        const address2 = await getAddressFromCoordinates2(latitude, longitude);
+                        if (address2) {
+                            session.data.address = address2;
+                            // session.data.street = extractStreetName(address); // Store street name separately
                         }
 
                         // Store location data in the session
@@ -2919,8 +2925,8 @@ app.post('/webhook', async (req, res) => {
                         await sendToWhatsApp(
                             from,
                             session.language === 'ar'
-                                ? "أي معلومات تريد تعديلها؟ يرجى الرد بالرقم المقابل:\n\n1. الموقع\n2. الشارع\n3. اسم المبنى\n4. رقم الشقة\n5. الكمية"
-                                : "Which information would you like to modify? Please reply with the corresponding number:\n\n1. Location\n2. Street\n3. Building Name\n4. Flat No\n5. Quantity"
+                                ? "أي معلومات تريد تعديلها؟ يرجى الرد بالرقم المقابل:\n\n1. الموقع\n2. اسم المبنى\n3. رقم الشقة\n4. الكمية"
+                                : "Which information would you like to modify? Please reply with the corresponding number:\n\n1. Location\n2. Building Name\n3. Flat No\n4. Quantity"
                         );
                     }
                 }
@@ -2930,21 +2936,20 @@ app.post('/webhook', async (req, res) => {
                 // Convert any Arabic digits in the text to English digits
                 const normalizedText = convertArabicNumbers(text);
                 const fieldToModify = parseInt(normalizedText);
-                if (isNaN(fieldToModify) || fieldToModify < 1 || fieldToModify > 6) {
+                if (isNaN(fieldToModify) || fieldToModify < 1 || fieldToModify > 5) {
                     await sendToWhatsApp(
                         from,
                         session.language === 'ar'
-                            ? "❌ خيار غير صالح. يرجى اختيار رقم بين 1 و 5."
-                            : "❌ Invalid option. Please choose a number between 1 and 5."
+                            ? "❌ خيار غير صالح. يرجى اختيار رقم بين 1 و 4."
+                            : "❌ Invalid option. Please choose a number between 1 and 4."
                     ); return res.sendStatus(200);
                 }
 
                 const fieldMap = {
                     1: "location",
-                    2: "street",
-                    3: "building_name",
-                    4: "flat_no",
-                    5: "quantity"
+                    2: "building_name",
+                    3: "flat_no",
+                    4: "quantity"
                 };
 
                 const selectedField = fieldMap[fieldToModify];
@@ -2994,13 +2999,23 @@ app.post('/webhook', async (req, res) => {
                 ) {
                     const address = await getAddressFromCoordinates(latitude, longitude);
                     if (address) {
-                        session.data.address = address;
+                        // session.data.address = address.fullAddress;
+                        session.data.street = address.street; // Store street name separately
+                        session.data.city = address.city; // Store city name separately
+                    }
+                    const address2 = await getAddressFromCoordinates2(latitude, longitude);
+                    if (address2) {
+                        session.data.address = address2;
+                        // session.data.street = extractStreetName(address); // Store street name separately
                     }
                     session.data.latitude = latitude;
                     session.data.longitude = longitude;
+                    session.step = STATES.CONFIRMATION,
 
-                    session.step = "MODIFY_CITY_SELECTION";
-                    return await sendCitySelection(from, session.language);
+                    await sendUpdatedSummary(from, session);
+
+                    // session.step = "MODIFY_CITY_SELECTION";
+                    // return await sendCitySelection(from, session.language);
 
                 } else {
                     await sendToWhatsApp(from, getInvalidUAERegionMessage(session.language));
