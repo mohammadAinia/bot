@@ -824,7 +824,7 @@ async function isQuestionOrRequest(text) {
     const namePattern = /^[A-Za-z\s]{2,30}$/; // Simple name regex (2-30 characters, letters and spaces)
     const quantityPattern = /(\d+)\s*liters?/i; // Matches "50 liters", "100 liter", etc.
     const addressPattern = /(street|st\.|avenue|ave\.|road|rd\.|building|bldg\.|flat|apartment|apt\.)/i; // Matches common address terms
-    const nameAndQuantityPattern = /(\b[A-Za-z]+\b).*?(\d+)\s*liters?/i; // Matches "I am Khaled and I have 40 liters of oil."
+    const nameAndQuantityPattern = /(\b[A-Za-z]+\b).*?(\d+)\s*liters?.*?(order|request|pickup|collect)/i; // Matches "I am Khaled and I have 40 liters of oil."
 
     // Check if the input matches any answer pattern
     if (emailPattern.test(text)) {
@@ -844,7 +844,7 @@ async function isQuestionOrRequest(text) {
     }
 
     // Fallback mechanism
-    const fallbackKeywords = ["oil", "liters", "pickup", "collect"];
+    const fallbackKeywords = ["oil", "liters", "pickup", "collect", "order", "request"];
     if (fallbackKeywords.some(keyword => text.toLowerCase().includes(keyword))) {
         return "request";
     }
@@ -1834,6 +1834,7 @@ app.post('/webhook', async (req, res) => {
 
                 // Classify the transcribed text
                 const classification = await isQuestionOrRequest(transcribedText);
+                console.log(`🔹 Classification Result: ${classification}, Input: ${transcribedText}`);
                 let aiResponse = ""; // Declare aiResponse here to avoid scope issues
 
                 // Handle each classification in the specified order
