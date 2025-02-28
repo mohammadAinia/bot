@@ -1738,49 +1738,8 @@ app.post('/webhook', async (req, res) => {
 
 
         // Update the session language
-        session.language = detectedLanguage;
+        // session.language = detectedLanguage;
 
-
-
-        // if (!session) {
-        // const user = await checkUserRegistration(from);
-        // if (user && user.name) {
-        //     let welcomeMessage = await getOpenAIResponse(
-        //         `Welcome back, ${user.name}. Generate a WhatsApp welcome message for Lootah Biofuels.`,
-        //         "",
-        //         detectedLanguage
-        //     );
-        //     await sendInteractiveButtons(from, welcomeMessage, [
-        //         { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
-        //         { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
-        //     ]);
-        //     userSessions[from] = {
-        //         step: STATES.WELCOME,
-        //         data: user,
-        //         language: detectedLanguage,
-        //         inRequest: false,
-        //         lastTimestamp: Number(message.timestamp)
-        //     };
-        // } else {
-        //     userSessions[from] = {
-        //         step: STATES.WELCOME,
-        //         data: { phone: from },
-        //         language: detectedLanguage,
-        //         inRequest: false,
-        //         lastTimestamp: Number(message.timestamp)
-        //     };
-        //     const welcomeMessage = await getOpenAIResponse(
-        //         "Generate a WhatsApp welcome message for Lootah Biofuels.",
-        //         "",
-        //         detectedLanguage
-        //     );
-        //     await sendInteractiveButtons(from, welcomeMessage, [
-        //         { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
-        //         { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
-        //     ]);
-        // }
-        //     return res.sendStatus(200);
-        // }
 
         // Handle voice messages
 
