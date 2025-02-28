@@ -1734,6 +1734,8 @@ app.post('/webhook', async (req, res) => {
 
         if (!session) {
             const user = await checkUserRegistration(from);
+            const detectedLanguage = user?.language || "en";  // Ensure detectedLanguage is set
+
             if (user && user.name) {
                 // let welcomeMessage = await getOpenAIResponse(
                 //     `Welcome back, ${user.name}. Generate a WhatsApp welcome message for Lootah Biofuels.`,
@@ -1759,6 +1761,7 @@ app.post('/webhook', async (req, res) => {
                     inRequest: false,
                     lastTimestamp: Number(message.timestamp)
                 };
+                
                 // const welcomeMessage = await getOpenAIResponse(
                 //     "Generate a WhatsApp welcome message for Lootah Biofuels.",
                 //     "",
@@ -1788,7 +1791,7 @@ app.post('/webhook', async (req, res) => {
                     console.log("🔹 Voice file downloaded successfully:", filePath);
     
                     // Transcribe the voice file using OpenAI Whisper
-                    const transcription = await transcribeVoiceMessage(filePath, session.language);
+                    const transcription = await transcribeVoiceMessage(filePath, session?.language || "en");
                     if (!transcription) {
                         console.error("❌ Failed to transcribe voice message. Transcription result is empty.");
                         await sendToWhatsApp(from, "Sorry, I couldn't understand your voice message. Please try again.");
