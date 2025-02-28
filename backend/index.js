@@ -1735,18 +1735,7 @@ app.post('/webhook', async (req, res) => {
         if (!session) {
             const user = await checkUserRegistration(from);
             if (user && user.name) {
-                const isGreeting = await isGreetingOrGeneralInquiry(textRaw);
-                if (isGreeting) {
-                    let welcomeMessage = await getOpenAIResponse(
-                        `Welcome back, ${user.name}. Generate a WhatsApp welcome message for Lootah Biofuels.`,
-                        "",
-                        detectedLanguage
-                    );
-                    await sendInteractiveButtons(from, welcomeMessage, [
-                        { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
-                        { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
-                    ]);
-                }
+
                 userSessions[from] = {
                     step: STATES.WELCOME,
                     data: user,
@@ -1754,6 +1743,288 @@ app.post('/webhook', async (req, res) => {
                     inRequest: false,
                     lastTimestamp: Number(message.timestamp)
                 };
+
+            } else {
+                // if (isGreeting) {
+                //     const welcomeMessage = await getOpenAIResponse(
+                //         "Generate a WhatsApp welcome message for Lootah Biofuels.",
+                //         "",
+                //         detectedLanguage
+                //     );
+                //     await sendInteractiveButtons(from, welcomeMessage, [
+                //         { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
+                //         { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
+                //     ]);
+                // }
+                userSessions[from] = {
+                    step: STATES.WELCOME,
+                    data: { phone: from },
+                    language: detectedLanguage,
+                    inRequest: false,
+                    lastTimestamp: Number(message.timestamp)
+                };
+
+            }
+            // if (message.type === "audio" && message.audio) {
+            //     const mediaId = message.audio.id; // Get the media ID
+
+            //     // Fetch the media URL using the media ID
+            //     const audioUrl = await fetchMediaUrl(mediaId);
+            //     if (!audioUrl || !isValidUrl(audioUrl)) {
+            //         console.error("❌ Invalid or missing audio URL:", audioUrl);
+            //         await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
+            //         return res.sendStatus(200);
+            //     }
+
+            //     const filePath = `./temp/${messageId}.ogg`; // Unique temporary file path
+
+            //     try {
+            //         // Download the voice file
+            //         await downloadFile(audioUrl, filePath);
+            //         console.log("🔹 Voice file downloaded successfully:", filePath);
+
+            //         // Transcribe the voice file using OpenAI Whisper
+            //         const transcription = await transcribeVoiceMessage(filePath, session.language);
+            //         if (!transcription) {
+            //             console.error("❌ Failed to transcribe voice message. Transcription result is empty.");
+            //             await sendToWhatsApp(from, "Sorry, I couldn't understand your voice message. Please try again.");
+            //             return res.sendStatus(200);
+            //         }
+
+            //         console.log(`🔹 Transcribed voice message: ${transcription}`);
+            //         const transcribedText = transcription; // Use the transcribed text as the message
+
+
+            //         if (isCancellationRequest(transcribedText)) {
+            //             console.log("🔹 Cancellation request detected.");
+            //             await handleCancellationRequest(from, session, message, res); // Pass `res` here
+            //             return;
+            //         }
+
+            //         // Classify the transcribed text
+            //         const classification = await isQuestionOrRequest(transcribedText);
+            //         let aiResponse = ""; // Declare aiResponse here to avoid scope issues
+
+            //         // Handle each classification in the specified order
+            //         if (classification === "question") {
+            //             // Handle questions
+            //             aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
+
+            //             // Send text response
+            //             if (session.inRequest) {
+            //                 await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
+            //             } else {
+            //                 const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+            //                 await sendInteractiveButtons(from, reply, [
+            //                     { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+            //                     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+            //                 ]);
+            //             }
+            //         } else if (classification === "answer") {
+            //             // Handle answers
+            //             if (session.step === STATES.NAME) {
+            //                 session.data.name = transcribedText;
+            //                 session.step = STATES.EMAIL;
+            //                 await sendToWhatsApp(from, getEmailMessage(session.language));
+            //                 await sendToWhatsApp(from, aiResponse);
+            //             }
+            //             else if (session.step === STATES.EMAIL) {
+            //                 if (!isValidEmail(transcribedText)) {
+            //                     await sendToWhatsApp(from, "❌ Please provide a valid email address (e.g., example@domain.com).");
+            //                     return res.sendStatus(200);
+            //                 }
+            //                 session.data.email = transcribedText;
+            //                 session.step = STATES.LONGITUDE;
+            //                 await sendToWhatsApp(from, getLocationMessage(session.language));
+            //             }
+            //             else if (session.step === STATES.STREET) {
+            //                 session.data.street = transcribedText;
+            //                 session.step = STATES.BUILDING_NAME;
+            //                 await sendToWhatsApp(from, getBuildingMessage(session.language));
+            //             }
+            //             else if (session.step === STATES.BUILDING_NAME) {
+            //                 session.data.building_name = transcribedText;
+            //                 session.step = STATES.FLAT_NO;
+            //                 await sendToWhatsApp(from, getFlatMessage(session.language));
+            //             }
+            //             else if (session.step === STATES.FLAT_NO) {
+            //                 session.data.flat_no = transcribedText;
+            //                 session.step = STATES.QUANTITY;
+            //                 return await sendQuantitySelection(from, session.language);
+            //             }
+            //             else if (session.step === STATES.QUANTITY) {
+            //                 // const quantity = parseInt(transcribedText.trim(), 10);
+
+            //                 if (transcribedText < 10) {
+            //                     await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
+            //                     await sendQuantitySelection(from, session.language);
+            //                     return res.sendStatus(200);
+            //                 }
+            //                 session.data.quantity = transcribedText;
+            //                 session.step = STATES.CONFIRMATION;
+            //             }
+            //         } else if (classification === "request") {
+            //             // Handle requests
+            //             if (!session.data || !session.data.name) {  // Check if the user doesn't have any data
+            //                 // Start collecting information immediately if the user is new and doesn't have data
+            //                 session.inRequest = true;
+            //                 session.step = STATES.NAME;
+            //                 aiResponse = "Please provide your name."; // Set aiResponse for voice generation
+            //                 await sendToWhatsApp(from, aiResponse);
+            //             } else {
+            //                 const extractedData = await extractInformationFromText(transcribedText, session.language);
+            //                 if (Object.keys(extractedData).length > 0) {
+            //                     session.step = STATES.CHANGE_INFOO;
+            //                     aiResponse = "Do you want to change your information?"; // Set aiResponse for voice generation
+            //                     await sendInteractiveButtons(from, aiResponse, [
+            //                         { type: "reply", reply: { id: "yes_change", title: "Yes" } },
+            //                         { type: "reply", reply: { id: "no_change", title: "No" } }
+            //                     ]);
+            //                     session.tempData = extractedData; // Store extracted data temporarily
+            //                 } else {
+            //                     aiResponse = "Do you want to change your information?"; // Set aiResponse for voice generation
+            //                     await sendToWhatsApp(from, `${aiResponse}\n\nPlease provide more details about your request.`);
+            //                     session.inRequest = true; // Set the session to indicate the user is in a request flow
+            //                 }
+            //             }
+            //         } else if (classification === "greeting" || classification === "other") {
+            //             // Handle greetings or other cases
+            //             aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
+            //             await sendToWhatsApp(from, aiResponse);
+            //         }
+
+            //         // Generate audio response using OpenAI TTS (for all cases except when returning early)
+            //         if (aiResponse) {
+            //             const audioFilePath = `./temp/${messageId}_response.mp3`;
+            //             await generateAudio(aiResponse, audioFilePath);
+
+            //             // Upload audio file to WhatsApp's servers
+            //             const uploadedMediaId = await uploadMediaToWhatsApp(audioFilePath);
+
+            //             // Send audio to user using the media ID
+            //             await sendAudioUsingMediaId(from, uploadedMediaId);
+
+            //             // Clean up temporary files
+            //             fs.unlinkSync(audioFilePath);
+            //             console.log("✅ Temporary audio file deleted:", audioFilePath);
+            //         }
+
+            //         return res.sendStatus(200);
+            //     } catch (error) {
+            //         console.error("❌ Error downloading or transcribing voice message:", error);
+            //         await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
+            //         return res.sendStatus(200);
+            //     } finally {
+            //         // Clean up the temporary file
+            //         if (fs.existsSync(filePath)) {
+            //             fs.unlinkSync(filePath);
+            //             console.log("✅ Temporary file deleted:", filePath);
+            //         }
+            //     }
+            // }
+            // const classification = await isQuestionOrRequest(textRaw);
+            // if (classification === "question") {
+            //     const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+            //     if (session.inRequest) {
+            //         // await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
+
+            //         const lang = session?.language || "en"; // Define lang based on session.language
+            //         await sendToWhatsApp(from, lang === 'ar' ? `${aiResponse}\n\nمن فضلك اكمل معلومات الطلب.` :
+            //             `${aiResponse}\n\nPlease complete the request information.`
+            //         );
+
+            //     } else {
+            //         const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+            //         await sendInteractiveButtons(from, reply, [
+            //             { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+            //             { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+            //         ]);
+            //     }
+            //     return res.sendStatus(200);
+            // }
+            // if (session.step === STATES.WELCOME && message.type === "text") {
+            //     // Check if the user's message indicates the start of a request
+            //     const isRequestStart = await detectRequestStart(textRaw);
+            //     if (isRequestStart) {
+            //         session.inRequest = true;
+
+            //         const lang = session?.language || "en"; // Define lang based on session.language
+
+            //         await sendToWhatsApp(from, lang === 'ar'
+            //             ? "🔹 يمكنك إلغاء الطلب في أي وقت عن طريق كتابة 'إلغاء'او التسجيل الصوتي."
+            //             : "🔹 You can cancel the order at any time by writing cancel or recording a voice message..");
+
+            //         // Extract information from the user's message
+            //         const extractedData = await extractInformationFromText(textRaw, session.language);
+
+            //         // Check if the user is registered
+            //         const user = await checkUserRegistration(from);
+            //         if (user && user.name) {
+            //             // User is registered, ask if they want to change their information
+            //             session.tempData = extractedData; // Store extracted data temporarily
+            //             await sendInteractiveButtons(from, getTranslation("change_information", session.language), [
+            //                 { type: "reply", reply: { id: "yes_change", title: getTranslation("yes", session.language) } },
+            //                 { type: "reply", reply: { id: "no_change", title: getTranslation("no", session.language) } }
+            //             ]);
+            //             session.step = STATES.CHANGE_INFOO;
+
+            //         } else {
+            //             // User is not registered, start collecting information
+            //             session.data = { ...session.data, ...extractedData }; // Merge extracted data with session data
+            //             if (!session.data.phone) {
+            //                 session.data.phone = from; // Use the WhatsApp number as the default phone number
+            //             }
+
+            //             // Check for missing fields
+            //             const missingFields = getMissingFields(session.data);
+            //             if (missingFields.length > 0) {
+            //                 session.step = `ASK_${missingFields[0].toUpperCase()}`;
+            //                 await askForNextMissingField(session, from);
+            //             } else {
+            //                 // If no missing fields, proceed to quantity selection
+            //                 session.step = STATES.QUANTITY;
+            //                 await sendQuantitySelection(from, session.language);
+            //             }
+            //         }
+            //     } else {
+            //         // If the message is not a request, treat it as a general message
+            //         const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+
+            //         if (session.inRequest) {
+            //             // User has started a request
+            //             const lang = session?.language || "en"; // Define lang based on session.language
+            //             await sendToWhatsApp(from, `${aiResponse}\n\n${lang === 'ar'
+            //                 ? "🔹من فضلك اكمل اجراءات الطلب"
+            //                 : "🔹Please complete the application process."}`);
+            //         } else {
+            //             // User has not started a request
+            //             const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+            //             await sendInteractiveButtons(from, reply, [
+            //                 { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+            //                 { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+            //             ]);
+            //         }
+
+            //     }
+            //     return res.sendStatus(200);
+            // }
+            return res.sendStatus(200);
+        }
+
+        const isGreeting = await isGreetingOrGeneralInquiry(textRaw);
+        const user = await checkUserRegistration(from);
+        if (isGreeting) {
+            if (user && user.name) {
+
+                let welcomeMessage = await getOpenAIResponse(
+                    `Welcome back, ${user.name}. Generate a WhatsApp welcome message for Lootah Biofuels.`,
+                    "",
+                    detectedLanguage
+                );
+                await sendInteractiveButtons(from, welcomeMessage, [
+                    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
+                    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
+                ]);
 
             } else {
                 if (isGreeting) {
@@ -1767,259 +2038,9 @@ app.post('/webhook', async (req, res) => {
                         { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
                     ]);
                 }
-                userSessions[from] = {
-                    step: STATES.WELCOME,
-                    data: { phone: from },
-                    language: detectedLanguage,
-                    inRequest: false,
-                    lastTimestamp: Number(message.timestamp)
-                };
 
             }
-            if (message.type === "audio" && message.audio) {
-                const mediaId = message.audio.id; // Get the media ID
 
-                // Fetch the media URL using the media ID
-                const audioUrl = await fetchMediaUrl(mediaId);
-                if (!audioUrl || !isValidUrl(audioUrl)) {
-                    console.error("❌ Invalid or missing audio URL:", audioUrl);
-                    await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
-                    return res.sendStatus(200);
-                }
-
-                const filePath = `./temp/${messageId}.ogg`; // Unique temporary file path
-
-                try {
-                    // Download the voice file
-                    await downloadFile(audioUrl, filePath);
-                    console.log("🔹 Voice file downloaded successfully:", filePath);
-
-                    // Transcribe the voice file using OpenAI Whisper
-                    const transcription = await transcribeVoiceMessage(filePath, session.language);
-                    if (!transcription) {
-                        console.error("❌ Failed to transcribe voice message. Transcription result is empty.");
-                        await sendToWhatsApp(from, "Sorry, I couldn't understand your voice message. Please try again.");
-                        return res.sendStatus(200);
-                    }
-
-                    console.log(`🔹 Transcribed voice message: ${transcription}`);
-                    const transcribedText = transcription; // Use the transcribed text as the message
-
-
-                    if (isCancellationRequest(transcribedText)) {
-                        console.log("🔹 Cancellation request detected.");
-                        await handleCancellationRequest(from, session, message, res); // Pass `res` here
-                        return;
-                    }
-
-                    // Classify the transcribed text
-                    const classification = await isQuestionOrRequest(transcribedText);
-                    let aiResponse = ""; // Declare aiResponse here to avoid scope issues
-
-                    // Handle each classification in the specified order
-                    if (classification === "question") {
-                        // Handle questions
-                        aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
-
-                        // Send text response
-                        if (session.inRequest) {
-                            await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
-                        } else {
-                            const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-                            await sendInteractiveButtons(from, reply, [
-                                { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-                                { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-                            ]);
-                        }
-                    } else if (classification === "answer") {
-                        // Handle answers
-                        if (session.step === STATES.NAME) {
-                            session.data.name = transcribedText;
-                            session.step = STATES.EMAIL;
-                            await sendToWhatsApp(from, getEmailMessage(session.language));
-                            await sendToWhatsApp(from, aiResponse);
-                        }
-                        else if (session.step === STATES.EMAIL) {
-                            if (!isValidEmail(transcribedText)) {
-                                await sendToWhatsApp(from, "❌ Please provide a valid email address (e.g., example@domain.com).");
-                                return res.sendStatus(200);
-                            }
-                            session.data.email = transcribedText;
-                            session.step = STATES.LONGITUDE;
-                            await sendToWhatsApp(from, getLocationMessage(session.language));
-                        }
-                        else if (session.step === STATES.STREET) {
-                            session.data.street = transcribedText;
-                            session.step = STATES.BUILDING_NAME;
-                            await sendToWhatsApp(from, getBuildingMessage(session.language));
-                        }
-                        else if (session.step === STATES.BUILDING_NAME) {
-                            session.data.building_name = transcribedText;
-                            session.step = STATES.FLAT_NO;
-                            await sendToWhatsApp(from, getFlatMessage(session.language));
-                        }
-                        else if (session.step === STATES.FLAT_NO) {
-                            session.data.flat_no = transcribedText;
-                            session.step = STATES.QUANTITY;
-                            return await sendQuantitySelection(from, session.language);
-                        }
-                        else if (session.step === STATES.QUANTITY) {
-                            // const quantity = parseInt(transcribedText.trim(), 10);
-
-                            if (transcribedText < 10) {
-                                await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
-                                await sendQuantitySelection(from, session.language);
-                                return res.sendStatus(200);
-                            }
-                            session.data.quantity = transcribedText;
-                            session.step = STATES.CONFIRMATION;
-                        }
-                    } else if (classification === "request") {
-                        // Handle requests
-                        if (!session.data || !session.data.name) {  // Check if the user doesn't have any data
-                            // Start collecting information immediately if the user is new and doesn't have data
-                            session.inRequest = true;
-                            session.step = STATES.NAME;
-                            aiResponse = "Please provide your name."; // Set aiResponse for voice generation
-                            await sendToWhatsApp(from, aiResponse);
-                        } else {
-                            const extractedData = await extractInformationFromText(transcribedText, session.language);
-                            if (Object.keys(extractedData).length > 0) {
-                                session.step = STATES.CHANGE_INFOO;
-                                aiResponse = "Do you want to change your information?"; // Set aiResponse for voice generation
-                                await sendInteractiveButtons(from, aiResponse, [
-                                    { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                                    { type: "reply", reply: { id: "no_change", title: "No" } }
-                                ]);
-                                session.tempData = extractedData; // Store extracted data temporarily
-                            } else {
-                                aiResponse = "Do you want to change your information?"; // Set aiResponse for voice generation
-                                await sendToWhatsApp(from, `${aiResponse}\n\nPlease provide more details about your request.`);
-                                session.inRequest = true; // Set the session to indicate the user is in a request flow
-                            }
-                        }
-                    } else if (classification === "greeting" || classification === "other") {
-                        // Handle greetings or other cases
-                        aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
-                        await sendToWhatsApp(from, aiResponse);
-                    }
-
-                    // Generate audio response using OpenAI TTS (for all cases except when returning early)
-                    if (aiResponse) {
-                        const audioFilePath = `./temp/${messageId}_response.mp3`;
-                        await generateAudio(aiResponse, audioFilePath);
-
-                        // Upload audio file to WhatsApp's servers
-                        const uploadedMediaId = await uploadMediaToWhatsApp(audioFilePath);
-
-                        // Send audio to user using the media ID
-                        await sendAudioUsingMediaId(from, uploadedMediaId);
-
-                        // Clean up temporary files
-                        fs.unlinkSync(audioFilePath);
-                        console.log("✅ Temporary audio file deleted:", audioFilePath);
-                    }
-
-                    return res.sendStatus(200);
-                } catch (error) {
-                    console.error("❌ Error downloading or transcribing voice message:", error);
-                    await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
-                    return res.sendStatus(200);
-                } finally {
-                    // Clean up the temporary file
-                    if (fs.existsSync(filePath)) {
-                        fs.unlinkSync(filePath);
-                        console.log("✅ Temporary file deleted:", filePath);
-                    }
-                }
-            }
-            const classification = await isQuestionOrRequest(textRaw);
-            if (classification === "question") {
-                const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-                if (session.inRequest) {
-                    // await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
-
-                    const lang = session?.language || "en"; // Define lang based on session.language
-                    await sendToWhatsApp(from, lang === 'ar' ? `${aiResponse}\n\nمن فضلك اكمل معلومات الطلب.` :
-                        `${aiResponse}\n\nPlease complete the request information.`
-                    );
-
-                } else {
-                    const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-                    await sendInteractiveButtons(from, reply, [
-                        { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-                        { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-                    ]);
-                }
-                return res.sendStatus(200);
-            }
-            if (session.step === STATES.WELCOME && message.type === "text") {
-                // Check if the user's message indicates the start of a request
-                const isRequestStart = await detectRequestStart(textRaw);
-                if (isRequestStart) {
-                    session.inRequest = true;
-
-                    const lang = session?.language || "en"; // Define lang based on session.language
-
-                    await sendToWhatsApp(from, lang === 'ar'
-                        ? "🔹 يمكنك إلغاء الطلب في أي وقت عن طريق كتابة 'إلغاء'او التسجيل الصوتي."
-                        : "🔹 You can cancel the order at any time by writing cancel or recording a voice message..");
-
-                    // Extract information from the user's message
-                    const extractedData = await extractInformationFromText(textRaw, session.language);
-
-                    // Check if the user is registered
-                    const user = await checkUserRegistration(from);
-                    if (user && user.name) {
-                        // User is registered, ask if they want to change their information
-                        session.tempData = extractedData; // Store extracted data temporarily
-                        await sendInteractiveButtons(from, getTranslation("change_information", session.language), [
-                            { type: "reply", reply: { id: "yes_change", title: getTranslation("yes", session.language) } },
-                            { type: "reply", reply: { id: "no_change", title: getTranslation("no", session.language) } }
-                        ]);
-                        session.step = STATES.CHANGE_INFOO;
-
-                    } else {
-                        // User is not registered, start collecting information
-                        session.data = { ...session.data, ...extractedData }; // Merge extracted data with session data
-                        if (!session.data.phone) {
-                            session.data.phone = from; // Use the WhatsApp number as the default phone number
-                        }
-
-                        // Check for missing fields
-                        const missingFields = getMissingFields(session.data);
-                        if (missingFields.length > 0) {
-                            session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                            await askForNextMissingField(session, from);
-                        } else {
-                            // If no missing fields, proceed to quantity selection
-                            session.step = STATES.QUANTITY;
-                            await sendQuantitySelection(from, session.language);
-                        }
-                    }
-                } else {
-                    // If the message is not a request, treat it as a general message
-                    const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-
-                    if (session.inRequest) {
-                        // User has started a request
-                        const lang = session?.language || "en"; // Define lang based on session.language
-                        await sendToWhatsApp(from, `${aiResponse}\n\n${lang === 'ar'
-                            ? "🔹من فضلك اكمل اجراءات الطلب"
-                            : "🔹Please complete the application process."}`);
-                    } else {
-                        // User has not started a request
-                        const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-                        await sendInteractiveButtons(from, reply, [
-                            { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-                            { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-                        ]);
-                    }
-
-                }
-                return res.sendStatus(200);
-            }
-            return res.sendStatus(200);
         }
 
         // Handle voice messages
