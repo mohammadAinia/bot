@@ -819,37 +819,7 @@ async function askForNextMissingField(session, from) {
 }
 
 async function isQuestionOrRequest(text) {
-    // Patterns for detecting answers
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // Basic email regex
-    const namePattern = /^[A-Za-z\s]{2,30}$/; // Simple name regex (2-30 characters, letters and spaces)
-    const quantityPattern = /(\d+)\s*liters?/i; // Matches "50 liters", "100 liter", etc.
-    const addressPattern = /(street|st\.|avenue|ave\.|road|rd\.|building|bldg\.|flat|apartment|apt\.)/i; // Matches common address terms
-    const nameAndQuantityPattern = /(\b[A-Za-z]+\b).*?(\d+)\s*liters?.*?(order|request|pickup|collect)/i; // Matches "I am Khaled and I have 40 liters of oil."
-
-    // Check if the input matches any answer pattern
-    if (emailPattern.test(text)) {
-        return "answer"; // Classify as answer if it's an email
-    }
-    if (namePattern.test(text)) {
-        return "answer"; // Classify as answer if it looks like a name
-    }
-    if (quantityPattern.test(text)) {
-        return "answer"; // Classify as answer if it's a quantity
-    }
-    if (addressPattern.test(text)) {
-        return "answer"; // Classify as answer if it looks like an address
-    }
-    if (nameAndQuantityPattern.test(text)) {
-        return "request"; // Classify as request if it contains both name and quantity
-    }
-
-    // Fallback mechanism
-    const fallbackKeywords = ["oil", "liters", "pickup", "collect", "order", "request"];
-    if (fallbackKeywords.some(keyword => text.toLowerCase().includes(keyword))) {
-        return "request";
-    }
-
-    // If no patterns match, use the OpenAI prompt for classification
+    // Use OpenAI prompt for classification
     const prompt = `
     Classify the user's input into one of the following categories:
     
@@ -861,12 +831,28 @@ async function isQuestionOrRequest(text) {
        - "I need a pickup for used oil"
        - "New order request"
        - "I am Mohammad and I have 50 liters in Sharjah"
-        - "أريد إنشاء طلب جديد"
-        - "لدي زيت أريد التخلص منه"
-        - "الرجاء جمع الزيت من موقعي"
-        - "أحتاج إلى استلام الزيت المستعمل"
-        - "طلب جديد"
-        - "أنا محمد ولدي 50 لتر في الشارقة"
+       - "I would like to submit a request."
+       - "أريد إنشاء طلب جديد"
+       - "لدي زيت أريد التخلص منه"
+       - "الرجاء جمع الزيت من موقعي"
+       - "أحتاج إلى استلام الزيت المستعمل"
+       - "طلب جديد"
+       - "أنا محمد ولدي 50 لتر في الشارقة"
+       - "I am Khaled and I have 32 liters of oil."
+       - "Can you collect 20 liters of used oil from my location?"
+       - "I need to schedule a pickup for 50 liters of oil."
+       - "I have 100 liters of used oil in Abu Dhabi."
+       - "Please arrange a collection for 30 liters of oil."
+       - "I want to dispose of 40 liters of oil."
+       - "I am Ahmed and I have 60 liters of oil in Dubai."
+       - "Can you help me with a pickup for 25 liters of oil?"
+       - "I need to submit a request for oil collection."
+       - "I have 70 liters of oil in Sharjah."
+       - "أريد حجز موعد لجمع 50 لتر من الزيت."
+       - "لدي 30 لتر من الزيت في دبي."
+       - "أحتاج إلى جمع 40 لتر من الزيت المستعمل."
+       - "أنا علي ولدي 20 لتر من الزيت في أبوظبي."
+       - "الرجاء مساعدتي في جمع 60 لتر من الزيت."
     
     2️⃣ **"question"** → If the user is **asking for information** about the company, services, or anything general. Examples:
        - "What services do you provide?"
