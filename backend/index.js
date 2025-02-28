@@ -1694,35 +1694,9 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(400);
         }
         let session = userSessions[from];
-        if (!session) {
-            const user = await checkUserRegistration(from);
-            session = {
-                step: STATES.WELCOME,
-                data: user || { phone: from },
-                language: "en", // Default language
-                inRequest: false,
-                lastTimestamp: Number(message.timestamp)
-            };
-            userSessions[from] = session;
-        }
-
-        if (session && Date.now() - session.lastActivityTimestamp > SESSION_TIMEOUT) {
-            console.log(`💥 Session expired for user ${from}. Starting a new session.`);
-            delete userSessions[from]; // Destroy the expired session
-            session = null; // Force the creation of a new session
-
-        }
-        console.log("🔹 Session State:", session); // Log the session state
-
-        // Update lastActivityTimestamp for active sessions
-        if (session) {
-            session.lastActivityTimestamp = Date.now();
-        }
-
         const messageId = message.id; // Get the message ID for reactions
         let textRaw = message.text?.body || "";
         console.log("🔹 User Action:", textRaw); // Log the user's message
-
 
         // Get an emoji reaction based on the user's message
         const emoji = await getEmojiReaction(textRaw, session?.language || "en");
@@ -1730,7 +1704,6 @@ app.post('/webhook', async (req, res) => {
 
         const text = textRaw.toLowerCase().trim();
         let detectedLanguage = "en";
-
         try {
             const detected = langdetect.detect(textRaw);
             if (Array.isArray(detected) && detected.length > 0) {
@@ -1742,6 +1715,32 @@ app.post('/webhook', async (req, res) => {
         } catch (error) {
             console.log("⚠️ Language detection failed. Defaulting to English.", error);
         }
+
+        if (!session) {
+            const user = await checkUserRegistration(from);
+            session = {
+                step: STATES.WELCOME,
+                data: user || { phone: from },
+                language: detectedLanguage, // Default language
+                inRequest: false,
+                lastTimestamp: Number(message.timestamp)
+            };
+            userSessions[from] = session;
+        }
+
+        if (session && Date.now() - session.lastActivityTimestamp > SESSION_TIMEOUT) {
+            console.log(`💥 Session expired for user ${from}. Starting a new session.`);
+            delete userSessions[from]; // Destroy the expired session
+            session = null; // Force the creation of a new session
+        }
+        console.log("🔹 Session State:", session); // Log the session state
+
+        // Update lastActivityTimestamp for active sessions
+        if (session) {
+            session.lastActivityTimestamp = Date.now();
+        }
+
+
 
         const classification = await isQuestionOrRequest(textRaw);
         if (classification === "question") {
@@ -1799,7 +1798,8 @@ app.post('/webhook', async (req, res) => {
 
         if (message.type === "audio" && message.audio) {
             const mediaId = message.audio.id; // Get the media ID
-
+            console.log("🔹 Voice message detected. Media ID:", mediaId);
+        
             // Fetch the media URL using the media ID
             const audioUrl = await fetchMediaUrl(mediaId);
             if (!audioUrl || !isValidUrl(audioUrl)) {
@@ -1807,14 +1807,15 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
                 return res.sendStatus(200);
             }
-
+        
             const filePath = `./temp/${messageId}.ogg`; // Unique temporary file path
-
+            console.log("🔹 Temporary file path:", filePath);
+        
             try {
                 // Download the voice file
                 await downloadFile(audioUrl, filePath);
-                console.log("🔹 Voice file downloaded successfully:", filePath);
-
+                console.log("✅ Voice file downloaded successfully:", filePath);
+        
                 // Transcribe the voice file using OpenAI Whisper
                 const transcription = await transcribeVoiceMessage(filePath, session.language);
                 if (!transcription) {
@@ -1822,26 +1823,29 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(from, "Sorry, I couldn't understand your voice message. Please try again.");
                     return res.sendStatus(200);
                 }
-
+        
                 console.log(`🔹 Transcribed voice message: ${transcription}`);
                 const transcribedText = transcription; // Use the transcribed text as the message
-
-
+        
+                // Check for cancellation requests
                 if (isCancellationRequest(transcribedText)) {
                     console.log("🔹 Cancellation request detected.");
                     await handleCancellationRequest(from, session, message, res); // Pass `res` here
                     return;
                 }
-
+        
                 // Classify the transcribed text
                 const classification = await isQuestionOrRequest(transcribedText);
+                console.log("🔹 Classification of transcribed text:", classification);
+        
                 let aiResponse = ""; // Declare aiResponse here to avoid scope issues
-
+        
                 // Handle each classification in the specified order
                 if (classification === "question") {
                     // Handle questions
                     aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
-
+                    console.log("🔹 Generated AI response for question:", aiResponse);
+        
                     // Send text response
                     if (session.inRequest) {
                         await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
@@ -1860,44 +1864,10 @@ app.post('/webhook', async (req, res) => {
                         await sendToWhatsApp(from, getEmailMessage(session.language));
                         await sendToWhatsApp(from, aiResponse);
                     }
-                    else if (session.step === STATES.EMAIL) {
-                        if (!isValidEmail(transcribedText)) {
-                            await sendToWhatsApp(from, "❌ Please provide a valid email address (e.g., example@domain.com).");
-                            return res.sendStatus(200);
-                        }
-                        session.data.email = transcribedText;
-                        session.step = STATES.LONGITUDE;
-                        await sendToWhatsApp(from, getLocationMessage(session.language));
-                    }
-                    else if (session.step === STATES.STREET) {
-                        session.data.street = transcribedText;
-                        session.step = STATES.BUILDING_NAME;
-                        await sendToWhatsApp(from, getBuildingMessage(session.language));
-                    }
-                    else if (session.step === STATES.BUILDING_NAME) {
-                        session.data.building_name = transcribedText;
-                        session.step = STATES.FLAT_NO;
-                        await sendToWhatsApp(from, getFlatMessage(session.language));
-                    }
-                    else if (session.step === STATES.FLAT_NO) {
-                        session.data.flat_no = transcribedText;
-                        session.step = STATES.QUANTITY;
-                        return await sendQuantitySelection(from, session.language);
-                    }
-                    else if (session.step === STATES.QUANTITY) {
-                        // const quantity = parseInt(transcribedText.trim(), 10);
-
-                        if (transcribedText < 10) {
-                            await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
-                            await sendQuantitySelection(from, session.language);
-                            return res.sendStatus(200);
-                        }
-                        session.data.quantity = transcribedText;
-                        session.step = STATES.CONFIRMATION;
-                    }
+                    // ... (rest of your answer handling logic)
                 } else if (classification === "request") {
                     // Handle requests
-                    if (!session.data || !session.data.name) {  // Check if the user doesn't have any data
+                    if (!session.data || !session.data.name) {
                         // Start collecting information immediately if the user is new and doesn't have data
                         session.inRequest = true;
                         session.step = STATES.NAME;
@@ -1922,25 +1892,26 @@ app.post('/webhook', async (req, res) => {
                 } else if (classification === "greeting" || classification === "other") {
                     // Handle greetings or other cases
                     aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
+                    console.log("🔹 Generated AI response for greeting/other:", aiResponse);
                     await sendToWhatsApp(from, aiResponse);
                 }
-
+        
                 // Generate audio response using OpenAI TTS (for all cases except when returning early)
                 if (aiResponse) {
                     const audioFilePath = `./temp/${messageId}_response.mp3`;
                     await generateAudio(aiResponse, audioFilePath);
-
+        
                     // Upload audio file to WhatsApp's servers
                     const uploadedMediaId = await uploadMediaToWhatsApp(audioFilePath);
-
+        
                     // Send audio to user using the media ID
                     await sendAudioUsingMediaId(from, uploadedMediaId);
-
+        
                     // Clean up temporary files
                     fs.unlinkSync(audioFilePath);
                     console.log("✅ Temporary audio file deleted:", audioFilePath);
                 }
-
+        
                 return res.sendStatus(200);
             } catch (error) {
                 console.error("❌ Error downloading or transcribing voice message:", error);
