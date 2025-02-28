@@ -1693,13 +1693,34 @@ app.post('/webhook', async (req, res) => {
             console.error("❌ Error: Missing 'from' field in message.");
             return res.sendStatus(400);
         }
+
+        // Initialize or retrieve the user session
+        let session = userSessions[from];
+        if (!session || (session && Date.now() - session.lastActivityTimestamp > SESSION_TIMEOUT)) {
+            console.log(`💥 Session expired for user ${from}. Starting a new session.`);
+            const user = await checkUserRegistration(from);
+            session = {
+                step: STATES.WELCOME,
+                data: user || { phone: from },
+                language: "en", // Default language
+                inRequest: false,
+                lastTimestamp: Number(message.timestamp),
+                lastActivityTimestamp: Date.now()
+            };
+            userSessions[from] = session;
+        }
+
+        console.log("🔹 Session State:", session); // Log the session state
+
+        // Update lastActivityTimestamp for active sessions
+        session.lastActivityTimestamp = Date.now();
+
         const messageId = message.id; // Get the message ID for reactions
         let textRaw = message.text?.body || "";
         console.log("🔹 User Action:", textRaw); // Log the user's message
 
-
         // Get an emoji reaction based on the user's message
-        const emoji = await getEmojiReaction(textRaw, session?.language || "en");
+        const emoji = await getEmojiReaction(textRaw, session.language);
         await sendReaction(from, messageId, emoji); // Send the reaction
 
         const text = textRaw.toLowerCase().trim();
@@ -1717,33 +1738,8 @@ app.post('/webhook', async (req, res) => {
             console.log("⚠️ Language detection failed. Defaulting to English.", error);
         }
 
-        let session = userSessions[from];
-        if (!session || (session && Date.now() - session.lastActivityTimestamp > SESSION_TIMEOUT)) {
-            console.log(`💥 Session expired for user ${from}. Starting a new session.`);
-            const user = await checkUserRegistration(from);
-            session = {
-                step: STATES.WELCOME,
-                data: user || { phone: from },
-                language: detectedLanguage, // Default language
-                inRequest: false,
-                lastTimestamp: Number(message.timestamp),
-                lastActivityTimestamp: Date.now()
-            };
-            userSessions[from] = session;
-        }
-
-        if (session && Date.now() - session.lastActivityTimestamp > SESSION_TIMEOUT) {
-            console.log(`💥 Session expired for user ${from}. Starting a new session.`);
-            delete userSessions[from]; // Destroy the expired session
-            session = null; // Force the creation of a new session
-
-        }
-        console.log("🔹 Session State:", session); // Log the session state
-
-        // Update lastActivityTimestamp for active sessions
-        if (session) {
-            session.lastActivityTimestamp = Date.now();
-        }
+        // Update the session language
+        session.language = detectedLanguage;
 
 
 
