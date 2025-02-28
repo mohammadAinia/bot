@@ -1746,22 +1746,23 @@ app.post('/webhook', async (req, res) => {
                 //     { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
                 //     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
                 // ]);
-                userSessions[from] = {
+                session = userSessions[from] = {
                     step: STATES.WELCOME,
                     data: user,
                     language: detectedLanguage,
                     inRequest: false,
                     lastTimestamp: Number(message.timestamp)
                 };
+
             } else {
-                userSessions[from] = {
+                session = userSessions[from] = {
                     step: STATES.WELCOME,
                     data: { phone: from },
                     language: detectedLanguage,
                     inRequest: false,
                     lastTimestamp: Number(message.timestamp)
                 };
-                
+
                 // const welcomeMessage = await getOpenAIResponse(
                 //     "Generate a WhatsApp welcome message for Lootah Biofuels.",
                 //     "",
@@ -1772,9 +1773,11 @@ app.post('/webhook', async (req, res) => {
                 //     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
                 // ]);
             }
+            userSessions[from] = session;
+
             if (message.type === "audio" && message.audio) {
                 const mediaId = message.audio.id; // Get the media ID
-    
+
                 // Fetch the media URL using the media ID
                 const audioUrl = await fetchMediaUrl(mediaId);
                 if (!audioUrl || !isValidUrl(audioUrl)) {
@@ -1782,14 +1785,14 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
                     return res.sendStatus(200);
                 }
-    
+
                 const filePath = `./temp/${messageId}.ogg`; // Unique temporary file path
-    
+
                 try {
                     // Download the voice file
                     await downloadFile(audioUrl, filePath);
                     console.log("🔹 Voice file downloaded successfully:", filePath);
-    
+
                     // Transcribe the voice file using OpenAI Whisper
                     const transcription = await transcribeVoiceMessage(filePath, session?.language || "en");
                     if (!transcription) {
@@ -1797,26 +1800,26 @@ app.post('/webhook', async (req, res) => {
                         await sendToWhatsApp(from, "Sorry, I couldn't understand your voice message. Please try again.");
                         return res.sendStatus(200);
                     }
-    
+
                     console.log(`🔹 Transcribed voice message: ${transcription}`);
                     const transcribedText = transcription; // Use the transcribed text as the message
-    
-    
+
+
                     if (isCancellationRequest(transcribedText)) {
                         console.log("🔹 Cancellation request detected.");
                         await handleCancellationRequest(from, session, message, res); // Pass `res` here
                         return;
                     }
-    
+
                     // Classify the transcribed text
                     const classification = await isQuestionOrRequest(transcribedText);
                     let aiResponse = ""; // Declare aiResponse here to avoid scope issues
-    
+
                     // Handle each classification in the specified order
                     if (classification === "question") {
                         // Handle questions
                         aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
-    
+
                         // Send text response
                         if (session.inRequest) {
                             await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
@@ -1861,7 +1864,7 @@ app.post('/webhook', async (req, res) => {
                         }
                         else if (session.step === STATES.QUANTITY) {
                             // const quantity = parseInt(transcribedText.trim(), 10);
-    
+
                             if (transcribedText < 10) {
                                 await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
                                 await sendQuantitySelection(from, session.language);
@@ -1899,23 +1902,23 @@ app.post('/webhook', async (req, res) => {
                         aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
                         await sendToWhatsApp(from, aiResponse);
                     }
-    
+
                     // Generate audio response using OpenAI TTS (for all cases except when returning early)
                     if (aiResponse) {
                         const audioFilePath = `./temp/${messageId}_response.mp3`;
                         await generateAudio(aiResponse, audioFilePath);
-    
+
                         // Upload audio file to WhatsApp's servers
                         const uploadedMediaId = await uploadMediaToWhatsApp(audioFilePath);
-    
+
                         // Send audio to user using the media ID
                         await sendAudioUsingMediaId(from, uploadedMediaId);
-    
+
                         // Clean up temporary files
                         fs.unlinkSync(audioFilePath);
                         console.log("✅ Temporary audio file deleted:", audioFilePath);
                     }
-    
+
                     return res.sendStatus(200);
                 } catch (error) {
                     console.error("❌ Error downloading or transcribing voice message:", error);
