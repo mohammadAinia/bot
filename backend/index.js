@@ -1694,42 +1694,6 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(400);
         }
         let session = userSessions[from];
-        if (!session) {
-            const user = await checkUserRegistration(from);
-            if (user && user.name) {
-
-                userSessions[from] = {
-                    step: STATES.WELCOME,
-                    data: user,
-                    language: detectedLanguage,
-                    inRequest: false,
-                    lastTimestamp: Number(message.timestamp)
-                };
-
-            } else {
-                // if (isGreeting) {
-                //     const welcomeMessage = await getOpenAIResponse(
-                //         "Generate a WhatsApp welcome message for Lootah Biofuels.",
-                //         "",
-                //         detectedLanguage
-                //     );
-                //     await sendInteractiveButtons(from, welcomeMessage, [
-                //         { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
-                //         { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
-                //     ]);
-                // }
-                userSessions[from] = {
-                    step: STATES.WELCOME,
-                    data: { phone: from },
-                    language: detectedLanguage,
-                    inRequest: false,
-                    lastTimestamp: Number(message.timestamp)
-                };
-
-            }
-            
-            return res.sendStatus(200);
-        }
 
         if (session && Date.now() - session.lastActivityTimestamp > SESSION_TIMEOUT) {
             console.log(`💥 Session expired for user ${from}. Starting a new session.`);
@@ -1768,7 +1732,42 @@ app.post('/webhook', async (req, res) => {
             console.log("⚠️ Language detection failed. Defaulting to English.", error);
         }
 
+        if (!session) {
+            const user = await checkUserRegistration(from);
+            if (user && user.name) {
 
+                userSessions[from] = {
+                    step: STATES.WELCOME,
+                    data: user,
+                    language: detectedLanguage,
+                    inRequest: false,
+                    lastTimestamp: Number(message.timestamp)
+                };
+
+            } else {
+                // if (isGreeting) {
+                //     const welcomeMessage = await getOpenAIResponse(
+                //         "Generate a WhatsApp welcome message for Lootah Biofuels.",
+                //         "",
+                //         detectedLanguage
+                //     );
+                //     await sendInteractiveButtons(from, welcomeMessage, [
+                //         { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
+                //         { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
+                //     ]);
+                // }
+                userSessions[from] = {
+                    step: STATES.WELCOME,
+                    data: { phone: from },
+                    language: detectedLanguage,
+                    inRequest: false,
+                    lastTimestamp: Number(message.timestamp)
+                };
+
+            }
+            
+            return res.sendStatus(200);
+        }
 
         const isGreeting = await isGreetingOrGeneralInquiry(textRaw);
         const user = await checkUserRegistration(from);
