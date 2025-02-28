@@ -1694,6 +1694,17 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(400);
         }
         let session = userSessions[from];
+        if (!session) {
+            const user = await checkUserRegistration(from);
+            session = {
+                step: STATES.WELCOME,
+                data: user || { phone: from },
+                language: "en", // Default language
+                inRequest: false,
+                lastTimestamp: Number(message.timestamp)
+            };
+            userSessions[from] = session;
+        }
 
         if (session && Date.now() - session.lastActivityTimestamp > SESSION_TIMEOUT) {
             console.log(`💥 Session expired for user ${from}. Starting a new session.`);
@@ -1732,7 +1743,28 @@ app.post('/webhook', async (req, res) => {
             console.log("⚠️ Language detection failed. Defaulting to English.", error);
         }
 
-        if (!session) {
+        const classification = await isQuestionOrRequest(textRaw);
+        if (classification === "question") {
+            const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+            if (session.inRequest) {
+                // await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
+
+                const lang = session?.language || "en"; // Define lang based on session.language
+                await sendToWhatsApp(from, lang === 'ar' ? `${aiResponse}\n\nمن فضلك اكمل معلومات الطلب.` :
+                    `${aiResponse}\n\nPlease complete the request information.`
+                );
+
+            } else {
+                const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+                await sendInteractiveButtons(from, reply, [
+                    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+                    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+                ]);
+            }
+            return res.sendStatus(200);
+        }
+        const greate = await isGreetingOrGeneralInquiry(textRaw)
+        if (greate) {
             const user = await checkUserRegistration(from);
             if (user && user.name) {
                 let welcomeMessage = await getOpenAIResponse(
@@ -1744,21 +1776,7 @@ app.post('/webhook', async (req, res) => {
                     { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
                     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
                 ]);
-                userSessions[from] = {
-                    step: STATES.WELCOME,
-                    data: user,
-                    language: detectedLanguage,
-                    inRequest: false,
-                    lastTimestamp: Number(message.timestamp)
-                };
             } else {
-                userSessions[from] = {
-                    step: STATES.WELCOME,
-                    data: { phone: from },
-                    language: detectedLanguage,
-                    inRequest: false,
-                    lastTimestamp: Number(message.timestamp)
-                };
                 const welcomeMessage = await getOpenAIResponse(
                     "Generate a WhatsApp welcome message for Lootah Biofuels.",
                     "",
@@ -1769,8 +1787,12 @@ app.post('/webhook', async (req, res) => {
                     { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
                 ]);
             }
-            return res.sendStatus(200);
         }
+
+        // if (!session) {
+
+        //     return res.sendStatus(200);
+        // }
 
         // Handle voice messages
 
@@ -1975,26 +1997,7 @@ app.post('/webhook', async (req, res) => {
         }
         session.lastTimestamp = Number(message.timestamp);
 
-        const classification = await isQuestionOrRequest(textRaw);
-        if (classification === "question") {
-            const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-            if (session.inRequest) {
-                // await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
 
-                const lang = session?.language || "en"; // Define lang based on session.language
-                await sendToWhatsApp(from, lang === 'ar' ? `${aiResponse}\n\nمن فضلك اكمل معلومات الطلب.` :
-                    `${aiResponse}\n\nPlease complete the request information.`
-                );
-
-            } else {
-                const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-                await sendInteractiveButtons(from, reply, [
-                    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-                    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-                ]);
-            }
-            return res.sendStatus(200);
-        }
 
         // Check for cancellation requests
         if (isCancellationRequest(textRaw)) {
