@@ -1735,7 +1735,7 @@ app.post('/webhook', async (req, res) => {
         if (!session) {
             const user = await checkUserRegistration(from);
             if (user && user.name) {
-                const isGreeting = await detectGreeting(textRaw);
+                const isGreeting = await isGreetingOrGeneralInquiry(textRaw);
                 if (isGreeting) {
                     let welcomeMessage = await getOpenAIResponse(
                         `Welcome back, ${user.name}. Generate a WhatsApp welcome message for Lootah Biofuels.`,
