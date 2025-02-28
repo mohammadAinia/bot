@@ -1689,6 +1689,10 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(400);
         }
 
+        const messageId = message.id; // Get the message ID for reactions
+        let textRaw = message.text?.body || "";
+        console.log("🔹 User Action:", textRaw); // Log the user's message
+
         let detectedLanguage = "en";
 
         try {
@@ -1724,9 +1728,7 @@ app.post('/webhook', async (req, res) => {
         // Update lastActivityTimestamp for active sessions
         session.lastActivityTimestamp = Date.now();
 
-        const messageId = message.id; // Get the message ID for reactions
-        let textRaw = message.text?.body || "";
-        console.log("🔹 User Action:", textRaw); // Log the user's message
+
 
         // Get an emoji reaction based on the user's message
         const emoji = await getEmojiReaction(textRaw, session.language);
