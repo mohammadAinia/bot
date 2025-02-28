@@ -1693,43 +1693,32 @@ app.post('/webhook', async (req, res) => {
             console.error("❌ Error: Missing 'from' field in message.");
             return res.sendStatus(400);
         }
-
         let session = userSessions[from];
 
         if (session && Date.now() - session.lastActivityTimestamp > SESSION_TIMEOUT) {
             console.log(`💥 Session expired for user ${from}. Starting a new session.`);
             delete userSessions[from]; // Destroy the expired session
             session = null; // Force the creation of a new session
-        }
 
-        // Initialize session if it doesn't exist
-        if (!session) {
-            const user = await checkUserRegistration(from);
-            const detectedLanguage = user?.language || "en"; // Ensure detectedLanguage is set
-
-            session = userSessions[from] = {
-                step: STATES.WELCOME,
-                data: user || { phone: from },
-                language: detectedLanguage,
-                inRequest: false,
-                lastTimestamp: Number(message.timestamp),
-                lastActivityTimestamp: Date.now(),
-            };
         }
+        console.log("🔹 Session State:", session); // Log the session state
 
         // Update lastActivityTimestamp for active sessions
-        session.lastActivityTimestamp = Date.now();
+        if (session) {
+            session.lastActivityTimestamp = Date.now();
+        }
 
         const messageId = message.id; // Get the message ID for reactions
         let textRaw = message.text?.body || "";
         console.log("🔹 User Action:", textRaw); // Log the user's message
+
 
         // Get an emoji reaction based on the user's message
         const emoji = await getEmojiReaction(textRaw, session?.language || "en");
         await sendReaction(from, messageId, emoji); // Send the reaction
 
         const text = textRaw.toLowerCase().trim();
-        let detectedLanguage = session.language || "en";
+        let detectedLanguage = "en";
 
         try {
             const detected = langdetect.detect(textRaw);
@@ -1743,7 +1732,49 @@ app.post('/webhook', async (req, res) => {
             console.log("⚠️ Language detection failed. Defaulting to English.", error);
         }
 
+        if (!session) {
+            const user = await checkUserRegistration(from);
+            if (user && user.name) {
+                let welcomeMessage = await getOpenAIResponse(
+                    `Welcome back, ${user.name}. Generate a WhatsApp welcome message for Lootah Biofuels.`,
+                    "",
+                    detectedLanguage
+                );
+                await sendInteractiveButtons(from, welcomeMessage, [
+                    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
+                    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
+                ]);
+                userSessions[from] = {
+                    step: STATES.WELCOME,
+                    data: user,
+                    language: detectedLanguage,
+                    inRequest: false,
+                    lastTimestamp: Number(message.timestamp)
+                };
+            } else {
+                userSessions[from] = {
+                    step: STATES.WELCOME,
+                    data: { phone: from },
+                    language: detectedLanguage,
+                    inRequest: false,
+                    lastTimestamp: Number(message.timestamp)
+                };
+                const welcomeMessage = await getOpenAIResponse(
+                    "Generate a WhatsApp welcome message for Lootah Biofuels.",
+                    "",
+                    detectedLanguage
+                );
+                await sendInteractiveButtons(from, welcomeMessage, [
+                    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", detectedLanguage) } },
+                    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", detectedLanguage) } }
+                ]);
+            }
+            return res.sendStatus(200);
+        }
+
         // Handle voice messages
+
+
         if (message.type === "audio" && message.audio) {
             const mediaId = message.audio.id; // Get the media ID
 
@@ -1772,6 +1803,7 @@ app.post('/webhook', async (req, res) => {
 
                 console.log(`🔹 Transcribed voice message: ${transcription}`);
                 const transcribedText = transcription; // Use the transcribed text as the message
+
 
                 if (isCancellationRequest(transcribedText)) {
                     console.log("🔹 Cancellation request detected.");
@@ -1805,7 +1837,8 @@ app.post('/webhook', async (req, res) => {
                         session.step = STATES.EMAIL;
                         await sendToWhatsApp(from, getEmailMessage(session.language));
                         await sendToWhatsApp(from, aiResponse);
-                    } else if (session.step === STATES.EMAIL) {
+                    }
+                    else if (session.step === STATES.EMAIL) {
                         if (!isValidEmail(transcribedText)) {
                             await sendToWhatsApp(from, "❌ Please provide a valid email address (e.g., example@domain.com).");
                             return res.sendStatus(200);
@@ -1813,19 +1846,25 @@ app.post('/webhook', async (req, res) => {
                         session.data.email = transcribedText;
                         session.step = STATES.LONGITUDE;
                         await sendToWhatsApp(from, getLocationMessage(session.language));
-                    } else if (session.step === STATES.STREET) {
+                    }
+                    else if (session.step === STATES.STREET) {
                         session.data.street = transcribedText;
                         session.step = STATES.BUILDING_NAME;
                         await sendToWhatsApp(from, getBuildingMessage(session.language));
-                    } else if (session.step === STATES.BUILDING_NAME) {
+                    }
+                    else if (session.step === STATES.BUILDING_NAME) {
                         session.data.building_name = transcribedText;
                         session.step = STATES.FLAT_NO;
                         await sendToWhatsApp(from, getFlatMessage(session.language));
-                    } else if (session.step === STATES.FLAT_NO) {
+                    }
+                    else if (session.step === STATES.FLAT_NO) {
                         session.data.flat_no = transcribedText;
                         session.step = STATES.QUANTITY;
                         return await sendQuantitySelection(from, session.language);
-                    } else if (session.step === STATES.QUANTITY) {
+                    }
+                    else if (session.step === STATES.QUANTITY) {
+                        // const quantity = parseInt(transcribedText.trim(), 10);
+
                         if (transcribedText < 10) {
                             await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
                             await sendQuantitySelection(from, session.language);
@@ -1836,7 +1875,7 @@ app.post('/webhook', async (req, res) => {
                     }
                 } else if (classification === "request") {
                     // Handle requests
-                    if (!session.data || !session.data.name) {
+                    if (!session.data || !session.data.name) {  // Check if the user doesn't have any data
                         // Start collecting information immediately if the user is new and doesn't have data
                         session.inRequest = true;
                         session.step = STATES.NAME;
@@ -1894,28 +1933,6 @@ app.post('/webhook', async (req, res) => {
             }
         }
 
-        // Handle text messages
-        const classification = await isQuestionOrRequest(textRaw);
-        if (classification === "question") {
-            const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-            if (session.inRequest) {
-                // await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
-
-                const lang = session?.language || "en"; // Define lang based on session.language
-                await sendToWhatsApp(from, lang === 'ar' ? `${aiResponse}\n\nمن فضلك اكمل معلومات الطلب.` :
-                    `${aiResponse}\n\nPlease complete the request information.`
-                );
-
-            } else {
-                const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
-                await sendInteractiveButtons(from, reply, [
-                    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
-                    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
-                ]);
-            }
-            return res.sendStatus(200);
-        }
-
         if (message.type === "interactive" && message.interactive?.type === "button_reply") {
             const buttonId = message.interactive.button_reply.id;
             if (buttonId === "new_request") {
@@ -1958,7 +1975,26 @@ app.post('/webhook', async (req, res) => {
         }
         session.lastTimestamp = Number(message.timestamp);
 
+        const classification = await isQuestionOrRequest(textRaw);
+        if (classification === "question") {
+            const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
+            if (session.inRequest) {
+                // await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
 
+                const lang = session?.language || "en"; // Define lang based on session.language
+                await sendToWhatsApp(from, lang === 'ar' ? `${aiResponse}\n\nمن فضلك اكمل معلومات الطلب.` :
+                    `${aiResponse}\n\nPlease complete the request information.`
+                );
+
+            } else {
+                const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
+                await sendInteractiveButtons(from, reply, [
+                    { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
+                    { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
+                ]);
+            }
+            return res.sendStatus(200);
+        }
 
         // Check for cancellation requests
         if (isCancellationRequest(textRaw)) {
