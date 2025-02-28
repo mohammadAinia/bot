@@ -1689,9 +1689,34 @@ app.post('/webhook', async (req, res) => {
             return res.sendStatus(400);
         }
 
+        let detectedLanguage = "en";
+
+        try {
+            const detected = langdetect.detect(textRaw);
+            if (Array.isArray(detected) && detected.length > 0) {
+                detectedLanguage = detected[0].lang;
+            }
+            if (detectedLanguage !== "ar" && detectedLanguage !== "en") {
+                detectedLanguage = "en";
+            }
+        } catch (error) {
+            console.log("⚠️ Language detection failed. Defaulting to English.", error);
+        }
         // Initialize or retrieve the user session
         let session = userSessions[from];
-
+        if (!session || (session && Date.now() - session.lastActivityTimestamp > SESSION_TIMEOUT)) {
+            console.log(`💥 Session expired for user ${from}. Starting a new session.`);
+            const user = await checkUserRegistration(from);
+            session = {
+                step: STATES.WELCOME,
+                data: user || { phone: from },
+                language: detectedLanguage, // Default language
+                inRequest: false,
+                lastTimestamp: Number(message.timestamp),
+                lastActivityTimestamp: Date.now()
+            };
+            userSessions[from] = session;
+        }
 
         console.log("🔹 Session State:", session); // Log the session state
 
@@ -1707,31 +1732,7 @@ app.post('/webhook', async (req, res) => {
         await sendReaction(from, messageId, emoji); // Send the reaction
 
         const text = textRaw.toLowerCase().trim();
-        let detectedLanguage = "en";
-        try {
-            const detected = langdetect.detect(textRaw);
-            if (Array.isArray(detected) && detected.length > 0) {
-                detectedLanguage = detected[0].lang;
-            }
-            if (detectedLanguage !== "ar" && detectedLanguage !== "en") {
-                detectedLanguage = "en";
-            }
-        } catch (error) {
-            console.log("⚠️ Language detection failed. Defaulting to English.", error);
-        }
-        if (!session || (session && Date.now() - session.lastActivityTimestamp > SESSION_TIMEOUT)) {
-            console.log(`💥 Session expired for user ${from}. Starting a new session.`);
-            const user = await checkUserRegistration(from);
-            session = {
-                step: STATES.WELCOME,
-                data: user || { phone: from },
-                language: detectedLanguage, // Default language
-                inRequest: false,
-                lastTimestamp: Number(message.timestamp),
-                lastActivityTimestamp: Date.now()
-            };
-            userSessions[from] = session;
-        }
+
 
         // Update the session language
         // session.language = detectedLanguage;
