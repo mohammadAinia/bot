@@ -1826,158 +1826,66 @@ app.post('/webhook', async (req, res) => {
                     }
                 } else if (classification === "answer") {
                     // Handle answers
-                    if (session.step === "ASK_NAME") {
-                        if (!transcribedText) {
-                            const lang = session?.language || "en"; // Define lang based on session.language
-                            await sendToWhatsApp(from, lang === 'ar'
-                                ? "👤 من فضلك زودنا بالاسم"
-                                : "👤 Please provide your full name.");
-                            return res.sendStatus(200); // Exit and wait for the user's response
-                        }
-                        // If the name is provided, store it and proceed to the next step
+                    // if (session.step === "ASK_NAME") {
+                    //     if (!transcribedText) {
+                    //         const lang = session?.language || "en"; // Define lang based on session.language
+                    //         await sendToWhatsApp(from, lang === 'ar'
+                    //             ? "👤 من فضلك زودنا بالاسم"
+                    //             : "👤 Please provide your full name.");
+                    //         return res.sendStatus(200); // Exit and wait for the user's response
+                    //     }
+                    //     // If the name is provided, store it and proceed to the next step
+                    //     session.data.name = transcribedText;
+                    //     // Check for other missing fields
+                    //     const missingFieldsName = getMissingFields(session.data);
+                    //     if (missingFieldsName.length === 0) {
+                    //         session.step = "CONFIRMATION"; // Use raw string for confirmation step
+                    //         await sendOrderSummary(from, session);
+                    //     } else {
+                    //         session.step = `ASK_${missingFieldsName[0].toUpperCase()}`; // Dynamically set the next step
+                    //         await askForNextMissingField(session, from);
+                    //     }
+                    // }
+                     if (session.step === STATES.NAME) {
                         session.data.name = transcribedText;
-                        // Check for other missing fields
-                        const missingFieldsName = getMissingFields(session.data);
-                        if (missingFieldsName.length === 0) {
-                            session.step = "CONFIRMATION"; // Use raw string for confirmation step
-                            await sendOrderSummary(from, session);
-                        } else {
-                            session.step = `ASK_${missingFieldsName[0].toUpperCase()}`; // Dynamically set the next step
-                            await askForNextMissingField(session, from);
-                        }
-                    }
-                    else if (session.step === "ASK_BUILDING_NAME") {
-                        if (!transcribedText) {
-                            await sendToWhatsApp(
-                                from,
-                                session.language === 'ar'
-                                    ? "🏢 يرجى تقديم اسم المبنى الخاص بك."
-                                    : "🏢 Please provide your building name."
-                            );
-                            return res.sendStatus(200); // Exit and wait for the user's response
-                        }
-                        // If the building name is provided, store it and proceed to the next step
-                        session.data.building_name = transcribedText;
-                        // Check for other missing fields
-                        const missingFieldsBuilding = getMissingFields(session.data);
-                        if (missingFieldsBuilding.length === 0) {
-                            session.step = "CONFIRMATION";
-                            await sendOrderSummary(from, session);
-                        } else {
-                            session.step = `ASK_${missingFieldsBuilding[0].toUpperCase()}`;
-                            await askForNextMissingField(session, from);
-                        }
-                    }
-                    else if (session.step === "ASK_FLAT_NO") {
-                        if (!transcribedText) {
-                            await sendToWhatsApp(
-                                from,
-                                session.language === 'ar'
-                                    ? "🏠 يرجى تقديم رقم الشقة الخاص بك."
-                                    : "🏠 Please provide your flat number."
-                            );
-                            return res.sendStatus(200); // Exit and wait for the user's response
-                        }
-                        // If the flat number is provided, store it and proceed to the next step
-                        session.data.flat_no = transcribedText;
-                        // Check for other missing fields
-                        const missingFieldsFlat = getMissingFields(session.data);
-                        if (missingFieldsFlat.length === 0) {
-                            session.step = "CONFIRMATION";
-                            await sendOrderSummary(from, session);
-                        } else {
-                            session.step = `ASK_${missingFieldsFlat[0].toUpperCase()}`;
-                            await askForNextMissingField(session, from);
-                        }
-                    }
-                    else if (session.step === "ASK_QUANTITY") {
-                        console.log("🔹 Entered QUANTITY state for user:", from);
-                        console.log("🔹 textRaw:", transcribedText);
-
-                        // ✅ Handle button selection (interactive message)
-                        if (message.interactive && message.interactive.type === "button_reply") {
-                            const selectedQuantity = message.interactive.button_reply.id;
-
-                            if (["10", "15", "20"].includes(selectedQuantity)) {
-                                console.log("🔹 User selected predefined quantity:", selectedQuantity);
-                                session.data.quantity = parseInt(selectedQuantity, 10);
-                            } else {
-                                console.log("🔹 Invalid button selection. Asking for valid quantity.");
-                                await sendQuantitySelection(from, session.language);
-                                return res.sendStatus(200);
-                            }
-                        }
-                        // ✅ Handle manual input
-                        else {
-                            if (!transcribedText || transcribedText.trim() === "") {
-                                console.log("🔹 No quantity provided. Asking for quantity.");
-                                await sendQuantitySelection(from, session.language);
-                                return res.sendStatus(200);
-                            }
-                            const convertedTextRaw = convertArabicNumbers(transcribedText.trim());
-                            const quantity = parseInt(convertedTextRaw.trim(), 10);
-
-                            if (isNaN(quantity) || quantity < 10) {
-                                console.log("🔹 Invalid quantity or less than 10 provided. Asking for a valid quantity.");
-                                await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
-                                await sendQuantitySelection(from, session.language);
-                                return res.sendStatus(200);
-                            }
-
-                            console.log("🔹 Valid quantity provided:", quantity);
-                            session.data.quantity = quantity;
-                        }
-
-                        // ✅ Proceed to the next step
-                        const missingFields2 = getMissingFields(session.data);
-                        console.log("🔹 Missing fields after quantity:", missingFields2);
-
-                        if (missingFields2.length === 0) {
-                            session.step = "CONFIRMATION";
-                            await sendOrderSummary(from, session);
-                        } else {
-                            session.step = `ASK_${missingFields2[0].toUpperCase()}`;
-                            await askForNextMissingField(session, from);
-                        }
-                    }
-                    else if (session.step === "NAME") {
-                        session.data.name = transcribedText;
-                        session.step = "EMAIL";
+                        session.step = STATES.EMAIL;
                         await sendToWhatsApp(from, getEmailMessage(session.language));
                         await sendToWhatsApp(from, aiResponse);
                     }
-                    else if (session.step === "EMAIL") {
+                    else if (session.step === STATES.EMAIL) {
                         if (!isValidEmail(transcribedText)) {
                             await sendToWhatsApp(from, "❌ Please provide a valid email address (e.g., example@domain.com).");
                             return res.sendStatus(200);
                         }
                         session.data.email = transcribedText;
-                        session.step = "LONGITUDE";
+                        session.step = STATES.LONGITUDE;
                         await sendToWhatsApp(from, getLocationMessage(session.language));
                     }
-                    else if (session.step === "STREET") {
+                    else if (session.step === STATES.STREET) {
                         session.data.street = transcribedText;
-                        session.step = "BUILDING_NAME";
+                        session.step = STATES.BUILDING_NAME;
                         await sendToWhatsApp(from, getBuildingMessage(session.language));
                     }
-                    else if (session.step === "BUILDING_NAME") {
+                    else if (session.step === STATES.BUILDING_NAME) {
                         session.data.building_name = transcribedText;
-                        session.step = "FLAT_NO";
+                        session.step = STATES.FLAT_NO;
                         await sendToWhatsApp(from, getFlatMessage(session.language));
                     }
-                    else if (session.step === "FLAT_NO") {
+                    else if (session.step === STATES.FLAT_NO) {
                         session.data.flat_no = transcribedText;
-                        session.step = "QUANTITY";
+                        session.step = STATES.QUANTITY;
                         return await sendQuantitySelection(from, session.language);
                     }
-                    else if (session.step === "QUANTITY") {
+                    else if (session.step === STATES.QUANTITY) {
+                        // const quantity = parseInt(transcribedText.trim(), 10);
+
                         if (transcribedText < 10) {
                             await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
                             await sendQuantitySelection(from, session.language);
                             return res.sendStatus(200);
                         }
                         session.data.quantity = transcribedText;
-                        session.step = "CONFIRMATION";
+                        session.step = STATES.CONFIRMATION;
                     }
                 } else if (classification === "request") {
                     // Handle requests
