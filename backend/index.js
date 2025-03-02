@@ -1701,9 +1701,8 @@ app.post('/webhook', async (req, res) => {
 
 
         if (message.type === "audio" && message.audio) {
-
             const mediaId = message.audio.id; // Get the media ID
-
+        
             // Fetch the media URL using the media ID
             const audioUrl = await fetchMediaUrl(mediaId);
             if (!audioUrl || !isValidUrl(audioUrl)) {
@@ -1711,42 +1710,59 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
                 return res.sendStatus(200);
             }
-
+        
             const filePath = `./temp/${messageId}.ogg`; // Unique temporary file path
-
+        
             try {
                 // Download the voice file
                 await downloadFile(audioUrl, filePath);
                 console.log("🔹 Voice file downloaded successfully:", filePath);
-
+        
+                // Detect language from the user's session or transcription
+                let transcriptionLanguage = session.language || "en"; // Default to English if no session language is set
+                console.log("🔹 Initial session language:", transcriptionLanguage);
+        
                 // Transcribe the voice file using OpenAI Whisper
-                const transcription = await transcribeVoiceMessage(filePath, session.language);
+                const transcription = await transcribeVoiceMessage(filePath, transcriptionLanguage);
                 if (!transcription) {
                     console.error("❌ Failed to transcribe voice message. Transcription result is empty.");
                     await sendToWhatsApp(from, "Sorry, I couldn't understand your voice message. Please try again.");
                     return res.sendStatus(200);
                 }
-
+        
                 console.log(`🔹 Transcribed voice message: ${transcription}`);
                 const transcribedText = transcription; // Use the transcribed text as the message
-
-
+        
+                // Validate if transcription contains Arabic
+                const containsArabic = /[\u0600-\u06FF]/.test(transcription);
+                if (containsArabic) {
+                    console.log("🔹 Detected Arabic in transcription. Setting session language to Arabic.");
+                    session.language = "ar";
+                } else {
+                    console.log("🔹 No Arabic detected in transcription. Defaulting to English.");
+                    session.language = "en";
+                }
+        
+                // Log the final detected language
+                console.log("🔹 Final detected language:", session.language);
+        
+                // Handle cancellation requests
                 if (isCancellationRequest(transcribedText)) {
                     console.log("🔹 Cancellation request detected.");
                     await handleCancellationRequest(from, session, message, res); // Pass `res` here
                     return;
                 }
-
+        
                 // Classify the transcribed text
                 const classification = await isQuestionOrRequest(transcribedText);
                 console.log(`🔹 Classification Result: ${classification}, Input: ${transcribedText}`);
                 let aiResponse = ""; // Declare aiResponse here to avoid scope issues
-
+        
                 // Handle each classification in the specified order
                 if (classification === "question") {
                     // Handle questions
                     aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
-
+        
                     // Send text response
                     if (session.inRequest) {
                         await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
