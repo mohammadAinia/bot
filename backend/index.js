@@ -1722,6 +1722,12 @@ app.post('/webhook', async (req, res) => {
                 let transcriptionLanguage = session.language || "en"; // Default to English if no session language is set
                 console.log("🔹 Initial session language:", transcriptionLanguage);
         
+                // Force Arabic transcription if the session language is Arabic
+                if (session.language === 'ar') {
+                    transcriptionLanguage = 'ar';
+                    console.log("🔹 Forcing Arabic transcription because session language is Arabic.");
+                }
+        
                 // Transcribe the voice file using OpenAI Whisper
                 const transcription = await transcribeVoiceMessage(filePath, transcriptionLanguage);
                 if (!transcription) {
