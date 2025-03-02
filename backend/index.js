@@ -1702,7 +1702,7 @@ app.post('/webhook', async (req, res) => {
 
         if (message.type === "audio" && message.audio) {
             const mediaId = message.audio.id; // Get the media ID
-        
+
             // Fetch the media URL using the media ID
             const audioUrl = await fetchMediaUrl(mediaId);
             if (!audioUrl || !isValidUrl(audioUrl)) {
@@ -1710,24 +1710,24 @@ app.post('/webhook', async (req, res) => {
                 await sendToWhatsApp(from, "Sorry, I couldn't process your voice message. Please try again.");
                 return res.sendStatus(200);
             }
-        
+
             const filePath = `./temp/${messageId}.ogg`; // Unique temporary file path
-        
+
             try {
                 // Download the voice file
                 await downloadFile(audioUrl, filePath);
                 console.log("🔹 Voice file downloaded successfully:", filePath);
-        
+
                 // Detect language from the user's session or transcription
                 let transcriptionLanguage = session.language || "en"; // Default to English if no session language is set
                 console.log("🔹 Initial session language:", transcriptionLanguage);
-        
+
                 // Force Arabic transcription if the session language is Arabic
                 if (session.language === 'ar') {
                     transcriptionLanguage = 'ar';
                     console.log("🔹 Forcing Arabic transcription because session language is Arabic.");
                 }
-        
+
                 // Transcribe the voice file using OpenAI Whisper
                 const transcription = await transcribeVoiceMessage(filePath, transcriptionLanguage);
                 if (!transcription) {
@@ -1735,10 +1735,10 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(from, "Sorry, I couldn't understand your voice message. Please try again.");
                     return res.sendStatus(200);
                 }
-        
+
                 console.log(`🔹 Transcribed voice message: ${transcription}`);
                 const transcribedText = transcription; // Use the transcribed text as the message
-        
+
                 // Validate if transcription contains Arabic
                 const containsArabic = /[\u0600-\u06FF]/.test(transcription);
                 if (containsArabic) {
@@ -1748,31 +1748,32 @@ app.post('/webhook', async (req, res) => {
                     console.log("🔹 No Arabic detected in transcription. Defaulting to English.");
                     session.language = "en";
                 }
-        
+
                 // Log the final detected language
                 console.log("🔹 Final detected language:", session.language);
-        
+
                 // Handle cancellation requests
                 if (isCancellationRequest(transcribedText)) {
                     console.log("🔹 Cancellation request detected.");
                     await handleCancellationRequest(from, session, message, res); // Pass `res` here
                     return;
                 }
-        
+
                 // Classify the transcribed text
                 const classification = await isQuestionOrRequest(transcribedText);
                 console.log(`🔹 Classification Result: ${classification}, Input: ${transcribedText}`);
                 let aiResponse = ""; // Declare aiResponse here to avoid scope issues
-        
+
                 // Handle each classification in the specified order
                 if (classification === "question") {
                     // Handle questions
                     aiResponse = await getOpenAIResponse(transcribedText, systemMessage, session.language);
-        
+
                     // Send text response
                     if (session.inRequest) {
-                        await sendToWhatsApp(from, `${aiResponse}\n\nPlease complete the request information.`);
-                    } else {
+                        await sendToWhatsApp(from, `${aiResponse}\n\n${session.language === 'ar'
+                            ? "من فضلك أكمل معلومات الطلب." // Arabic translation: "Please complete the request information."
+                            : "Please complete the request information."}`); // English                    } else {
                         const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
                         await sendInteractiveButtons(from, reply, [
                             { type: "reply", reply: { id: "contact_us", title: getButtonTitle("contact_us", session.language) } },
@@ -1801,7 +1802,7 @@ app.post('/webhook', async (req, res) => {
                             await askForNextMissingField(session, from);
                         }
                     }
-                    else if (session.step === "ASK_BUILDING_NAME"){
+                    else if (session.step === "ASK_BUILDING_NAME") {
                         session.data.building_name = transcribedText;
                         const missingFieldsBuilding = getMissingFields(session.data);
                         if (missingFieldsBuilding.length === 0) {
@@ -1812,7 +1813,7 @@ app.post('/webhook', async (req, res) => {
                             await askForNextMissingField(session, from);
                         }
                     }
-                    else if (session.step === "ASK_FLAT_NO"){
+                    else if (session.step === "ASK_FLAT_NO") {
                         session.data.flat_no = transcribedText;
                         const missingFieldsBuilding = getMissingFields(session.data);
                         if (missingFieldsBuilding.length === 0) {
@@ -1823,10 +1824,10 @@ app.post('/webhook', async (req, res) => {
                             await askForNextMissingField(session, from);
                         }
                     }
-                    else if (session.step === "ASK_QUANTITY"){
+                    else if (session.step === "ASK_QUANTITY") {
                         const convertedTextRaw = convertArabicNumbers(transcribedText.trim());
                         const quantity = parseInt(convertedTextRaw.trim(), 10);
-    
+
                         if (isNaN(quantity) || quantity < 10) {
                             console.log("🔹 Invalid quantity or less than 10 provided. Asking for a valid quantity.");
                             await sendToWhatsApp(from, getInvalidQuantityMessage(session.language));
@@ -1890,21 +1891,28 @@ app.post('/webhook', async (req, res) => {
                         // Start collecting information immediately if the user is new and doesn't have data
                         session.inRequest = true;
                         session.step = STATES.NAME;
-                        aiResponse = "Please provide your name."; // Set aiResponse for voice generation
-                        await sendToWhatsApp(from, aiResponse);
+                        aiResponse = session.language === 'ar'
+                            ? "👤 من فضلك زودنا بالاسم" // Arabic translation: "Please provide your name."
+                            : "👤 Please provide your name."; // English                        await sendToWhatsApp(from, aiResponse);
                     } else {
                         const extractedData = await extractInformationFromText(transcribedText, session.language);
                         if (Object.keys(extractedData).length > 0) {
                             session.step = STATES.CHANGE_INFOO;
-                            aiResponse = "Do you want to change your information?"; // Set aiResponse for voice generation
+                            aiResponse = session.language === 'ar'
+                                ? "هل تريد تغيير معلوماتك؟" // Arabic translation: "Do you want to change your information?"
+                                : "Do you want to change your information?"; // English
                             await sendInteractiveButtons(from, aiResponse, [
-                                { type: "reply", reply: { id: "yes_change", title: "Yes" } },
-                                { type: "reply", reply: { id: "no_change", title: "No" } }
+                                { type: "reply", reply: { id: "yes_change", title: session.language === 'ar' ? "نعم" : "Yes" } },
+                                { type: "reply", reply: { id: "no_change", title: session.language === 'ar' ? "لا" : "No" } }
                             ]);
                             session.tempData = extractedData; // Store extracted data temporarily
                         } else {
-                            aiResponse = "Do you want to change your information?"; // Set aiResponse for voice generation
-                            await sendToWhatsApp(from, `${aiResponse}\n\nPlease provide more details about your request.`);
+                            aiResponse = session.language === 'ar'
+                                ? "من فضلك قدم المزيد من التفاصيل حول طلبك." // Arabic translation: "Please provide more details about your request."
+                                : "Please provide more details about your request."; // English
+                            await sendToWhatsApp(from, `${aiResponse}\n\n${session.language === 'ar' ? "من فضلك قدم المزيد من التفاصيل." : "Please provide more details."}`);
+                            // aiResponse = "Do you want to change your information?"; // Set aiResponse for voice generation
+                            // await sendToWhatsApp(from, `${aiResponse}\n\nPlease provide more details about your request.`);
                             session.inRequest = true; // Set the session to indicate the user is in a request flow
                         }
                     }
