@@ -1779,7 +1779,7 @@ app.post('/webhook', async (req, res) => {
                             { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
                         ]);
                     }
-                } else if (classification === "answer") {
+                }  else if (classification === "answer") {
                     // Handle answers
                     if (session.step === "ASK_NAME") {
                         if (!transcribedText) {
