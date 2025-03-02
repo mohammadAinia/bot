@@ -268,6 +268,8 @@ const isValidPhone = (phone) => {
     return regex.test(phone);
 };
 
+//البريد الإلكتروني: ${session.data.email || 'غير متوفر'}
+//Email: ${session.data.email || 'Not provided'}
 
 async function sendOrderSummary(to, session) {
     try {
@@ -291,7 +293,6 @@ async function sendOrderSummary(to, session) {
             ? `📝 *ملخص الطلب*\n
 الاسم: ${session.data.name || 'غير متوفر'}
 الهاتف: ${session.data.phone || 'غير متوفر'} 
-البريد الإلكتروني: ${session.data.email || 'غير متوفر'}
 المدينة: ${session.data.city || 'غير متوفر'}
 العنوان: ${session.data.address || 'غير متوفر'}
 الشارع: ${session.data.street || 'غير متوفر'}
@@ -301,7 +302,6 @@ async function sendOrderSummary(to, session) {
             : `📝 *Order Summary*\n
 Name: ${session.data.name || 'Not provided'}
 Phone: ${session.data.phone || 'Not provided'}
-Email: ${session.data.email || 'Not provided'}
 City: ${session.data.city || 'Not provided'}
 Address: ${session.data.address || 'Not provided'}
 Street: ${session.data.street || 'Not provided'}
@@ -334,6 +334,9 @@ Quantity: ${session.data.quantity || 'Not provided'} liters`;
         await sendToWhatsApp(to, "❌ An error occurred while generating your order summary.");
     }
 }
+//البريد الإلكتروني: ${session.data.email || 'غير متوفر'}
+//Email: ${session.data.email || 'Not provided'}
+
 const sendUpdatedSummary = async (to, session) => {
     try {
         // Ensure session exists
@@ -356,7 +359,6 @@ const sendUpdatedSummary = async (to, session) => {
             ? `📝 * ملخص الطلب بعد التعديل*\n
 الاسم: ${session.data.name || 'غير متوفر'}
 الهاتف: ${session.data.phone || 'غير متوفر'} 
-البريد الإلكتروني: ${session.data.email || 'غير متوفر'}
 المدينة: ${session.data.city || 'غير متوفر'}
 العنوان: ${session.data.address || 'غير متوفر'}
 الشارع: ${session.data.street || 'غير متوفر'}
@@ -366,7 +368,6 @@ const sendUpdatedSummary = async (to, session) => {
             : `📝 *Summary of the Order after modification*\n
 Name: ${session.data.name || 'Not provided'}
 Phone: ${session.data.phone || 'Not provided'}
-Email: ${session.data.email || 'Not provided'}
 City: ${session.data.city || 'Not provided'}
 Address: ${session.data.address || 'Not provided'}
 Street: ${session.data.street || 'Not provided'}
@@ -717,7 +718,7 @@ async function extractInformationFromText(text, language = "en") {
         return {
             name: null,
             phone: null,
-            email: null,
+            // email: null,
             address: null,
             street: null,
             building_name: null,
@@ -732,7 +733,7 @@ function getMissingFields(sessionData) {
     const orderedFields = [
         'name',
         'phone',
-        'email',
+        // 'email',
         'latitude',
         'longitude',
         'address',
@@ -782,9 +783,9 @@ async function askForNextMissingField(session, from) {
             case "city":
                 await sendCitySelection(from, lang);
                 break;
-            case "email":
-                await sendToWhatsApp(from, getEmailMessage(lang));
-                break;
+            // case "email":
+            //     await sendToWhatsApp(from, getEmailMessage(lang));
+            //     break;
             case "name":
                 await sendToWhatsApp(from, getNameMessage(lang));
                 break;
@@ -1616,72 +1617,6 @@ const isLink = (text) => {
     return urlPattern.test(text);
 };
 
-async function processUserMessage(from, message, session, res) {
-    const textRaw = message.text?.body || "";
-    const text = textRaw.toLowerCase().trim();
-
-    // Check if the message is a cancellation request
-    if (isCancellationRequest(textRaw)) {
-        await handleCancellationRequest(from, session, message, res);
-        return;
-    }
-
-    // Check if the message is a request or contains actionable information
-    const isRequest = await detectRequestStart(textRaw);
-    if (isRequest) {
-        session.inRequest = true;
-        const extractedData = await extractInformationFromText(textRaw, session.language);
-        session.data = { ...session.data, ...extractedData };
-
-        // Check for missing fields and proceed accordingly
-        const missingFields = getMissingFields(session.data);
-        if (missingFields.length > 0) {
-            session.step = `ASK_${missingFields[0].toUpperCase()}`;
-            await askForNextMissingField(session, from);
-        } else {
-            session.step = STATES.QUANTITY;
-            await sendQuantitySelection(from, session.language);
-        }
-        return;
-    }
-
-    // Handle other message types (e.g., questions, answers, etc.)
-    const classification = await isQuestionOrRequest(textRaw);
-    if (classification === "question") {
-        const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-        await sendToWhatsApp(from, aiResponse);
-    } else if (classification === "answer") {
-        // Handle answers based on the current step
-        switch (session.step) {
-            case STATES.NAME:
-                session.data.name = textRaw;
-                session.step = STATES.EMAIL;
-                await sendToWhatsApp(from, getEmailMessage(session.language));
-                break;
-            case STATES.EMAIL:
-                if (!isValidEmail(textRaw)) {
-                    await sendToWhatsApp(from, "❌ Please provide a valid email address (e.g., example@domain.com).");
-                    return;
-                }
-                session.data.email = textRaw;
-                session.step = STATES.LONGITUDE;
-                await sendToWhatsApp(from, getLocationMessage(session.language));
-                break;
-            // Add other cases as needed
-        }
-    } else if (classification === "greeting" || classification === "other") {
-        // Handle greetings or other cases
-        const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-        await sendToWhatsApp(from, aiResponse);
-    }
-}
-
-async function isGreetingOrGeneralInquiry(text) {
-    // Define a list of greetings or general inquiries
-    const greetings = ["hello", "hi", "how are you", "how can i submit a request", "help"];
-    return greetings.some(greeting => text.toLowerCase().includes(greeting));
-}
-
 // // Webhook endpoint
 app.post('/webhook', async (req, res) => {
     try {
@@ -1750,8 +1685,6 @@ app.post('/webhook', async (req, res) => {
 
         // Update lastActivityTimestamp for active sessions
         session.lastActivityTimestamp = Date.now();
-
-
 
         // Get an emoji reaction based on the user's message
         const emoji = await getEmojiReaction(textRaw, session.language);
@@ -2282,8 +2215,10 @@ app.post('/webhook', async (req, res) => {
                 } else {
                     if (textRaw.trim().length > 0) {
                         session.data.name = textRaw;
-                        session.step = STATES.EMAIL;
-                        await sendToWhatsApp(from, getEmailMessage(session.language));
+                        session.step = STATES.LONGITUDE;
+                        await sendToWhatsApp(from, getLocationMessage(session.language)); // Ask for location
+                        // session.step = STATES.EMAIL;
+                        // await sendToWhatsApp(from, getEmailMessage(session.language));
                     } else {
                         const errorMsg = session.language === 'ar'
                             ? "❌ يرجى تقديم اسم صحيح"
@@ -2929,7 +2864,7 @@ app.post('/webhook', async (req, res) => {
                     if (buttonId === "yes_confirm") {
                         const requestData = {
                             user_name: session.data.name,
-                            email: session.data.email,
+                            // email: session.data.email,
                             phone_number: session.data.phone,
                             city: session.data.city,
                             address: session.data.address,
