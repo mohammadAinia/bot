@@ -275,7 +275,15 @@ app.post('/webhook', async (req, res) => {
             INFANTS_PROMPT: {
                 en: "Please enter the number of infants:",
                 ar: "من فضلك قم بإدخال عدد الرضع:"
-            }
+            },
+            ADULT_PASSPORT_PHOTO_PROMPT: {
+                en: "Please send a passport photo for adult ",
+                ar: "من فضلك قم بإرسال صورة جواز السفر للبالغ "
+            },
+            CHILD_PASSPORT_PHOTO_PROMPT: {
+                en: "Please send a passport photo for child ",
+                ar: "من فضلك قم بإرسال صورة جواز السفر للطفل "
+            },
         };
 
         switch (session.step) {
@@ -451,45 +459,56 @@ app.post('/webhook', async (req, res) => {
             case "INFANTS":
                 if (!isNaN(userMessage) && parseInt(userMessage) >= 0) {
                     session.data.infants = parseInt(userMessage);
-                    await sendToWhatsApp(userPhone, messages.PASSPORT_PHOTO_PROMPT[session.language]);
-                    session.step = "PASSPORT_PHOTO";
+                    session.data.currentPerson = 1; // Start with the first adult
+                    session.data.passportPhotos = []; // Initialize an array to store passport photo IDs
+                    await sendToWhatsApp(userPhone, messages.ADULT_PASSPORT_PHOTO_PROMPT[session.language] + session.data.currentPerson);
+                    session.step = "COLLECT_PASSPORT_PHOTOS";
                 } else {
                     await sendToWhatsApp(userPhone, "Invalid input. Please enter a valid number of infants.");
                 }
                 break;
 
-            case "PASSPORT_PHOTO":
+            case "COLLECT_PASSPORT_PHOTOS":
                 if (message.type === "image") {
-                    session.data.passportPhoto = message.image.id;
-                    const summary = session.language === 'ar'
-                        ? `📝 *ملخص الحجز*\n
-            مدينة المغادرة: ${session.data.departureCity}
-            مدينة الوصول: ${session.data.arrivalCity}
-            نوع الرحلة: ${session.data.tripType === "one_way" ? "ذهاب فقط" : "ذهاب وعودة"}
-            تاريخ المغادرة: ${session.data.departureDate}
-            تاريخ العودة: ${session.data.returnDate || "غير متوفر"}
-            البريد الإلكتروني: ${session.data.email}
-            عدد البالغين: ${session.data.adults}
-            عدد الأطفال: ${session.data.children || 0}
-            عدد الرضع: ${session.data.infants || 0}`
-                        : `📝 *Reservation Summary*\n
-            Departure City: ${session.data.departureCity}
-            Arrival City: ${session.data.arrivalCity}
-            Trip Type: ${session.data.tripType === "one_way" ? "One Way" : "Round Trip"}
-            Departure Date: ${session.data.departureDate}
-            Return Date: ${session.data.returnDate || "N/A"}
-            Email: ${session.data.email}
-            Number of Adults: ${session.data.adults}
-            Number of Children: ${session.data.children || 0}
-            Number of Infants: ${session.data.infants || 0}`;
+                    session.data.passportPhotos.push(message.image.id);
 
-                    // Send the summary and buttons in a single interactive message
-                    await sendInteractiveButtons(userPhone, summary, [
-                        { id: "confirm", title: session.language === 'ar' ? "تأكيد ✅" : "Confirm ✅" },
-                        { id: "modify", title: session.language === 'ar' ? "تعديل ✏️" : "Modify ✏️" },
-                        { id: "delete", title: session.language === 'ar' ? "حذف 🗑️" : "Delete 🗑️" }
-                    ]);
-                    session.step = "CONFIRMATION";
+                    if (session.data.currentPerson < session.data.adults) {
+                        session.data.currentPerson++;
+                        await sendToWhatsApp(userPhone, messages.ADULT_PASSPORT_PHOTO_PROMPT[session.language] + session.data.currentPerson);
+                    } else if (session.data.currentPerson < session.data.adults + (session.data.children || 0)) {
+                        session.data.currentPerson++;
+                        await sendToWhatsApp(userPhone, messages.CHILD_PASSPORT_PHOTO_PROMPT[session.language] + (session.data.currentPerson - session.data.adults));
+                    } else {
+                        const summary = session.language === 'ar'
+                            ? `📝 *ملخص الحجز*\n
+                مدينة المغادرة: ${session.data.departureCity}
+                مدينة الوصول: ${session.data.arrivalCity}
+                نوع الرحلة: ${session.data.tripType === "one_way" ? "ذهاب فقط" : "ذهاب وعودة"}
+                تاريخ المغادرة: ${session.data.departureDate}
+                تاريخ العودة: ${session.data.returnDate || "غير متوفر"}
+                البريد الإلكتروني: ${session.data.email}
+                عدد البالغين: ${session.data.adults}
+                عدد الأطفال: ${session.data.children || 0}
+                عدد الرضع: ${session.data.infants || 0}`
+                            : `📝 *Reservation Summary*\n
+                Departure City: ${session.data.departureCity}
+                Arrival City: ${session.data.arrivalCity}
+                Trip Type: ${session.data.tripType === "one_way" ? "One Way" : "Round Trip"}
+                Departure Date: ${session.data.departureDate}
+                Return Date: ${session.data.returnDate || "N/A"}
+                Email: ${session.data.email}
+                Number of Adults: ${session.data.adults}
+                Number of Children: ${session.data.children || 0}
+                Number of Infants: ${session.data.infants || 0}`;
+
+                        // Send the summary and buttons in a single interactive message
+                        await sendInteractiveButtons(userPhone, summary, [
+                            { id: "confirm", title: session.language === 'ar' ? "تأكيد ✅" : "Confirm ✅" },
+                            { id: "modify", title: session.language === 'ar' ? "تعديل ✏️" : "Modify ✏️" },
+                            { id: "delete", title: session.language === 'ar' ? "حذف 🗑️" : "Delete 🗑️" }
+                        ]);
+                        session.step = "CONFIRMATION";
+                    }
                 } else {
                     await sendToWhatsApp(userPhone, messages.PASSPORT_PHOTO_PROMPT[session.language]);
                 }
