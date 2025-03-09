@@ -147,7 +147,6 @@ const sendCitySelection = async (to, language) => {
     });
 };
 
-
 const getOpenAIResponse = async (userMessage, context = "", language = "en") => {
     try {
         const systemMessage = `
@@ -171,8 +170,6 @@ const getOpenAIResponse = async (userMessage, context = "", language = "en") => 
         - No discounted prices currently.
         - 📍 Company Location: [Google Maps](https://maps.app.goo.gl/mbzekpz5bwrKkAte9)
     `;
-    
-    
 
         const messages = [
             { role: "system", content: systemMessage },
