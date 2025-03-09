@@ -145,6 +145,12 @@ app.get("/webhook", (req, res) => {
     }
 });
 
+const cities = [
+    { id: "riyadh", title: { en: "Riyadh", ar: "الرياض" } },
+    { id: "jeddah", title: { en: "Jeddah", ar: "جدة" } },
+    { id: "damascus", title: { en: "Damascus", ar: "دمشق" } }
+];
+
 // Handle incoming messages
 app.post('/webhook', async (req, res) => {
     try {
@@ -249,24 +255,30 @@ app.post('/webhook', async (req, res) => {
                     await sendToWhatsApp(userPhone, messages.INQUIRY_PROMPT[session.language]);
                     session.step = "HANDLE_INQUIRY";
                 } else if (userMessage === "book_ticket") {
-                    await sendToWhatsApp(userPhone, messages.DEPARTURE_CITY_PROMPT[session.language]);
-                    session.step = "DEPARTURE_CITY";
+                    await sendInteractiveButtons(userPhone, messages.DEPARTURE_CITY_PROMPT[session.language], [
+                        { id: "riyadh", title: cities[0].title[session.language] },
+                        { id: "jeddah", title: cities[1].title[session.language] },
+                        { id: "damascus", title: cities[2].title[session.language] }
+                    ]);
+                    session.step = "DEPARTURE_CITY_SELECTION";
                 }
                 break;
 
-            case "HANDLE_INQUIRY":
-                const response = await getOpenAIResponse(userMessage, session.language);
-                await sendToWhatsApp(userPhone, response);
-                session.step = "WELCOME"; // Reset to welcome step
+            case "DEPARTURE_CITY_SELECTION":
+                if (["riyadh", "jeddah", "damascus"].includes(userMessage)) {
+                    session.data.departureCity = userMessage;
+                    await sendInteractiveButtons(userPhone, messages.ARRIVAL_CITY_PROMPT[session.language], [
+                        { id: "riyadh", title: cities[0].title[session.language] },
+                        { id: "jeddah", title: cities[1].title[session.language] },
+                        { id: "damascus", title: cities[2].title[session.language] }
+                    ]);
+                    session.step = "ARRIVAL_CITY_SELECTION";
+                } else {
+                    await sendToWhatsApp(userPhone, "Invalid city selection. Please try again.");
+                }
                 break;
 
-            case "DEPARTURE_CITY":
-                session.data.departureCity = userMessage;
-                await sendToWhatsApp(userPhone, messages.ARRIVAL_CITY_PROMPT[session.language]);
-                session.step = "ARRIVAL_CITY";
-                break;
-
-            case "ARRIVAL_CITY":
+            case "ARRIVAL_CITY_SELECTION":
                 session.data.arrivalCity = userMessage;
                 await sendInteractiveButtons(userPhone, messages.TRIP_TYPE_PROMPT[session.language], [
                     { id: "one_way", title: session.language === 'ar' ? "ذهاب فقط" : "One Way" },
@@ -309,24 +321,25 @@ app.post('/webhook', async (req, res) => {
                     session.data.passportPhoto = message.image.id;
                     const summary = session.language === 'ar'
                         ? `📝 *ملخص الحجز*\n
-مدينة المغادرة: ${session.data.departureCity}
-مدينة الوصول: ${session.data.arrivalCity}
-نوع الرحلة: ${session.data.tripType === "one_way" ? "ذهاب فقط" : "ذهاب وعودة"}
-تاريخ المغادرة: ${session.data.departureDate}
-تاريخ العودة: ${session.data.returnDate || "غير متوفر"}
-البريد الإلكتروني: ${session.data.email}`
+                مدينة المغادرة: ${session.data.departureCity}
+                مدينة الوصول: ${session.data.arrivalCity}
+                نوع الرحلة: ${session.data.tripType === "one_way" ? "ذهاب فقط" : "ذهاب وعودة"}
+                تاريخ المغادرة: ${session.data.departureDate}
+                تاريخ العودة: ${session.data.returnDate || "غير متوفر"}
+                البريد الإلكتروني: ${session.data.email}`
                         : `📝 *Reservation Summary*\n
-Departure City: ${session.data.departureCity}
-Arrival City: ${session.data.arrivalCity}
-Trip Type: ${session.data.tripType === "one_way" ? "One Way" : "Round Trip"}
-Departure Date: ${session.data.departureDate}
-Return Date: ${session.data.returnDate || "N/A"}
-Email: ${session.data.email}`;
+                Departure City: ${session.data.departureCity}
+                Arrival City: ${session.data.arrivalCity}
+                Trip Type: ${session.data.tripType === "one_way" ? "One Way" : "Round Trip"}
+                Departure Date: ${session.data.departureDate}
+                Return Date: ${session.data.returnDate || "N/A"}
+                Email: ${session.data.email}`;
 
                     await sendToWhatsApp(userPhone, summary);
                     await sendInteractiveButtons(userPhone, messages.CONFIRMATION_PROMPT[session.language], [
                         { id: "confirm", title: session.language === 'ar' ? "تأكيد ✅" : "Confirm ✅" },
-                        { id: "cancel", title: session.language === 'ar' ? "إلغاء ❌" : "Cancel ❌" }
+                        { id: "modify", title: session.language === 'ar' ? "تعديل ✏️" : "Modify ✏️" },
+                        { id: "delete", title: session.language === 'ar' ? "حذف 🗑️" : "Delete 🗑️" }
                     ]);
                     session.step = "CONFIRMATION";
                 } else {
@@ -338,9 +351,12 @@ Email: ${session.data.email}`;
                 if (userMessage === "confirm") {
                     await sendToWhatsApp(userPhone, messages.SUCCESS_MESSAGE[session.language]);
                     delete userSessions[userPhone]; // Clear session
-                } else {
+                } else if (userMessage === "modify") {
+                    await sendToWhatsApp(userPhone, messages.DEPARTURE_CITY_PROMPT[session.language]);
+                    session.step = "DEPARTURE_CITY"; // Restart the booking process
+                } else if (userMessage === "delete") {
                     await sendToWhatsApp(userPhone, messages.CANCEL_MESSAGE[session.language]);
-                    session.step = "WELCOME";
+                    delete userSessions[userPhone]; // Clear session
                 }
                 break;
         }
