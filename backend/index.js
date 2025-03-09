@@ -272,20 +272,28 @@ app.post('/webhook', async (req, res) => {
                 break;
 
             case "HANDLE_INQUIRY":
-                if (userMessage) {
-                    // Get the OpenAI response for the user's inquiry
+                if (userMessage === "book_ticket") {
+                    // Handle the "Book a Ticket" button click
+                    await sendInteractiveButtons(userPhone, messages.DEPARTURE_CITY_PROMPT[session.language], [
+                        { id: "riyadh", title: cities[0].title[session.language] },
+                        { id: "jeddah", title: cities[1].title[session.language] },
+                        { id: "damascus", title: cities[2].title[session.language] }
+                    ]);
+                    session.step = "DEPARTURE_CITY_SELECTION";
+                } else if (userMessage) {
+                    // Handle user inquiries
                     const response = await getOpenAIResponse(userMessage, session.language);
 
-                    // Send the response to the user
-                    await sendToWhatsApp(userPhone, response);
-
-                    // Send a follow-up message with interactive buttons
+                    // Combine the response and follow-up message
                     const followUpMessage = session.language === 'ar'
-                        ? "يمكنك الاستمرار في طرح الأسئلة أو النقر على زر حجز تذكرة."
-                        : "You can continue asking questions or click on the Book a Ticket button.";
+                        ? `${response}\n\nيمكنك الاستمرار في طرح الأسئلة أو النقر على زر حجز تذكرة.`
+                        : `${response}\n\nYou can continue asking questions or click on the Book a Ticket button.`;
 
-                    await sendInteractiveButtons(userPhone, followUpMessage, [
-                        { id: "inquiry", title: session.language === 'ar' ? "استفسار" : "Inquiry" },
+                    // Send the combined message to the user
+                    await sendToWhatsApp(userPhone, followUpMessage);
+
+                    // Send interactive buttons in a separate message
+                    await sendInteractiveButtons(userPhone, "", [
                         { id: "book_ticket", title: session.language === 'ar' ? "حجز تذكرة" : "Book a Ticket" }
                     ]);
 
