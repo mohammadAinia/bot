@@ -5,11 +5,8 @@ import bodyParser from 'body-parser';
 import cors from 'cors';
 import fs from 'fs';
 import { OpenAI } from 'openai';
-import mime from 'mime-types';
-import path from 'path';
-import FormData from 'form-data';
 import langdetect from 'langdetect'; // Add language detection library
-//
+
 dotenv.config();
 
 if (!process.env.OPENAI_API_KEY || !process.env.WHATSAPP_API_URL || !process.env.WHATSAPP_ACCESS_TOKEN) {
@@ -208,6 +205,7 @@ const STATES = {
     TRIP_TYPE: "trip_type",
     DEPARTURE_DATE: "departure_date",
     RETURN_DATE: "return_date",
+    EMAIL: "email",
     PASSPORT_PHOTO: "passport_photo",
     CONFIRMATION: "confirmation"
 };
@@ -261,94 +259,83 @@ app.post('/webhook', async (req, res) => {
             session.language = detectLanguage(text); // Update session language
         }
 
-        // Handle button clicks
-        if (message.type === "interactive" && message.interactive.type === "button_reply") {
-            const buttonId = message.interactive.button_reply.id;
-
-            switch (buttonId) {
-                case "inquiry":
-                    session.step = STATES.INQUIRY;
-                    await sendToWhatsApp(from, session.language === 'ar' ? "ما هو استفسارك؟" : "What is your inquiry?");
-                    break;
-
-                case "reservation":
-                    session.step = STATES.DEPARTURE_CITY;
-                    await sendCitySelection(from, session.language);
-                    break;
-
-                default:
-                    console.warn("⚠️ Unknown button pressed:", buttonId);
-                    await sendToWhatsApp(from, session.language === 'ar' ? "حدث خطأ. يرجى المحاولة مرة أخرى." : "An error occurred. Please try again.");
-            }
-        }
-
         // Handle text messages
         if (message.type === "text") {
             const text = message.text.body;
 
-            switch (session.step) {
-                case STATES.INQUIRY:
-                    const response = await getOpenAIResponse(text, "", session.language);
-                    await sendToWhatsApp(from, response);
-                    session.step = STATES.WELCOME; // Reset to welcome state after inquiry
-                    break;
+            if (session.step === STATES.WELCOME) {
+                const welcomeMessage = session.language === 'ar'
+                    ? "مرحبًا بكم في شركة الشاهين للسفر والسياحة! كيف يمكننا مساعدتك اليوم؟"
+                    : "Welcome to Al Shaheen Travel and Tourism! How can we assist you today?";
 
-                case STATES.DEPARTURE_CITY:
-                    session.data.departureCity = text;
-                    session.step = STATES.ARRIVAL_CITY;
+                const buttons = [
+                    { id: "contact_us", title: session.language === 'ar' ? "اتصل بنا" : "Contact Us" },
+                    { id: "new_reservation", title: session.language === 'ar' ? "حجز تذكرة" : "Ticket Reservation" }
+                ];
+
+                await sendInteractiveButtons(from, welcomeMessage, buttons);
+                session.step = STATES.WELCOME;
+                userSessions[from] = session;
+            } else if (session.step === STATES.INQUIRY) {
+                const response = await getOpenAIResponse(text, "", session.language);
+                await sendToWhatsApp(from, response);
+            } else if (session.step === STATES.RESERVATION) {
+                if (text === "new_reservation") {
+                    session.step = STATES.DEPARTURE_CITY;
                     await sendCitySelection(from, session.language);
-                    break;
-
-                case STATES.ARRIVAL_CITY:
-                    session.data.arrivalCity = text;
-                    session.step = STATES.TRIP_TYPE;
-                    const tripTypeMessage = session.language === 'ar'
-                        ? "هل تريد حجز ذهاب فقط أم ذهاب وعودة؟"
-                        : "Do you want a one-way or round trip?";
-                    const tripTypeButtons = [
-                        { id: "one_way", title: session.language === 'ar' ? "ذهاب فقط" : "One Way" },
-                        { id: "round_trip", title: session.language === 'ar' ? "ذهاب وعودة" : "Round Trip" }
-                    ];
-                    await sendInteractiveButtons(from, tripTypeMessage, tripTypeButtons);
-                    break;
-
-                case STATES.TRIP_TYPE:
-                    session.data.tripType = text;
-                    session.step = STATES.DEPARTURE_DATE;
-                    await sendToWhatsApp(from, session.language === 'ar' ? "يرجى إدخال تاريخ المغادرة (YYYY-MM-DD):" : "Please enter the departure date (YYYY-MM-DD):");
-                    break;
-
-                case STATES.DEPARTURE_DATE:
-                    session.data.departureDate = text;
-                    if (session.data.tripType === "round_trip") {
-                        session.step = STATES.RETURN_DATE;
-                        await sendToWhatsApp(from, session.language === 'ar' ? "يرجى إدخال تاريخ العودة (YYYY-MM-DD):" : "Please enter the return date (YYYY-MM-DD):");
-                    } else {
-                        session.step = STATES.PASSPORT_PHOTO;
-                        await sendToWhatsApp(from, session.language === 'ar' ? "يرجى إرسال صورة جواز السفر." : "Please send a photo of your passport.");
-                    }
-                    break;
-
-                case STATES.RETURN_DATE:
-                    session.data.returnDate = text;
-                    session.step = STATES.PASSPORT_PHOTO;
+                }
+            } else if (session.step === STATES.DEPARTURE_CITY) {
+                session.data.departureCity = text;
+                session.step = STATES.ARRIVAL_CITY;
+                await sendCitySelection(from, session.language);
+            } else if (session.step === STATES.ARRIVAL_CITY) {
+                session.data.arrivalCity = text;
+                session.step = STATES.TRIP_TYPE;
+                const tripTypeMessage = session.language === 'ar'
+                    ? "هل تريد حجز ذهاب فقط أم ذهاب وعودة؟"
+                    : "Do you want a one-way or round trip?";
+                const tripTypeButtons = [
+                    { id: "one_way", title: session.language === 'ar' ? "ذهاب فقط" : "One Way" },
+                    { id: "round_trip", title: session.language === 'ar' ? "ذهاب وعودة" : "Round Trip" }
+                ];
+                await sendInteractiveButtons(from, tripTypeMessage, tripTypeButtons);
+            } else if (session.step === STATES.TRIP_TYPE) {
+                session.data.tripType = text;
+                session.step = STATES.DEPARTURE_DATE;
+                await sendToWhatsApp(from, session.language === 'ar' ? "يرجى إدخال تاريخ المغادرة (YYYY-MM-DD):" : "Please enter the departure date (YYYY-MM-DD):");
+            } else if (session.step === STATES.DEPARTURE_DATE) {
+                session.data.departureDate = text;
+                if (session.data.tripType === "round_trip") {
+                    session.step = STATES.RETURN_DATE;
+                    await sendToWhatsApp(from, session.language === 'ar' ? "يرجى إدخال تاريخ العودة (YYYY-MM-DD):" : "Please enter the return date (YYYY-MM-DD):");
+                } else {
+                    session.step = STATES.EMAIL;
+                    await sendToWhatsApp(from, session.language === 'ar' ? "يرجى إدخال بريدك الإلكتروني." : "Please provide your email address.");
+                }
+            } else if (session.step === STATES.RETURN_DATE) {
+                session.data.returnDate = text;
+                session.step = STATES.EMAIL;
+                await sendToWhatsApp(from, session.language === 'ar' ? "يرجى إدخال بريدك الإلكتروني." : "Please provide your email address.");
+            } else if (session.step === STATES.EMAIL) {
+                session.data.email = text;
+                session.step = STATES.PASSPORT_PHOTO;
+                await sendToWhatsApp(from, session.language === 'ar' ? "يرجى إرسال صورة جواز السفر." : "Please send a photo of your passport.");
+            } else if (session.step === STATES.PASSPORT_PHOTO) {
+                if (message.type === "image") {
+                    session.data.passportPhoto = message.image.id;
+                    session.step = STATES.CONFIRMATION;
+                    await sendReservationSummary(from, session);
+                } else {
                     await sendToWhatsApp(from, session.language === 'ar' ? "يرجى إرسال صورة جواز السفر." : "Please send a photo of your passport.");
-                    break;
-
-                case STATES.CONFIRMATION:
-                    if (text === "yes_confirm") {
-                        await sendToWhatsApp(from, session.language === 'ar' ? "تم تأكيد الحجز بنجاح!" : "Reservation confirmed successfully!");
-                        session.step = STATES.WELCOME;
-                    } else if (text === "no_correct") {
-                        session.step = STATES.RESERVATION;
-                        await sendToWhatsApp(from, session.language === 'ar' ? "يرجى إعادة إدخال معلومات الحجز." : "Please re-enter your reservation details.");
-                    }
-                    break;
-
-                default:
-                    console.warn("⚠️ Unrecognized state:", session.step);
+                }
+            } else if (session.step === STATES.CONFIRMATION) {
+                if (text === "yes_confirm") {
+                    await sendToWhatsApp(from, session.language === 'ar' ? "تم تأكيد الحجز بنجاح!" : "Reservation confirmed successfully!");
                     session.step = STATES.WELCOME;
-                    await sendToWhatsApp(from, session.language === 'ar' ? "حدث خطأ. يرجى المحاولة مرة أخرى." : "An error occurred. Please try again.");
+                } else if (text === "no_correct") {
+                    session.step = STATES.RESERVATION;
+                    await sendToWhatsApp(from, session.language === 'ar' ? "يرجى إعادة إدخال معلومات الحجز." : "Please re-enter your reservation details.");
+                }
             }
         }
 
@@ -368,13 +355,15 @@ const sendReservationSummary = async (to, session) => {
 مدينة الوصول: ${session.data.arrivalCity || 'غير متوفر'}
 نوع الرحلة: ${session.data.tripType === "one_way" ? "ذهاب فقط" : "ذهاب وعودة" || 'غير متوفر'}
 تاريخ المغادرة: ${session.data.departureDate || 'غير متوفر'}
-تاريخ العودة: ${session.data.returnDate || 'غير متوفر'}`
+تاريخ العودة: ${session.data.returnDate || 'غير متوفر'}
+البريد الإلكتروني: ${session.data.email || 'غير متوفر'}`
         : `📝 *Reservation Summary*\n
 Departure City: ${session.data.departureCity || 'Not provided'}
 Arrival City: ${session.data.arrivalCity || 'Not provided'}
 Trip Type: ${session.data.tripType === "one_way" ? "One Way" : "Round Trip" || 'Not provided'}
 Departure Date: ${session.data.departureDate || 'Not provided'}
-Return Date: ${session.data.returnDate || 'Not provided'}`;
+Return Date: ${session.data.returnDate || 'Not provided'}
+Email: ${session.data.email || 'Not provided'}`;
 
     const confirmationButtons = [
         {
