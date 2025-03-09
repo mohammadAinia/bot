@@ -4,6 +4,7 @@ import axios from 'axios';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import { OpenAI } from 'openai';
+import langdetect from 'langdetect'; // Add language detection library
 
 dotenv.config();
 
@@ -23,7 +24,7 @@ const VERIFY_TOKEN = "5IG[@ZFuM754";
 app.use(cors());
 app.use(bodyParser.json());
 
-// User sessions to store booking data
+// User sessions to store booking data and language
 const userSessions = {};
 
 // Send a message to WhatsApp
@@ -122,6 +123,17 @@ const getOpenAIResponse = async (userMessage, language = "en") => {
     }
 };
 
+// Detect user language
+const detectLanguage = (text) => {
+    try {
+        const detected = langdetect.detect(text);
+        return detected[0]?.lang || 'en'; // Default to English if detection fails
+    } catch (error) {
+        console.error('❌ Error detecting language:', error);
+        return 'en'; // Default to English
+    }
+};
+
 // Handle webhook verification
 app.get("/webhook", (req, res) => {
     if (req.query["hub.mode"] === "subscribe" && req.query["hub.verify_token"] === VERIFY_TOKEN) {
@@ -159,86 +171,151 @@ app.post('/webhook', async (req, res) => {
         if (!userSessions[userPhone]) {
             userSessions[userPhone] = {
                 step: "WELCOME",
-                data: {}
+                data: {},
+                language: detectLanguage(userMessage) // Detect user language
             };
         }
 
         const session = userSessions[userPhone];
 
+        // Update language if not already set
+        if (!session.language) {
+            session.language = detectLanguage(userMessage);
+        }
+
+        // Define messages in Arabic and English
+        const messages = {
+            WELCOME: {
+                en: "Welcome! How can I assist you today?",
+                ar: "مرحبًا! كيف يمكنني مساعدتك اليوم؟"
+            },
+            INQUIRY_PROMPT: {
+                en: "Please type your inquiry:",
+                ar: "من فضلك اكتب استفسارك:"
+            },
+            DEPARTURE_CITY_PROMPT: {
+                en: "Please provide the departure city:",
+                ar: "من فضلك قم بإدخال مدينة المغادرة:"
+            },
+            ARRIVAL_CITY_PROMPT: {
+                en: "Please provide the arrival city:",
+                ar: "من فضلك قم بإدخال مدينة الوصول:"
+            },
+            TRIP_TYPE_PROMPT: {
+                en: "Please select the trip type:",
+                ar: "من فضلك اختر نوع الرحلة:"
+            },
+            DEPARTURE_DATE_PROMPT: {
+                en: "Please provide the departure date (YYYY-MM-DD):",
+                ar: "من فضلك قم بإدخال تاريخ المغادرة (YYYY-MM-DD):"
+            },
+            RETURN_DATE_PROMPT: {
+                en: "Please provide the return date (YYYY-MM-DD):",
+                ar: "من فضلك قم بإدخال تاريخ العودة (YYYY-MM-DD):"
+            },
+            EMAIL_PROMPT: {
+                en: "Please provide your email:",
+                ar: "من فضلك قم بإدخال بريدك الإلكتروني:"
+            },
+            PASSPORT_PHOTO_PROMPT: {
+                en: "Please send a photo of your passport:",
+                ar: "من فضلك قم بإرسال صورة جواز السفر:"
+            },
+            CONFIRMATION_PROMPT: {
+                en: "Please confirm your booking:",
+                ar: "من فضلك قم بتأكيد الحجز:"
+            },
+            SUCCESS_MESSAGE: {
+                en: "The request was sent successfully!",
+                ar: "تم إرسال الطلب بنجاح!"
+            },
+            CANCEL_MESSAGE: {
+                en: "Booking canceled. You can start over.",
+                ar: "تم إلغاء الحجز. يمكنك البدء من جديد."
+            }
+        };
+
         switch (session.step) {
             case "WELCOME":
-                // Send welcome message with buttons
-                await sendInteractiveButtons(userPhone, "Welcome! How can I assist you today?", [
-                    { id: "inquiry", title: "Inquiry" },
-                    { id: "book_ticket", title: "Book a Ticket" }
+                await sendInteractiveButtons(userPhone, messages.WELCOME[session.language], [
+                    { id: "inquiry", title: session.language === 'ar' ? "استفسار" : "Inquiry" },
+                    { id: "book_ticket", title: session.language === 'ar' ? "حجز تذكرة" : "Book a Ticket" }
                 ]);
                 session.step = "ACTION_SELECTION";
                 break;
 
             case "ACTION_SELECTION":
                 if (userMessage === "inquiry") {
-                    await sendToWhatsApp(userPhone, "Please type your inquiry:");
+                    await sendToWhatsApp(userPhone, messages.INQUIRY_PROMPT[session.language]);
                     session.step = "HANDLE_INQUIRY";
                 } else if (userMessage === "book_ticket") {
-                    await sendToWhatsApp(userPhone, "Please provide the departure city:");
+                    await sendToWhatsApp(userPhone, messages.DEPARTURE_CITY_PROMPT[session.language]);
                     session.step = "DEPARTURE_CITY";
                 }
                 break;
 
             case "HANDLE_INQUIRY":
-                const response = await getOpenAIResponse(userMessage);
+                const response = await getOpenAIResponse(userMessage, session.language);
                 await sendToWhatsApp(userPhone, response);
                 session.step = "WELCOME"; // Reset to welcome step
                 break;
 
             case "DEPARTURE_CITY":
                 session.data.departureCity = userMessage;
-                await sendToWhatsApp(userPhone, "Please provide the arrival city:");
+                await sendToWhatsApp(userPhone, messages.ARRIVAL_CITY_PROMPT[session.language]);
                 session.step = "ARRIVAL_CITY";
                 break;
 
             case "ARRIVAL_CITY":
                 session.data.arrivalCity = userMessage;
-                await sendInteractiveButtons(userPhone, "Please select the trip type:", [
-                    { id: "one_way", title: "One Way" },
-                    { id: "round_trip", title: "Round Trip" }
+                await sendInteractiveButtons(userPhone, messages.TRIP_TYPE_PROMPT[session.language], [
+                    { id: "one_way", title: session.language === 'ar' ? "ذهاب فقط" : "One Way" },
+                    { id: "round_trip", title: session.language === 'ar' ? "ذهاب وعودة" : "Round Trip" }
                 ]);
                 session.step = "TRIP_TYPE";
                 break;
 
             case "TRIP_TYPE":
                 session.data.tripType = userMessage;
-                await sendToWhatsApp(userPhone, "Please provide the departure date (YYYY-MM-DD):");
+                await sendToWhatsApp(userPhone, messages.DEPARTURE_DATE_PROMPT[session.language]);
                 session.step = "DEPARTURE_DATE";
                 break;
 
             case "DEPARTURE_DATE":
                 session.data.departureDate = userMessage;
                 if (session.data.tripType === "round_trip") {
-                    await sendToWhatsApp(userPhone, "Please provide the return date (YYYY-MM-DD):");
+                    await sendToWhatsApp(userPhone, messages.RETURN_DATE_PROMPT[session.language]);
                     session.step = "RETURN_DATE";
                 } else {
-                    await sendToWhatsApp(userPhone, "Please provide your email:");
+                    await sendToWhatsApp(userPhone, messages.EMAIL_PROMPT[session.language]);
                     session.step = "EMAIL";
                 }
                 break;
 
             case "RETURN_DATE":
                 session.data.returnDate = userMessage;
-                await sendToWhatsApp(userPhone, "Please provide your email:");
+                await sendToWhatsApp(userPhone, messages.EMAIL_PROMPT[session.language]);
                 session.step = "EMAIL";
                 break;
 
             case "EMAIL":
                 session.data.email = userMessage;
-                await sendToWhatsApp(userPhone, "Please send a photo of your passport:");
+                await sendToWhatsApp(userPhone, messages.PASSPORT_PHOTO_PROMPT[session.language]);
                 session.step = "PASSPORT_PHOTO";
                 break;
 
             case "PASSPORT_PHOTO":
                 if (message.type === "image") {
                     session.data.passportPhoto = message.image.id;
-                    const summary = `📝 *Reservation Summary*\n
+                    const summary = session.language === 'ar'
+                        ? `📝 *ملخص الحجز*\n
+مدينة المغادرة: ${session.data.departureCity}
+مدينة الوصول: ${session.data.arrivalCity}
+نوع الرحلة: ${session.data.tripType === "one_way" ? "ذهاب فقط" : "ذهاب وعودة"}
+تاريخ المغادرة: ${session.data.departureDate}
+تاريخ العودة: ${session.data.returnDate || "غير متوفر"}
+البريد الإلكتروني: ${session.data.email}`
+                        : `📝 *Reservation Summary*\n
 Departure City: ${session.data.departureCity}
 Arrival City: ${session.data.arrivalCity}
 Trip Type: ${session.data.tripType === "one_way" ? "One Way" : "Round Trip"}
@@ -247,22 +324,22 @@ Return Date: ${session.data.returnDate || "N/A"}
 Email: ${session.data.email}`;
 
                     await sendToWhatsApp(userPhone, summary);
-                    await sendInteractiveButtons(userPhone, "Please confirm your booking:", [
-                        { id: "confirm", title: "Confirm ✅" },
-                        { id: "cancel", title: "Cancel ❌" }
+                    await sendInteractiveButtons(userPhone, messages.CONFIRMATION_PROMPT[session.language], [
+                        { id: "confirm", title: session.language === 'ar' ? "تأكيد ✅" : "Confirm ✅" },
+                        { id: "cancel", title: session.language === 'ar' ? "إلغاء ❌" : "Cancel ❌" }
                     ]);
                     session.step = "CONFIRMATION";
                 } else {
-                    await sendToWhatsApp(userPhone, "Please send a valid photo of your passport.");
+                    await sendToWhatsApp(userPhone, messages.PASSPORT_PHOTO_PROMPT[session.language]);
                 }
                 break;
 
             case "CONFIRMATION":
                 if (userMessage === "confirm") {
-                    await sendToWhatsApp(userPhone, "The request was sent successfully!");
+                    await sendToWhatsApp(userPhone, messages.SUCCESS_MESSAGE[session.language]);
                     delete userSessions[userPhone]; // Clear session
                 } else {
-                    await sendToWhatsApp(userPhone, "Booking canceled. You can start over.");
+                    await sendToWhatsApp(userPhone, messages.CANCEL_MESSAGE[session.language]);
                     session.step = "WELCOME";
                 }
                 break;
