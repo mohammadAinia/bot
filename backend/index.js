@@ -292,8 +292,8 @@ app.post('/webhook', async (req, res) => {
                     // Send the combined message to the user
                     await sendToWhatsApp(userPhone, followUpMessage);
 
-                    // Send interactive buttons in a separate message
-                    await sendInteractiveButtons(userPhone, "", [
+                    // Send interactive buttons in a separate message with a valid text
+                    await sendInteractiveButtons(userPhone, session.language === 'ar' ? "الرجاء اختيار خيار:" : "Please select an option:", [
                         { id: "book_ticket", title: session.language === 'ar' ? "حجز تذكرة" : "Book a Ticket" }
                     ]);
 
