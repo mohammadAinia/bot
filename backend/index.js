@@ -259,15 +259,36 @@ app.post('/webhook', async (req, res) => {
         if (message.type === "text") {
             const text = message.text.body;
             session.language = detectLanguage(text); // Update session language
+            session.step = STATES.WELCOME;
         }
 
-        if (message.type === "text") {
-            const text = message.text.body;
+        if (message.type === "interactive" && message.interactive.type === "button_reply") {
+            const buttonId = message.interactive.button_reply.id;
 
-            if (session.step === STATES.WELCOME) {
+            switch (buttonId) {
+                case "inquiry":
+                    session.step = STATES.INQUIRY;
+                    await sendToWhatsApp(from, session.language === 'ar' ? "ما هو استفسارك؟" : "What is your inquiry?");
+                    break;
+
+                case "reservation":
+                    session.step = STATES.DEPARTURE_CITY;
+                    await sendCitySelection(from, session.language);
+                    break;
+
+                default:
+                    console.warn("⚠️ Unknown button pressed:", buttonId);
+                    await sendToWhatsApp(from, session.language === 'ar' ? "حدث خطأ. يرجى المحاولة مرة أخرى." : "An error occurred. Please try again.");
+            }
+        }
+
+
+
+        switch (session.step) {
+            case STATES.WELCOME:
                 const welcomeMessage = session.language === 'ar'
-                    ? "مرحبًا بكم في شركة السفر والسياحة! كيف يمكننا مساعدتك اليوم؟"
-                    : "Welcome to the Travel and Tourism Company! How can we assist you today?";
+                    ? "مرحبًا بكم في شركة الشاهين للسفر والسياحة! كيف يمكننا مساعدتك اليوم؟"
+                    : "Welcome to the shaheen Travel and Tourism Company! How can we assist you today?";
 
                 const buttons = [
                     { id: "inquiry", title: session.language === 'ar' ? "استفسار" : "Inquiry" },
@@ -276,25 +297,27 @@ app.post('/webhook', async (req, res) => {
 
                 await sendInteractiveButtons(from, welcomeMessage, buttons);
                 session.step = STATES.WELCOME;
-                userSessions[from] = session;
-            } else if (session.step === STATES.INQUIRY) {
-                if (text === "inquiry") {
-                    session.step = STATES.INQUIRY;
-                    await sendToWhatsApp(from, session.language === 'ar' ? "ما هو استفسارك؟" : "What is your inquiry?");
-                } else {
-                    const response = await getOpenAIResponse(text, "", session.language);
-                    await sendToWhatsApp(from, response);
-                }
-            } else if (session.step === STATES.RESERVATION) {
-                if (text === "reservation") {
+                break;
+
+            case STATES.INQUIRY:
+                await sendToWhatsApp(from, session.language === 'ar' ? "ما هو استفسارك؟" : "What is your inquiry?");
+                const response = await getOpenAIResponse(text, "", session.language);
+                await sendToWhatsApp(from, response);
+                break;
+
+            case STATES.RESERVATION:
                     session.step = STATES.DEPARTURE_CITY;
                     await sendCitySelection(from, session.language);
-                }
-            } else if (session.step === STATES.DEPARTURE_CITY) {
+                
+                break;
+
+            case STATES.DEPARTURE_CITY:
                 session.data.departureCity = text;
                 session.step = STATES.ARRIVAL_CITY;
                 await sendCitySelection(from, session.language);
-            } else if (session.step === STATES.ARRIVAL_CITY) {
+                break;
+
+            case STATES.ARRIVAL_CITY:
                 session.data.arrivalCity = text;
                 session.step = STATES.TRIP_TYPE;
                 const tripTypeMessage = session.language === 'ar'
@@ -305,11 +328,15 @@ app.post('/webhook', async (req, res) => {
                     { id: "round_trip", title: session.language === 'ar' ? "ذهاب وعودة" : "Round Trip" }
                 ];
                 await sendInteractiveButtons(from, tripTypeMessage, tripTypeButtons);
-            } else if (session.step === STATES.TRIP_TYPE) {
+                break;
+
+            case STATES.TRIP_TYPE:
                 session.data.tripType = text;
                 session.step = STATES.DEPARTURE_DATE;
                 await sendToWhatsApp(from, session.language === 'ar' ? "يرجى إدخال تاريخ المغادرة (YYYY-MM-DD):" : "Please enter the departure date (YYYY-MM-DD):");
-            } else if (session.step === STATES.DEPARTURE_DATE) {
+                break;
+
+            case STATES.DEPARTURE_DATE:
                 session.data.departureDate = text;
                 if (session.data.tripType === "round_trip") {
                     session.step = STATES.RETURN_DATE;
@@ -318,11 +345,15 @@ app.post('/webhook', async (req, res) => {
                     session.step = STATES.PASSPORT_PHOTO;
                     await sendToWhatsApp(from, session.language === 'ar' ? "يرجى إرسال صورة جواز السفر." : "Please send a photo of your passport.");
                 }
-            } else if (session.step === STATES.RETURN_DATE) {
+                break;
+
+            case STATES.RETURN_DATE:
                 session.data.returnDate = text;
                 session.step = STATES.PASSPORT_PHOTO;
                 await sendToWhatsApp(from, session.language === 'ar' ? "يرجى إرسال صورة جواز السفر." : "Please send a photo of your passport.");
-            } else if (session.step === STATES.PASSPORT_PHOTO) {
+                break;
+
+            case STATES.PASSPORT_PHOTO:
                 if (message.type === "image") {
                     session.data.passportPhoto = message.image.id;
                     session.step = STATES.CONFIRMATION;
@@ -330,7 +361,9 @@ app.post('/webhook', async (req, res) => {
                 } else {
                     await sendToWhatsApp(from, session.language === 'ar' ? "يرجى إرسال صورة جواز السفر." : "Please send a photo of your passport.");
                 }
-            } else if (session.step === STATES.CONFIRMATION) {
+                break;
+
+            case STATES.CONFIRMATION:
                 if (text === "yes_confirm") {
                     await sendToWhatsApp(from, session.language === 'ar' ? "تم تأكيد الحجز بنجاح!" : "Reservation confirmed successfully!");
                     session.step = STATES.WELCOME;
@@ -338,7 +371,12 @@ app.post('/webhook', async (req, res) => {
                     session.step = STATES.RESERVATION;
                     await sendToWhatsApp(from, session.language === 'ar' ? "يرجى إعادة إدخال معلومات الحجز." : "Please re-enter your reservation details.");
                 }
-            }
+                break;
+
+            default:
+                console.warn("⚠️ Unrecognized state:", session.step);
+                session.step = STATES.WELCOME;
+                await sendToWhatsApp(from, session.language === 'ar' ? "حدث خطأ. يرجى المحاولة مرة أخرى." : "An error occurred. Please try again.");
         }
 
         userSessions[from] = session;
@@ -348,6 +386,7 @@ app.post('/webhook', async (req, res) => {
         return res.sendStatus(500);
     }
 });
+
 
 const sendReservationSummary = async (to, session) => {
     const language = session.language || 'en';
