@@ -95,14 +95,31 @@ const getOpenAIResponse = async (userMessage, language = "en") => {
         Company Details:
         - Working hours during Ramadan: 10 AM - 4 PM & 9 PM - 1 AM.
         - Ticket Prices:
-          - Riyadh to Damascus: 1840 SAR.
-          - Damascus to Riyadh: 1440 SAR.
+          - Adults: 
+            - Riyadh to Damascus: 1840 SAR.
+            - Damascus to Riyadh: 1440 SAR.
+          - Children (3 to 12 years old): 
+            - Riyadh to Damascus: 1300 SAR.
+            - Damascus to Riyadh: 1000 SAR.
+          - Infants (1 month to 2 years old): 
+            - Riyadh to Damascus: 200 SAR.
+            - Damascus to Riyadh: 200 SAR.
         - No flights available to Aleppo.
         - No flights from Dammam.
         - Available flights from Riyadh to Damascus this month: March 31, 14, and 16.
         - April flights are on Fridays and Sundays every week.
         - Flights available until October.
         - No discounted prices currently.
+        - Luggage Allowance:
+          - Each passenger is allowed 30 kg of luggage, which can be distributed into two bags.
+          - Additionally, each passenger is allowed 7 kg of hand luggage on the plane.
+          - There is no option to purchase additional bags.
+          - For excess weight, each additional kilo is charged at 33 SAR.
+        - Seat Selection:
+          - There is no service to choose a plane seat.
+        - Ticket Policies:
+          - Tickets are non-refundable.
+          - Modifications to tickets are allowed but incur a fee of 300 SAR.
         - 📍 Company Location: [Google Maps](https://maps.app.goo.gl/mbzekpz5bwrKkAte9)
     `;
 
@@ -238,6 +255,26 @@ app.post('/webhook', async (req, res) => {
             CANCEL_MESSAGE: {
                 en: "Booking canceled. You can start over.",
                 ar: "تم إلغاء الحجز. يمكنك البدء من جديد."
+            },
+            ADULTS_PROMPT: {
+                en: "Please add the number of adults:",
+                ar: "من فضلك قم بإدخال عدد البالغين:"
+            },
+            CHILDREN_QUESTION: {
+                en: "Are there any children (3 to 12 years old)?",
+                ar: "هل يوجد أطفال (من 3 إلى 12 سنة)؟"
+            },
+            CHILDREN_PROMPT: {
+                en: "Please enter the number of children:",
+                ar: "من فضلك قم بإدخال عدد الأطفال:"
+            },
+            INFANTS_QUESTION: {
+                en: "Are there any infants (up to 2 years old)?",
+                ar: "هل يوجد رضع (حتى سنتين)؟"
+            },
+            INFANTS_PROMPT: {
+                en: "Please enter the number of infants:",
+                ar: "من فضلك قم بإدخال عدد الرضع:"
             }
         };
 
@@ -284,16 +321,16 @@ app.post('/webhook', async (req, res) => {
                     // Handle user inquiries
                     const response = await getOpenAIResponse(userMessage, session.language);
 
-                    // Combine the response and follow-up message
+                    // Send the answer in the first message
+                    await sendToWhatsApp(userPhone, response);
+
+                    // Prepare the follow-up text
                     const followUpMessage = session.language === 'ar'
-                        ? `${response}\n\nيمكنك الاستمرار في طرح الأسئلة أو النقر على زر حجز تذكرة.`
-                        : `${response}\n\nYou can continue asking questions or click on the Book a Ticket button.`;
+                        ? "يمكنك الاستمرار في طرح الأسئلة أو النقر على زر حجز تذكرة."
+                        : "You can continue asking questions or click on the Book a Ticket button.";
 
-                    // Send the combined message to the user
-                    await sendToWhatsApp(userPhone, followUpMessage);
-
-                    // Send interactive buttons in a separate message with a valid text
-                    await sendInteractiveButtons(userPhone, session.language === 'ar' ? "الرجاء اختيار خيار:" : "Please select an option:", [
+                    // Send the follow-up text and button in the second message
+                    await sendInteractiveButtons(userPhone, followUpMessage, [
                         { id: "book_ticket", title: session.language === 'ar' ? "حجز تذكرة" : "Book a Ticket" }
                     ]);
 
@@ -353,8 +390,72 @@ app.post('/webhook', async (req, res) => {
 
             case "EMAIL":
                 session.data.email = userMessage;
-                await sendToWhatsApp(userPhone, messages.PASSPORT_PHOTO_PROMPT[session.language]);
-                session.step = "PASSPORT_PHOTO";
+                await sendToWhatsApp(userPhone, messages.ADULTS_PROMPT[session.language]);
+                session.step = "ADULTS";
+                break;
+
+            case "ADULTS":
+                if (!isNaN(userMessage) && parseInt(userMessage) > 0) {
+                    session.data.adults = parseInt(userMessage);
+                    await sendInteractiveButtons(userPhone, messages.CHILDREN_QUESTION[session.language], [
+                        { id: "yes", title: session.language === 'ar' ? "نعم" : "Yes" },
+                        { id: "no", title: session.language === 'ar' ? "لا" : "No" }
+                    ]);
+                    session.step = "CHILDREN_QUESTION";
+                } else {
+                    await sendToWhatsApp(userPhone, "Invalid input. Please enter a valid number of adults.");
+                }
+                break;
+
+            case "CHILDREN_QUESTION":
+                if (userMessage === "yes") {
+                    await sendToWhatsApp(userPhone, messages.CHILDREN_PROMPT[session.language]);
+                    session.step = "CHILDREN";
+                } else if (userMessage === "no") {
+                    await sendInteractiveButtons(userPhone, messages.INFANTS_QUESTION[session.language], [
+                        { id: "yes", title: session.language === 'ar' ? "نعم" : "Yes" },
+                        { id: "no", title: session.language === 'ar' ? "لا" : "No" }
+                    ]);
+                    session.step = "INFANTS_QUESTION";
+                } else {
+                    await sendToWhatsApp(userPhone, "Invalid input. Please select 'Yes' or 'No'.");
+                }
+                break;
+
+            case "CHILDREN":
+                if (!isNaN(userMessage) && parseInt(userMessage) >= 0) {
+                    session.data.children = parseInt(userMessage);
+                    await sendInteractiveButtons(userPhone, messages.INFANTS_QUESTION[session.language], [
+                        { id: "yes", title: session.language === 'ar' ? "نعم" : "Yes" },
+                        { id: "no", title: session.language === 'ar' ? "لا" : "No" }
+                    ]);
+                    session.step = "INFANTS_QUESTION";
+                } else {
+                    await sendToWhatsApp(userPhone, "Invalid input. Please enter a valid number of children.");
+                }
+                break;
+
+            case "INFANTS_QUESTION":
+                if (userMessage === "yes") {
+                    await sendToWhatsApp(userPhone, messages.INFANTS_PROMPT[session.language]);
+                    session.step = "INFANTS";
+                } else if (userMessage === "no") {
+                    session.data.infants = 0; // No infants
+                    await sendToWhatsApp(userPhone, messages.PASSPORT_PHOTO_PROMPT[session.language]);
+                    session.step = "PASSPORT_PHOTO";
+                } else {
+                    await sendToWhatsApp(userPhone, "Invalid input. Please select 'Yes' or 'No'.");
+                }
+                break;
+
+            case "INFANTS":
+                if (!isNaN(userMessage) && parseInt(userMessage) >= 0) {
+                    session.data.infants = parseInt(userMessage);
+                    await sendToWhatsApp(userPhone, messages.PASSPORT_PHOTO_PROMPT[session.language]);
+                    session.step = "PASSPORT_PHOTO";
+                } else {
+                    await sendToWhatsApp(userPhone, "Invalid input. Please enter a valid number of infants.");
+                }
                 break;
 
             case "PASSPORT_PHOTO":
@@ -362,19 +463,25 @@ app.post('/webhook', async (req, res) => {
                     session.data.passportPhoto = message.image.id;
                     const summary = session.language === 'ar'
                         ? `📝 *ملخص الحجز*\n
-مدينة المغادرة: ${session.data.departureCity}
-مدينة الوصول: ${session.data.arrivalCity}
-نوع الرحلة: ${session.data.tripType === "one_way" ? "ذهاب فقط" : "ذهاب وعودة"}
-تاريخ المغادرة: ${session.data.departureDate}
-تاريخ العودة: ${session.data.returnDate || "غير متوفر"}
-البريد الإلكتروني: ${session.data.email}`
+            مدينة المغادرة: ${session.data.departureCity}
+            مدينة الوصول: ${session.data.arrivalCity}
+            نوع الرحلة: ${session.data.tripType === "one_way" ? "ذهاب فقط" : "ذهاب وعودة"}
+            تاريخ المغادرة: ${session.data.departureDate}
+            تاريخ العودة: ${session.data.returnDate || "غير متوفر"}
+            البريد الإلكتروني: ${session.data.email}
+            عدد البالغين: ${session.data.adults}
+            عدد الأطفال: ${session.data.children || 0}
+            عدد الرضع: ${session.data.infants || 0}`
                         : `📝 *Reservation Summary*\n
-Departure City: ${session.data.departureCity}
-Arrival City: ${session.data.arrivalCity}
-Trip Type: ${session.data.tripType === "one_way" ? "One Way" : "Round Trip"}
-Departure Date: ${session.data.departureDate}
-Return Date: ${session.data.returnDate || "N/A"}
-Email: ${session.data.email}`;
+            Departure City: ${session.data.departureCity}
+            Arrival City: ${session.data.arrivalCity}
+            Trip Type: ${session.data.tripType === "one_way" ? "One Way" : "Round Trip"}
+            Departure Date: ${session.data.departureDate}
+            Return Date: ${session.data.returnDate || "N/A"}
+            Email: ${session.data.email}
+            Number of Adults: ${session.data.adults}
+            Number of Children: ${session.data.children || 0}
+            Number of Infants: ${session.data.infants || 0}`;
 
                     // Send the summary and buttons in a single interactive message
                     await sendInteractiveButtons(userPhone, summary, [
