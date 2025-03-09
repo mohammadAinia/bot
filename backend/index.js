@@ -132,7 +132,14 @@ app.post('/webhook', async (req, res) => {
         }
 
         const userPhone = message.from;
-        const userMessage = message.text?.body || "";
+        let userMessage = "";
+
+        // Check if the message is a button click
+        if (message.interactive && message.interactive.type === "button_reply") {
+            userMessage = message.interactive.button_reply.id; // Get the button ID
+        } else if (message.text) {
+            userMessage = message.text.body; // Get the text message
+        }
 
         // Initialize user session if it doesn't exist
         if (!userSessions[userPhone]) {
