@@ -359,7 +359,7 @@ app.post('/webhook', async (req, res) => {
                     delete userSessions[userPhone]; // Clear session
                 }
                 break;
-        }
+        }//
 
         return res.sendStatus(200);
     } catch (error) {
