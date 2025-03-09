@@ -243,7 +243,14 @@ app.post('/webhook', async (req, res) => {
 
         switch (session.step) {
             case "WELCOME":
-                await sendInteractiveButtons(userPhone, messages.WELCOME[session.language], [
+                // Generate a welcome message using OpenAI
+                const welcomeMessage = await getOpenAIResponse(
+                    "Generate a brief and friendly welcome message for a travel and tourism company. Keep it very short and include an emoji.",
+                    session.language
+                );
+
+                // Send the welcome message with interactive buttons
+                await sendInteractiveButtons(userPhone, welcomeMessage, [
                     { id: "inquiry", title: session.language === 'ar' ? "استفسار" : "Inquiry" },
                     { id: "book_ticket", title: session.language === 'ar' ? "حجز تذكرة" : "Book a Ticket" }
                 ]);
@@ -261,6 +268,32 @@ app.post('/webhook', async (req, res) => {
                         { id: "damascus", title: cities[2].title[session.language] }
                     ]);
                     session.step = "DEPARTURE_CITY_SELECTION";
+                }
+                break;
+
+            case "HANDLE_INQUIRY":
+                if (userMessage) {
+                    // Get the OpenAI response for the user's inquiry
+                    const response = await getOpenAIResponse(userMessage, session.language);
+
+                    // Send the response to the user
+                    await sendToWhatsApp(userPhone, response);
+
+                    // Send a follow-up message with interactive buttons
+                    const followUpMessage = session.language === 'ar'
+                        ? "يمكنك الاستمرار في طرح الأسئلة أو النقر على زر حجز تذكرة."
+                        : "You can continue asking questions or click on the Book a Ticket button.";
+
+                    await sendInteractiveButtons(userPhone, followUpMessage, [
+                        { id: "inquiry", title: session.language === 'ar' ? "استفسار" : "Inquiry" },
+                        { id: "book_ticket", title: session.language === 'ar' ? "حجز تذكرة" : "Book a Ticket" }
+                    ]);
+
+                    // Stay in the HANDLE_INQUIRY step to allow the user to continue asking questions
+                    session.step = "HANDLE_INQUIRY";
+                } else {
+                    // Prompt the user to type their inquiry
+                    await sendToWhatsApp(userPhone, messages.INQUIRY_PROMPT[session.language]);
                 }
                 break;
 
@@ -321,19 +354,19 @@ app.post('/webhook', async (req, res) => {
                     session.data.passportPhoto = message.image.id;
                     const summary = session.language === 'ar'
                         ? `📝 *ملخص الحجز*\n
-                مدينة المغادرة: ${session.data.departureCity}
-                مدينة الوصول: ${session.data.arrivalCity}
-                نوع الرحلة: ${session.data.tripType === "one_way" ? "ذهاب فقط" : "ذهاب وعودة"}
-                تاريخ المغادرة: ${session.data.departureDate}
-                تاريخ العودة: ${session.data.returnDate || "غير متوفر"}
-                البريد الإلكتروني: ${session.data.email}`
+مدينة المغادرة: ${session.data.departureCity}
+مدينة الوصول: ${session.data.arrivalCity}
+نوع الرحلة: ${session.data.tripType === "one_way" ? "ذهاب فقط" : "ذهاب وعودة"}
+تاريخ المغادرة: ${session.data.departureDate}
+تاريخ العودة: ${session.data.returnDate || "غير متوفر"}
+البريد الإلكتروني: ${session.data.email}`
                         : `📝 *Reservation Summary*\n
-                Departure City: ${session.data.departureCity}
-                Arrival City: ${session.data.arrivalCity}
-                Trip Type: ${session.data.tripType === "one_way" ? "One Way" : "Round Trip"}
-                Departure Date: ${session.data.departureDate}
-                Return Date: ${session.data.returnDate || "N/A"}
-                Email: ${session.data.email}`;
+Departure City: ${session.data.departureCity}
+Arrival City: ${session.data.arrivalCity}
+Trip Type: ${session.data.tripType === "one_way" ? "One Way" : "Round Trip"}
+Departure Date: ${session.data.departureDate}
+Return Date: ${session.data.returnDate || "N/A"}
+Email: ${session.data.email}`;
 
                     // Send the summary and buttons in a single interactive message
                     await sendInteractiveButtons(userPhone, summary, [
