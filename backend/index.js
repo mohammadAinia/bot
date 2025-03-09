@@ -335,8 +335,8 @@ app.post('/webhook', async (req, res) => {
                 Return Date: ${session.data.returnDate || "N/A"}
                 Email: ${session.data.email}`;
 
-                    await sendToWhatsApp(userPhone, summary);
-                    await sendInteractiveButtons(userPhone, messages.CONFIRMATION_PROMPT[session.language], [
+                    // Send the summary and buttons in a single interactive message
+                    await sendInteractiveButtons(userPhone, summary, [
                         { id: "confirm", title: session.language === 'ar' ? "تأكيد ✅" : "Confirm ✅" },
                         { id: "modify", title: session.language === 'ar' ? "تعديل ✏️" : "Modify ✏️" },
                         { id: "delete", title: session.language === 'ar' ? "حذف 🗑️" : "Delete 🗑️" }
@@ -359,7 +359,7 @@ app.post('/webhook', async (req, res) => {
                     delete userSessions[userPhone]; // Clear session
                 }
                 break;
-        }//
+        }
 
         return res.sendStatus(200);
     } catch (error) {
