@@ -8,7 +8,7 @@ import { OpenAI } from 'openai';
 import mime from 'mime-types';
 import path from 'path';
 import FormData from 'form-data';
-
+//
 dotenv.config();
 
 if (!process.env.OPENAI_API_KEY || !process.env.WHATSAPP_API_URL || !process.env.WHATSAPP_ACCESS_TOKEN) {
