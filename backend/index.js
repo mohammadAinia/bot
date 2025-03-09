@@ -8,6 +8,7 @@ import { OpenAI } from 'openai';
 import mime from 'mime-types';
 import path from 'path';
 import FormData from 'form-data';
+import langdetect from 'langdetect'; // Add language detection library
 //
 dotenv.config();
 
@@ -108,13 +109,9 @@ const sendCitySelection = async (to, language) => {
         : 'Please select your city from the list:';
 
     const cityOptions = [
-        { id: "abu_dhabi", title: language === 'ar' ? 'أبو ظبي' : 'Abu Dhabi' },
-        { id: "dubai", title: language === 'ar' ? 'دبي' : 'Dubai' },
-        { id: "sharjah", title: language === 'ar' ? 'الشارقة' : 'Sharjah' },
-        { id: "ajman", title: language === 'ar' ? 'عجمان' : 'Ajman' },
-        { id: "umm_al_quwain", title: language === 'ar' ? 'أم القيوين' : 'Umm Al Quwain' },
-        { id: "ras_al_khaimah", title: language === 'ar' ? 'رأس الخيمة' : 'Ras Al Khaimah' },
-        { id: "fujairah", title: language === 'ar' ? 'الفجيرة' : 'Fujairah' }
+        { id: "riyadh", title: language === 'ar' ? 'الرياض' : 'Riyadh' },
+        { id: "jeddah", title: language === 'ar' ? 'جدة' : 'Jeddah' },
+        { id: "damascus", title: language === 'ar' ? 'دمشق' : 'Damascus' }
     ];
 
     const payload = {
@@ -150,16 +147,32 @@ const sendCitySelection = async (to, language) => {
     });
 };
 
+
 const getOpenAIResponse = async (userMessage, context = "", language = "en") => {
     try {
         const systemMessage = `
-            You are a friendly and intelligent WhatsApp assistant for a travel and tourism company. 
-            Your goal is to assist users with their travel inquiries and reservations.
-            Always respond concisely, use emojis sparingly, and maintain a helpful attitude.
-            Generate the response in the user's language: ${language}.
-            Keep your responses very short and to the point. Each response should be no longer than 30 seconds when spoken.
-            For Arabic responses, ensure the answer is complete and concise, fitting within 100 tokens.
-        `;
+        You are a friendly and intelligent WhatsApp assistant for Al Shaheen Travel and Tourism Company. 
+        Your goal is to assist users with their travel inquiries and reservations.
+        Always respond concisely, use emojis sparingly, and maintain a helpful attitude.
+        Generate the response in the user's language: ${language}.
+        Keep your responses very short and to the point. Each response should be no longer than 30 seconds when spoken.
+        For Arabic responses, ensure the answer is complete and concise, fitting within 100 tokens.
+    
+        Company Details:
+        - Working hours during Ramadan: 10 AM - 4 PM & 9 PM - 1 AM.
+        - Ticket Prices:
+          - Riyadh to Damascus: 1840 SAR.
+          - Damascus to Riyadh: 1440 SAR.
+        - No flights available to Aleppo.
+        - No flights from Dammam.
+        - Available flights from Riyadh to Damascus this month: March 31, 14, and 16.
+        - April flights are on Fridays and Sundays every week.
+        - Flights available until October.
+        - No discounted prices currently.
+        - 📍 Company Location: [Google Maps](https://maps.app.goo.gl/mbzekpz5bwrKkAte9)
+    `;
+    
+    
 
         const messages = [
             { role: "system", content: systemMessage },
@@ -202,6 +215,17 @@ const STATES = {
     CONFIRMATION: "confirmation"
 };
 
+// Function to detect language
+const detectLanguage = (text) => {
+    try {
+        const detectedLanguage = langdetect.detect(text);
+        return detectedLanguage[0]?.lang || 'en'; // Default to English if detection fails
+    } catch (error) {
+        console.error('❌ Error detecting language:', error);
+        return 'en'; // Default to English
+    }
+};
+
 app.post('/webhook', async (req, res) => {
     try {
         console.log("🔹 Incoming Webhook Data:", JSON.stringify(req.body, null, 2));
@@ -234,6 +258,12 @@ app.post('/webhook', async (req, res) => {
 
         let session = userSessions[from] || { step: STATES.WELCOME, data: {}, language: "en" };
 
+        // Detect language from the user's message
+        if (message.type === "text") {
+            const text = message.text.body;
+            session.language = detectLanguage(text); // Update session language
+        }
+
         if (message.type === "text") {
             const text = message.text.body;
 
@@ -251,13 +281,15 @@ app.post('/webhook', async (req, res) => {
                 session.step = STATES.WELCOME;
                 userSessions[from] = session;
             } else if (session.step === STATES.INQUIRY) {
-                const response = await getOpenAIResponse(text, "", session.language);
-                await sendToWhatsApp(from, response);
-            } else if (session.step === STATES.RESERVATION) {
                 if (text === "inquiry") {
                     session.step = STATES.INQUIRY;
                     await sendToWhatsApp(from, session.language === 'ar' ? "ما هو استفسارك؟" : "What is your inquiry?");
-                } else if (text === "reservation") {
+                } else {
+                    const response = await getOpenAIResponse(text, "", session.language);
+                    await sendToWhatsApp(from, response);
+                }
+            } else if (session.step === STATES.RESERVATION) {
+                if (text === "reservation") {
                     session.step = STATES.DEPARTURE_CITY;
                     await sendCitySelection(from, session.language);
                 }
