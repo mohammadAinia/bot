@@ -1118,7 +1118,7 @@ async function checkUserRegistration(phoneNumber) {
             cleanedNumber = cleanedNumber.slice(3); // Remove UAE country code
         }
 
-        const response = await axios.get('https://dev.lootahbiofuels.com/api/v1/check-user', {
+        const response = await axios.get('https://api.lootahbiofuels.com/api/v1/check-user', {
             headers: {
                 'API-KEY': 'iUmcFyQUYa7l0u5J1aOxoGpIoh0iQSqpAlXX8Zho5vfxlTK4mXr41GvOHc4JwIkvltIUSoCDmc9VMbmJLajSIMK3NHx3M5ggaff8JMBTlZCryZlr8SmmhmYGGlmXo8uM',
                 'Accept': 'application/json',
@@ -2906,7 +2906,7 @@ app.post('/webhook', async (req, res) => {
                         };
                         console.log('Request Data:', requestData);
                         try {
-                            const response = await axios.post('https://dev.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
+                            const response = await axios.post('https://api.lootahbiofuels.com/api/v1/whatsapp_request', requestData, {
                                 headers: { 'Content-Type': 'application/json' },
                                 timeout: 5000
                             });
