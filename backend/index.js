@@ -1716,6 +1716,7 @@ app.post('/webhook', async (req, res) => {
                 if (user && user.name) {
                     // User is registered
                     if (Object.keys(extractedData).length === 0) {
+                        session.tempData = extractedData; // Store extracted data temporarily
                         // No extracted data, ask if they want to change their information
                         await sendInteractiveButtons(from, getTranslation("change_information", session.language), [
                             { type: "reply", reply: { id: "yes_change", title: getTranslation("yes", session.language) } },
