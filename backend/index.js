@@ -1645,7 +1645,7 @@ app.post('/webhook', async (req, res) => {
             console.error("❌ Error: Missing 'from' field in message.");
             return res.sendStatus(400);
         }
-//
+
         const messageId = message.id; // Get the message ID for reactions
         let textRaw = message.text?.body || "";
         console.log("🔹 User Action:", textRaw); // Log the user's message
@@ -1673,7 +1673,7 @@ app.post('/webhook', async (req, res) => {
             session = {
                 step: STATES.WELCOME,
                 data: user || { phone: from },
-                language: detectedLanguage, // Default language
+                language: detectedLanguage, // Set initial language based on the first message
                 inRequest: false,
                 lastTimestamp: Number(message.timestamp),
                 lastActivityTimestamp: Date.now()
@@ -1693,9 +1693,9 @@ app.post('/webhook', async (req, res) => {
         const text = textRaw.toLowerCase().trim();
 
 
-        // Update the session language
-        session.language = detectedLanguage;
+        //session.language = detectedLanguage;
 
+        // Handle text messages
         if (message.type === "text") {
             // Check if the user's message indicates the start of a request
             const isRequestStart = await detectRequestStart(textRaw);
