@@ -1617,55 +1617,40 @@ const isLink = (text) => {
     const urlPattern = /https?:\/\/[^\s]+/;
     return urlPattern.test(text);
 };
-import * as franc from 'franc'; // Import the entire module
+const franc = (await import('franc')).default;
 app.post('/webhook', async (req, res) => {
     console.log("🔹 Webhook request received."); // Debugging: Ensure the server is receiving requests
     try {
         console.log("🔹 Incoming Webhook Data:", JSON.stringify(req.body, null, 2));
-        if (!req.body.entry || !Array.isArray(req.body.entry) || req.body.entry.length === 0) {
-            console.error("❌ Error: Missing or invalid 'entry' in webhook payload.");
-            return res.sendStatus(400);
-        }
 
-        const entry = req.body.entry[0];
-        if (!entry.changes || !Array.isArray(entry.changes) || entry.changes.length === 0) {
-            console.error("❌ Error: Missing or invalid 'changes' in webhook payload.");
-            return res.sendStatus(400);
-        }
-
-        const changes = entry.changes[0];
-        const value = changes.value;
-        if (!value?.messages || !Array.isArray(value.messages) || value.messages.length === 0) {
-            console.warn("⚠️ No messages found in webhook payload. Ignoring event.");
-            return res.sendStatus(200);
-        }
-
-        const message = value.messages[0];
+        // Extract the message text
+        const message = req.body.entry[0]?.changes[0]?.value?.messages[0];
         const from = message.from;
+        const textRaw = message.text?.body || "";
 
-        if (!message?.from) {
-            console.error("❌ Error: Missing 'from' field in message.");
-            return res.sendStatus(400);
-        }
-
-        const messageId = message.id; // Get the message ID for reactions
-        let textRaw = message.text?.body || "";
         console.log("🔹 User Action:", textRaw); // Log the user's message
 
         let detectedLanguage = "en";
 
         // Use franc for language detection
         try {
+            console.log("🔹 Text to detect language:", textRaw); // Debugging: Log the input text
             detectedLanguage = franc(textRaw);
+            console.log("🔹 Detected Language Code (franc):", detectedLanguage); // Debugging: Log the raw output from franc
+
+            // Map franc language codes to your app's language codes
             if (detectedLanguage !== "ara" && detectedLanguage !== "eng") {
                 detectedLanguage = "eng"; // Default to English if not Arabic
             }
-            // Map franc language codes to your app's language codes
             detectedLanguage = detectedLanguage === "ara" ? "ar" : "en";
+
+            console.log("🔹 Mapped Language Code:", detectedLanguage); // Debugging: Log the final mapped language
         } catch (error) {
             console.log("⚠️ Language detection failed. Defaulting to English.", error);
+            detectedLanguage = "en"; // Fallback to English
         }
-        console.log("🔹 Detected Language:", detectedLanguage);
+
+        console.log("🔹 Final Detected Language:", detectedLanguage);
 
         // Initialize or retrieve the user session
         let session = userSessions[from];
@@ -1681,6 +1666,11 @@ app.post('/webhook', async (req, res) => {
                 lastActivityTimestamp: Date.now()
             };
             userSessions[from] = session;
+        } else {
+            // Update the session language if it's not already set
+            if (!session.language) {
+                session.language = detectedLanguage;
+            }
         }
 
         console.log("🔹 Session State:", session); // Log the session state
