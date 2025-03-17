@@ -4,7 +4,7 @@ import axios from 'axios';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import langdetect from 'langdetect';
-import franc from 'franc';
+const franc = require('franc'); // Use require instead of import
 
 import fs from 'fs';
 import { OpenAI } from 'openai';
