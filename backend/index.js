@@ -2070,7 +2070,7 @@ app.post('/webhook', async (req, res) => {
                 return res.sendStatus(200);
             }
         }
-//
+
         // Check if the user's message contains information
         if (session.step === STATES.WELCOME && message.type === "text") {
             // Check if the user's message indicates the start of a request
@@ -2090,32 +2090,14 @@ app.post('/webhook', async (req, res) => {
                 // Check if the user is registered
                 const user = await checkUserRegistration(from);
                 if (user && user.name) {
-                    // User is registered
-                    if (Object.keys(extractedData).length === 0) {
-                        // No extracted data, ask if they want to change their information
-                        await sendInteractiveButtons(from, getTranslation("change_information", session.language), [
-                            { type: "reply", reply: { id: "yes_change", title: getTranslation("yes", session.language) } },
-                            { type: "reply", reply: { id: "no_change", title: getTranslation("no", session.language) } }
-                        ]);
-                        session.step = STATES.CHANGE_INFOO;
-                    } else {
-                        // Extracted data is present, skip the question and proceed
-                        session.data = { ...session.data, ...extractedData }; // Merge extracted data with session data
-                        if (!session.data.phone) {
-                            session.data.phone = from; // Use the WhatsApp number as the default phone number
-                        }
+                    // User is registered, ask if they want to change their information
+                    session.tempData = extractedData; // Store extracted data temporarily
+                    await sendInteractiveButtons(from, getTranslation("change_information", session.language), [
+                        { type: "reply", reply: { id: "yes_change", title: getTranslation("yes", session.language) } },
+                        { type: "reply", reply: { id: "no_change", title: getTranslation("no", session.language) } }
+                    ]);
+                    session.step = STATES.CHANGE_INFOO;
 
-                        // Check for missing fields
-                        const missingFields = getMissingFields(session.data);
-                        if (missingFields.length > 0) {
-                            session.step = `ASK_${missingFields[0].toUpperCase()}`;
-                            await askForNextMissingField(session, from);
-                        } else {
-                            // If no missing fields, proceed to quantity selection
-                            session.step = STATES.QUANTITY;
-                            await sendQuantitySelection(from, session.language);
-                        }
-                    }
                 } else {
                     // User is not registered, start collecting information
                     session.data = { ...session.data, ...extractedData }; // Merge extracted data with session data
@@ -2152,6 +2134,7 @@ app.post('/webhook', async (req, res) => {
                         { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
                     ]);
                 }
+
             }
             return res.sendStatus(200);
         }
