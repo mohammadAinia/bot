@@ -4,6 +4,8 @@ import axios from 'axios';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import langdetect from 'langdetect';
+import franc from 'franc';
+
 import fs from 'fs';
 import { OpenAI } from 'openai';
 import mime from 'mime-types';
@@ -1618,7 +1620,7 @@ const isLink = (text) => {
 };
 
 app.post('/webhook', async (req, res) => {
-    console.log("hi")
+    console.log("🔹 Webhook request received."); // Debugging: Ensure the server is receiving requests
     try {
         console.log("🔹 Incoming Webhook Data:", JSON.stringify(req.body, null, 2));
         if (!req.body.entry || !Array.isArray(req.body.entry) || req.body.entry.length === 0) {
@@ -1653,14 +1655,14 @@ app.post('/webhook', async (req, res) => {
 
         let detectedLanguage = "en";
 
+        // Use franc for language detection
         try {
-            const detected = langdetect.detect(textRaw);
-            if (Array.isArray(detected) && detected.length > 0) {
-                detectedLanguage = detected[0].lang;
+            detectedLanguage = franc(textRaw);
+            if (detectedLanguage !== "ara" && detectedLanguage !== "eng") {
+                detectedLanguage = "eng"; // Default to English if not Arabic
             }
-            if (detectedLanguage !== "ar" && detectedLanguage !== "en") {
-                detectedLanguage = "en";
-            }
+            // Map franc language codes to your app's language codes
+            detectedLanguage = detectedLanguage === "ara" ? "ar" : "en";
         } catch (error) {
             console.log("⚠️ Language detection failed. Defaulting to English.", error);
         }
