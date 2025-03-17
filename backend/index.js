@@ -1617,7 +1617,7 @@ const isLink = (text) => {
     const urlPattern = /https?:\/\/[^\s]+/;
     return urlPattern.test(text);
 };
-import franc from 'franc';
+import * as franc from 'franc'; // Import the entire module
 app.post('/webhook', async (req, res) => {
     console.log("🔹 Webhook request received."); // Debugging: Ensure the server is receiving requests
     try {
