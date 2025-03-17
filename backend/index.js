@@ -1618,6 +1618,7 @@ const isLink = (text) => {
 };
 
 app.post('/webhook', async (req, res) => {
+    console.log("hi")
     try {
         console.log("🔹 Incoming Webhook Data:", JSON.stringify(req.body, null, 2));
         if (!req.body.entry || !Array.isArray(req.body.entry) || req.body.entry.length === 0) {
