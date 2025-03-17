@@ -2070,7 +2070,7 @@ app.post('/webhook', async (req, res) => {
                 return res.sendStatus(200);
             }
         }
-
+//
         // Check if the user's message contains information
         if (session.step === STATES.WELCOME && message.type === "text") {
             // Check if the user's message indicates the start of a request
