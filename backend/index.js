@@ -1633,22 +1633,22 @@ app.post('/webhook', async (req, res) => {
         let detectedLanguage = "en";
 
         // Use franc for language detection
-        try {
-            console.log("🔹 Text to detect language:", textRaw); // Debugging: Log the input text
-            detectedLanguage = franc(textRaw);
-            console.log("🔹 Detected Language Code (franc):", detectedLanguage); // Debugging: Log the raw output from franc
+        // try {
+        //     console.log("🔹 Text to detect language:", textRaw); // Debugging: Log the input text
+        //     detectedLanguage = franc(textRaw);
+        //     console.log("🔹 Detected Language Code (franc):", detectedLanguage); // Debugging: Log the raw output from franc
 
-            // Map franc language codes to your app's language codes
-            if (detectedLanguage !== "ara" && detectedLanguage !== "eng") {
-                detectedLanguage = "eng"; // Default to English if not Arabic
-            }
-            detectedLanguage = detectedLanguage === "ara" ? "ar" : "en";
+        //     // Map franc language codes to your app's language codes
+        //     if (detectedLanguage !== "ara" && detectedLanguage !== "eng") {
+        //         detectedLanguage = "eng"; // Default to English if not Arabic
+        //     }
+        //     detectedLanguage = detectedLanguage === "ara" ? "ar" : "en";
 
-            console.log("🔹 Mapped Language Code:", detectedLanguage); // Debugging: Log the final mapped language
-        } catch (error) {
-            console.log("⚠️ Language detection failed. Defaulting to English.", error);
-            detectedLanguage = "en"; // Fallback to English
-        }
+        //     console.log("🔹 Mapped Language Code:", detectedLanguage); // Debugging: Log the final mapped language
+        // } catch (error) {
+        //     console.log("⚠️ Language detection failed. Defaulting to English.", error);
+        //     detectedLanguage = "en"; // Fallback to English
+        // }
 
         console.log("🔹 Final Detected Language:", detectedLanguage);
 
