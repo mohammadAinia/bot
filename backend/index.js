@@ -4,7 +4,6 @@ import axios from 'axios';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import langdetect from 'langdetect';
-const franc = require('franc'); // Use require instead of import
 
 import fs from 'fs';
 import { OpenAI } from 'openai';
@@ -1618,7 +1617,7 @@ const isLink = (text) => {
     const urlPattern = /https?:\/\/[^\s]+/;
     return urlPattern.test(text);
 };
-
+import franc from 'franc';
 app.post('/webhook', async (req, res) => {
     console.log("🔹 Webhook request received."); // Debugging: Ensure the server is receiving requests
     try {
