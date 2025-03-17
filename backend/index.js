@@ -2077,34 +2077,52 @@ app.post('/webhook', async (req, res) => {
             const isRequestStart = await detectRequestStart(textRaw);
             if (isRequestStart) {
                 session.inRequest = true;
-
+        
                 const lang = session?.language || "en"; // Define lang based on session.language
-
+        
                 await sendToWhatsApp(from, lang === 'ar'
-                    ? "🔹 يمكنك إلغاء الطلب في أي وقت عن طريق كتابة 'إلغاء'او التسجيل الصوتي."
-                    : "🔹 You can cancel the order at any time by writing cancel or recording a voice message..");
-
+                    ? "🔹 يمكنك إلغاء الطلب في أي وقت عن طريق كتابة 'إلغاء' أو التسجيل الصوتي."
+                    : "🔹 You can cancel the order at any time by writing cancel or recording a voice message.");
+        
                 // Extract information from the user's message
                 const extractedData = await extractInformationFromText(textRaw, session.language);
-
+        
                 // Check if the user is registered
                 const user = await checkUserRegistration(from);
                 if (user && user.name) {
-                    // User is registered, ask if they want to change their information
-                    session.tempData = extractedData; // Store extracted data temporarily
-                    await sendInteractiveButtons(from, getTranslation("change_information", session.language), [
-                        { type: "reply", reply: { id: "yes_change", title: getTranslation("yes", session.language) } },
-                        { type: "reply", reply: { id: "no_change", title: getTranslation("no", session.language) } }
-                    ]);
-                    session.step = STATES.CHANGE_INFOO;
-
+                    // User is registered
+                    if (Object.keys(extractedData).length === 0) {
+                        // No extracted data, ask if they want to change their information
+                        await sendInteractiveButtons(from, getTranslation("change_information", session.language), [
+                            { type: "reply", reply: { id: "yes_change", title: getTranslation("yes", session.language) } },
+                            { type: "reply", reply: { id: "no_change", title: getTranslation("no", session.language) } }
+                        ]);
+                        session.step = STATES.CHANGE_INFOO;
+                    } else {
+                        // Extracted data is present, skip the question and proceed
+                        session.data = { ...session.data, ...extractedData }; // Merge extracted data with session data
+                        if (!session.data.phone) {
+                            session.data.phone = from; // Use the WhatsApp number as the default phone number
+                        }
+        
+                        // Check for missing fields
+                        const missingFields = getMissingFields(session.data);
+                        if (missingFields.length > 0) {
+                            session.step = `ASK_${missingFields[0].toUpperCase()}`;
+                            await askForNextMissingField(session, from);
+                        } else {
+                            // If no missing fields, proceed to quantity selection
+                            session.step = STATES.QUANTITY;
+                            await sendQuantitySelection(from, session.language);
+                        }
+                    }
                 } else {
                     // User is not registered, start collecting information
                     session.data = { ...session.data, ...extractedData }; // Merge extracted data with session data
                     if (!session.data.phone) {
                         session.data.phone = from; // Use the WhatsApp number as the default phone number
                     }
-
+        
                     // Check for missing fields
                     const missingFields = getMissingFields(session.data);
                     if (missingFields.length > 0) {
@@ -2119,13 +2137,13 @@ app.post('/webhook', async (req, res) => {
             } else {
                 // If the message is not a request, treat it as a general message
                 const aiResponse = await getOpenAIResponse(textRaw, systemMessage, session.language);
-
+        
                 if (session.inRequest) {
                     // User has started a request
                     const lang = session?.language || "en"; // Define lang based on session.language
                     await sendToWhatsApp(from, `${aiResponse}\n\n${lang === 'ar'
-                        ? "🔹من فضلك اكمل اجراءات الطلب"
-                        : "🔹Please complete the application process."}`);
+                        ? "🔹 من فضلك أكمل إجراءات الطلب."
+                        : "🔹 Please complete the application process."}`);
                 } else {
                     // User has not started a request
                     const reply = `${aiResponse}\n\n${getContinueMessage(session.language)}`;
@@ -2134,7 +2152,6 @@ app.post('/webhook', async (req, res) => {
                         { type: "reply", reply: { id: "new_request", title: getButtonTitle("new_request", session.language) } }
                     ]);
                 }
-
             }
             return res.sendStatus(200);
         }
