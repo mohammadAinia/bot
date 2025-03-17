@@ -1645,7 +1645,7 @@ app.post('/webhook', async (req, res) => {
             console.error("❌ Error: Missing 'from' field in message.");
             return res.sendStatus(400);
         }
-
+//
         const messageId = message.id; // Get the message ID for reactions
         let textRaw = message.text?.body || "";
         console.log("🔹 User Action:", textRaw); // Log the user's message
